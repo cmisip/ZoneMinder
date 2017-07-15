@@ -15,14 +15,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-
 #ifndef ZM_FFMPEG_CAMERA_H
 #define ZM_FFMPEG_CAMERA_H
 
 #include "zm_camera.h"
 
 #include "zm_buffer.h"
-//#include "zm_utils.h"
 #include "zm_ffmpeg.h"
 #include "zm_videostore.h"
 #include "zm_packetqueue.h"
@@ -115,15 +113,17 @@ class FfmpegCamera : public Camera {
     
     Monitor::Function cfunction;
     
-    struct motion_vector {
-    char x_vector;
-    char y_vector;
+    struct motion_vector { //SW vectors will be 4x4, HW vectors will be 16x16
+    //char x_vector;    //displacement
+    //char y_vector;
     uint16_t xcoord;  //location of top left corner
     uint16_t ycoord;
-    uint8_t width;    //dimensions of macroblock
-    uint8_t height;
+    //uint8_t width;    //dimensions of macroblock
+    //uint8_t height;
     //unsigned short sad;
   };
+  
+  
   
     FfmpegCamera( int p_id, const std::string &path, const std::string &p_method, const std::string &p_options, int p_width, int p_height, int p_colours, int p_brightness, int p_contrast, int p_hue, int p_colour, bool p_capture, bool p_record_audio, h264_codec ictype, Monitor::Function cfunction );
     ~FfmpegCamera();

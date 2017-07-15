@@ -223,7 +223,7 @@ if (!( cfunction == Monitor::MVDECT )) {
 }
 
         
-        {   
+      {   
         mvect_buffer=image.VectBuffer();   
         if (mvect_buffer ==  NULL ){
                 Error("Failed requesting vector buffer for the captured image.");
@@ -231,7 +231,11 @@ if (!( cfunction == Monitor::MVDECT )) {
         } else
                 memset(mvect_buffer,0,image.mv_size);
         
-                       }
+        
+        
+      }
+
+     
         
 if (!ctype) { //motion vectors from software h264 decoding
             
@@ -239,11 +243,11 @@ if (!ctype) { //motion vectors from software h264 decoding
             AVFrameSideData *sd=NULL;
 
             sd = av_frame_get_side_data(mRawFrame, AV_FRAME_DATA_MOTION_VECTORS);
-            uint16_t vector_ceiling=(mRawFrame->width * mRawFrame->height)/64;  //FIXMEC, just max number of 8x8 macroblocks that can fit, hope its enough
+            uint16_t vector_ceiling=((((mRawFrame->width * mRawFrame->height)/16)*(double)20)/100);  //FIXMEC, just 20% of the maximum number of 4x4 blocks that will fit
         
             if (sd) {
                    
-                   uint16_t offset=sizeof(uint16_t);
+                   uint8_t offset=sizeof(uint16_t)*2;
                    const AVMotionVector *mvs = (const AVMotionVector *)sd->data;
                    uint16_t size=sd->size / sizeof(AVMotionVector);
                    uint16_t vec_count=0;
@@ -252,24 +256,35 @@ if (!ctype) { //motion vectors from software h264 decoding
                       
                         motion_vector mvt;
                         
-                        mvt.x_vector = mv->src_x - mv->dst_x;
-                        mvt.y_vector = mv->src_y - mv->dst_y;
+                        int x_disp = mv->src_x - mv->dst_x;
+                        int y_disp = mv->src_y - mv->dst_y;
                         
                        // if ((mvt.x_vector == 0) && (mvt.y_vector == 0))
                         //    continue;
                         
                         
-                        if ((abs(mvt.x_vector) + abs(mvt.y_vector)) < 1)
+                        if ((abs(x_disp) + abs(y_disp)) < 1)
                             continue;
                         
-                        mvt.height = mv->h;
-                        mvt.width = mv->w;
-                        mvt.xcoord = mv->dst_x;
-                        mvt.ycoord = mv->dst_y;
-                        vec_count++;
+                       
+                       
                         
-                        memcpy(mvect_buffer+offset,&mvt,sizeof(motion_vector));
-                        offset+=sizeof(motion_vector);
+                        
+                        for (uint16_t i=0 ; i< mv->w/4; i++) {
+                           for (uint16_t j=0 ; j< mv->h/4; j++) {
+                                mvt.xcoord=mv->dst_x+i*4;
+                                mvt.ycoord=mv->dst_y+j*4;
+                                
+                                memcpy(mvect_buffer+offset,&mvt,sizeof(motion_vector));
+                                offset+=sizeof(motion_vector);
+                                vec_count++;
+                           }
+                       }
+                        
+                        
+                        
+                        
+                        
                         
                       
                         if (size > vector_ceiling) {  
@@ -279,8 +294,11 @@ if (!ctype) { //motion vectors from software h264 decoding
                         }    
                         
                     }
-                       memcpy(mvect_buffer,&vec_count, 2);
-                    Info("FFMPEG SW VEC_COUNT %d", vec_count);
+                       memcpy(mvect_buffer,&vec_count, 2); //size on first byte
+                       uint16_t vec_type = 1;
+                         
+                       memcpy(mvect_buffer,&vec_type, 4);   //type of vector at 3rd byte
+                    Info("FFMPEG SW VEC_COUNT %d, ceiling %d", vec_count, vector_ceiling);
                
             } 
         }    
@@ -288,7 +306,7 @@ if (!ctype) { //motion vectors from software h264 decoding
 #ifdef __arm__        
  if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels and there are a fixed number covering the entire frame.
                 MMAL_BUFFER_HEADER_T *buffer;
-                MMAL_BUFFER_HEADER_T *fbuffer;
+               // MMAL_BUFFER_HEADER_T *fbuffer;
                 
                 //send free buffer to encoder
                 if ((buffer = mmal_queue_get(pool_out->queue)) != NULL) {
@@ -334,29 +352,35 @@ if (!ctype) { //motion vectors from software h264 decoding
                         mmal_buffer_header_mem_unlock(buffer);
                         
                         
-                        int offset=2;
                         
+                        uint8_t offset=sizeof(uint16_t)*2;
+                        uint16_t vector_ceiling=(((mRawFrame->width * mRawFrame->height)/256)*(double)20)/100;
                         uint16_t vec_count=0;
                         for (int i=0;i < size ; i++) {
                             motion_vector mvt;
                             
-                            mvt.x_vector = mvarray[i].x_vector;
-                            mvt.y_vector = mvarray[i].y_vector;
-                            
-                            if ((abs(mvt.x_vector) + abs(mvt.y_vector)) < 1)
+                            if ((abs(mvarray[i].x_vector) + abs(mvarray[i].y_vector)) < 1)
                                continue;
-                            
-                            mvt.height = 16;
-                            mvt.width = 16;
+                          
                             mvt.xcoord = (i*16) % (mVideoCodecContext->width + 16);
                             mvt.ycoord = ((i*16)/(mVideoCodecContext->width+16))*16;
                             vec_count++;
                             
                             memcpy(mvect_buffer+offset,&mvt,sizeof(motion_vector));
                             offset+=sizeof(motion_vector);
+                            
+                            if (size > vector_ceiling) {  
+                            memset(mvect_buffer,0,image.mv_size);
+                            size=0;
+                            break;
+                        }    
+                            
                          } 
-                         memcpy(mvect_buffer,&vec_count, 2);
-                         Info("FFMPEG HW VEC_COUNT %d", vec_count);
+                         memcpy(mvect_buffer,&vec_count, 2);  //size at first byte
+                         uint16_t vec_type = 0;
+                         
+                         memcpy(mvect_buffer,&vec_type, 4);   //type of vector at 3rd byte
+                         Info("FFMPEG HW VEC_COUNT %d, ceiling %d", vec_count, vector_ceiling);
                         
                       } 
                     
@@ -843,7 +867,7 @@ int FfmpegCamera::ReopenFfmpeg() {
 int FfmpegCamera::CloseFfmpeg(){
 
   Debug(2, "CloseFfmpeg called.");
-#if __arm__
+#ifdef __arm__
   if (ctype) {
      CloseMmal();
   }

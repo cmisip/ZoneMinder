@@ -209,6 +209,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
     uint16_t maximum_vector_coverage=((double)max_alarm_pixels/polygon.Area())*100; //worst case assumed, all vectors could be thrown out
     
     uint16_t size=0;
+    uint16_t vec_type;
     uint16_t vec_count=0;
     uint16_t x_sum=0;
     uint16_t y_sum=0;
@@ -218,11 +219,11 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
     //first 16bit value is size
     if (mvect_buffer) {
         memcpy(&size,mvect_buffer,2);
+        memcpy(&vec_type,mvect_buffer+2,2);
     }
     struct motion_vector mvarray[size];
                         
-    memcpy(mvarray,mvect_buffer+2,size*sizeof(motion_vector));
-    //Because we don't decompose during capture anymore, the size does not reflect number of 4x4 blocks
+    memcpy(mvarray,mvect_buffer+4,size*sizeof(motion_vector));
     
         for (int i = 0; i < size; i++) {
                 motion_vector *mv = &mvarray[i];
@@ -234,16 +235,20 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
                     uint16_t x;
                     uint16_t y;
                         
-                //Decompose into 4x4 macroblocks to get sum of x and y, can be used to get coordinates also 
-                for (uint16_t i=0 ; i< mv->width/4; i++) {
-                           for (uint16_t j=0 ; j< mv->height/4; j++) {
+                if (vec_type == 0 )  //hardware macroblock with size of 16x16, there are 16 4x4 blocks in each one
+                  for (uint16_t i=0 ; i< 4; i++) {
+                           for (uint16_t j=0 ; j< 4; j++) {
                                 x=mv->xcoord+i*4;
                                 y=mv->ycoord+j*4;
                                 x_sum+=x;
                                 y_sum+=y;   
                                 vec_count++;
                            }
-                }
+                  }
+                else //software macroblock with size of 4x4
+                  vec_count++;  
+             
+                
                      
                        
         }
@@ -260,7 +265,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
     //User expects value of percent min_alarm_pixels and max_alarm_pixels to be 0-100, I think 0.0 - 0.2 is practical (corresponding to percentages 0-100)
     
     
-    bool result=score > minimum_vector_coverage && score < maximum_vector_coverage;
+   // bool result=score > minimum_vector_coverage && score < maximum_vector_coverage;
     
    // if (result) {
    //    Info("ALARM | SCORE ==> %d | VECS ==> %d(%d) | vector threshold %d <> %d |SCORE RANGE ==> %d  <>  %d", score, vec_count, num_blocks, minimum_vector_threshold, maximum_vector_threshold,  minimum_vector_coverage, maximum_vector_coverage);
