@@ -224,15 +224,6 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
     memcpy(mvarray,mvect_buffer+2,size*sizeof(motion_vector));
     //Because we don't decompose during capture anymore, the size does not reflect number of 4x4 blocks
     
-    //Decompose here as a pretest
-    /*int num_blocks=0;
-    for (int i = 0; i < size; i++) {
-        motion_vector *mv = &mvarray[i];
-        num_blocks+=((mv->height/4)*(mv->width/4));
-    }*/
-    
-    
-   // if ((num_blocks>minimum_vector_threshold) && (num_blocks<maximum_vector_threshold)) {
         for (int i = 0; i < size; i++) {
                 motion_vector *mv = &mvarray[i];
                  
@@ -260,11 +251,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
         if (vec_count) {
           alarm_centre=Coord((uint16_t)(x_sum/vec_count),(uint16_t)(y_sum/vec_count));
         }
-        
-  // }  else {
-       //Info("Size is too big or small at %d", num_blocks);
-    //   return false;
-  // } 
+  
    
     alarm_pixels = vec_count*20 ; //4 pixels per 4x4 macroblock multiplied by the skew value
     score = ((double) alarm_pixels/(polygon.Area()))*100;  //score adjusted to faux pixel values for users who insist on using pixels for setting min_alarm_pixels and max_alarm_pixels instead of percentages, value is in the stat UI of the event score. 

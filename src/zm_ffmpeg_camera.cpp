@@ -215,20 +215,23 @@ int FfmpegCamera::Capture( Image &image ) {
         
 
         
-        uint8_t* mvect_buffer=image.VectBuffer();
-        if (mvect_buffer ==  NULL ){
-                Error("Failed requesting vector buffer for the captured image.");
-                return (-1); 
-        } else
-                memset(mvect_buffer,0,image.mv_size);
-        
-        
+ 
+      uint8_t* mvect_buffer=NULL;     
 if (!( cfunction == Monitor::MVDECT )) {     
     //Info("Camera Function is not MVDECT.. Will not capture motion vectors.");
     goto end;
 }
 
         
+        {   
+        mvect_buffer=image.VectBuffer();   
+        if (mvect_buffer ==  NULL ){
+                Error("Failed requesting vector buffer for the captured image.");
+                return (-1); 
+        } else
+                memset(mvect_buffer,0,image.mv_size);
+        
+                       }
         
 if (!ctype) { //motion vectors from software h264 decoding
             
@@ -277,7 +280,7 @@ if (!ctype) { //motion vectors from software h264 decoding
                         
                     }
                        memcpy(mvect_buffer,&vec_count, 2);
-                    //Info("FFMPEG SW VEC_COUNT %d", vec_count);
+                    Info("FFMPEG SW VEC_COUNT %d", vec_count);
                
             } 
         }    
@@ -353,7 +356,7 @@ if (!ctype) { //motion vectors from software h264 decoding
                             offset+=sizeof(motion_vector);
                          } 
                          memcpy(mvect_buffer,&vec_count, 2);
-                        // Info("FFMPEG HW VEC_COUNT %d", vec_count);
+                         Info("FFMPEG HW VEC_COUNT %d", vec_count);
                         
                       } 
                     
