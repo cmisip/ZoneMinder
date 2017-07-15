@@ -287,7 +287,7 @@ if (!ctype) { //motion vectors from software h264 decoding
                         
                         
                       
-                        if (size > vector_ceiling) {  
+                        if (vec_count > vector_ceiling) {  
                             memset(mvect_buffer,0,image.mv_size);
                             size=0;
                             break;
@@ -369,7 +369,7 @@ if (!ctype) { //motion vectors from software h264 decoding
                             memcpy(mvect_buffer+offset,&mvt,sizeof(motion_vector));
                             offset+=sizeof(motion_vector);
                             
-                            if (size > vector_ceiling) {  
+                            if (vec_count > vector_ceiling) {  
                             memset(mvect_buffer,0,image.mv_size);
                             size=0;
                             break;
