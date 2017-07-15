@@ -203,6 +203,7 @@ $sourceTypes = array(
     'Remote' => translate('Remote'),
     'File'   => translate('File'),
     'Ffmpeg' => translate('Ffmpeg'),
+    'Ffmpeghw' => translate('Ffmpeghw'),
     'Libvlc' => translate('Libvlc'),
     'cURL'   => 'cURL (HTTP(S) only)'
     );
@@ -561,17 +562,17 @@ if ( canEdit( 'Monitors' ) ) {
         <input type="hidden" name="newMonitor[Port]" value="<?php echo validHtmlStr($newMonitor['Port']) ?>"/>
 <?php
     }
-    if ( $tab != 'source' || ($newMonitor['Type'] != 'Local' && $newMonitor['Type'] != 'Remote' && $newMonitor['Type'] != 'Ffmpeg' && $newMonitor['Type'] != 'Libvlc') ) {
+    if ( $tab != 'source' || ($newMonitor['Type'] != 'Local' && $newMonitor['Type'] != 'Remote' && $newMonitor['Type'] != 'Ffmpeg' && $newMonitor['Type'] != 'Ffmpeghw' && $newMonitor['Type'] != 'Libvlc') ) {
 ?>
         <input type="hidden" name="newMonitor[Method]" value="<?php echo validHtmlStr($newMonitor['Method']) ?>"/>
 <?php
     }
-    if ( $tab != 'source' || ($newMonitor['Type'] != 'Ffmpeg' && $newMonitor['Type'] != 'Libvlc' )) {
+    if ( $tab != 'source' || ($newMonitor['Type'] != 'Ffmpeg' && $newMonitor['Type'] != 'Ffmpeghw' && $newMonitor['Type'] != 'Libvlc' )) {
 ?>
         <input type="hidden" name="newMonitor[Options]" value="<?php echo validHtmlStr($newMonitor['Options']) ?>"/>
 <?php
     }
-    if ( $tab != 'source' || ($newMonitor['Type'] != 'Remote' && $newMonitor['Type'] != 'File' && $newMonitor['Type'] != 'Ffmpeg' && $newMonitor['Type'] != 'Libvlc' && $newMonitor['Type'] != 'cURL') ) {
+    if ( $tab != 'source' || ($newMonitor['Type'] != 'Remote' && $newMonitor['Type'] != 'File' && $newMonitor['Type'] != 'Ffmpeg' && $newMonitor['Type'] != 'Ffmpeghw' && $newMonitor['Type'] != 'Libvlc' && $newMonitor['Type'] != 'cURL') ) {
 ?>
         <input type="hidden" name="newMonitor[Path]" value="<?php echo validHtmlStr($newMonitor['Path']) ?>"/>
         <input type="hidden" name="newMonitor[User]" value="<?php echo validHtmlStr($newMonitor['User']) ?>"/>
@@ -826,7 +827,7 @@ switch ( $tab ) {
             <tr><td><?php echo 'Username' ?></td><td><input type="text" name="newMonitor[User]" value="<?php echo validHtmlStr($newMonitor['User']) ?>" size="12"/></td></tr>
             <tr><td><?php echo 'Password' ?></td><td><input type="text" name="newMonitor[Pass]" value="<?php echo validHtmlStr($newMonitor['Pass']) ?>" size="12"/></td></tr>
 <?php
-      } elseif ( $newMonitor['Type'] == 'Ffmpeg' || $newMonitor['Type'] == 'Libvlc' ) {
+      } elseif ( $newMonitor['Type'] == 'Ffmpeg' || $newMonitor['Type'] == 'Ffmpeghw' || $newMonitor['Type'] == 'Libvlc' ) {
 ?>
             <tr><td><?php echo translate('SourcePath') ?></td><td><input type="text" name="newMonitor[Path]" value="<?php echo validHtmlStr($newMonitor['Path']) ?>" size="36"/></td></tr>
             <tr><td><?php echo translate('RemoteMethod') ?>&nbsp;(<?php echo makePopupLink('?view=optionhelp&amp;option=OPTIONS_RTSPTrans', 'zmOptionHelp', 'optionhelp', '?' ) ?>)</td><td><?php echo buildSelect( "newMonitor[Method]", $rtspFFMpegMethods ); ?></td></tr>

@@ -188,6 +188,128 @@ bool Zone::CheckExtendAlarmCount() {
   return false;
 } // end bool Zone::CheckExtendAlarmCount
 
+
+bool Zone::CheckAlarms( uint8_t *& mvect_buffer) { 
+    ResetStats();  
+    alarm_centre=Coord(0,0);
+   
+    if ( overload_count ) {
+    Info( "In overload mode, %d frames of %d remaining", overload_count, overload_frames );
+    Debug( 4, "In overload mode, %d frames of %d remaining", overload_count, overload_frames );
+    overload_count--;
+    return( false );
+  }
+    
+    //uint16_t maximum_vector_threshold=(polygon.Area()/16); //16 is the size of a 4x4 macroblock
+    
+    //CONFIG section
+    //USE the AlarmedPixels Method and Percent Units to set the Min/Max Alarmed Area
+    //uint16_t minimum_vector_threshold=(double)min_alarm_pixels/20;  //20 is 4 pixels per macroblock multiplied by the skew value of 5
+    uint16_t minimum_vector_coverage=((double)min_alarm_pixels/polygon.Area())*100; //best case assumed, all vectors are within polygon resulting in minimum score
+    uint16_t maximum_vector_coverage=((double)max_alarm_pixels/polygon.Area())*100; //worst case assumed, all vectors could be thrown out
+    
+    uint16_t size=0;
+    uint16_t vec_count=0;
+    uint16_t x_sum=0;
+    uint16_t y_sum=0;
+    
+    
+    
+    //first 16bit value is size
+    if (mvect_buffer) {
+        memcpy(&size,mvect_buffer,2);
+    }
+    struct motion_vector mvarray[size];
+                        
+    memcpy(mvarray,mvect_buffer+2,size*sizeof(motion_vector));
+    //Because we don't decompose during capture anymore, the size does not reflect number of 4x4 blocks
+    
+    //Decompose here as a pretest
+    /*int num_blocks=0;
+    for (int i = 0; i < size; i++) {
+        motion_vector *mv = &mvarray[i];
+        num_blocks+=((mv->height/4)*(mv->width/4));
+    }*/
+    
+    
+   // if ((num_blocks>minimum_vector_threshold) && (num_blocks<maximum_vector_threshold)) {
+        for (int i = 0; i < size; i++) {
+                motion_vector *mv = &mvarray[i];
+                 
+                //Are the vectors inside the zone polygon?
+                if (!polygon.isInside(Coord(mv->xcoord,mv->ycoord)))      
+                    continue;
+                
+                    uint16_t x;
+                    uint16_t y;
+                        
+                //Decompose into 4x4 macroblocks to get sum of x and y, can be used to get coordinates also 
+                for (uint16_t i=0 ; i< mv->width/4; i++) {
+                           for (uint16_t j=0 ; j< mv->height/4; j++) {
+                                x=mv->xcoord+i*4;
+                                y=mv->ycoord+j*4;
+                                x_sum+=x;
+                                y_sum+=y;   
+                                vec_count++;
+                           }
+                }
+                     
+                       
+        }
+        
+        if (vec_count) {
+          alarm_centre=Coord((uint16_t)(x_sum/vec_count),(uint16_t)(y_sum/vec_count));
+        }
+        
+  // }  else {
+       //Info("Size is too big or small at %d", num_blocks);
+    //   return false;
+  // } 
+   
+    alarm_pixels = vec_count*20 ; //4 pixels per 4x4 macroblock multiplied by the skew value
+    score = ((double) alarm_pixels/(polygon.Area()))*100;  //score adjusted to faux pixel values for users who insist on using pixels for setting min_alarm_pixels and max_alarm_pixels instead of percentages, value is in the stat UI of the event score. 
+    //possible values 0 to 500 where 100 is equal to .2 
+    //0-100 values mean 0.0 to 0.2,  anything higher probably won't happen since there are not very many vectors but this can be adjusted in the code in the future if testing can show a more practical range of values
+    //User expects value of percent min_alarm_pixels and max_alarm_pixels to be 0-100, I think 0.0 - 0.2 is practical (corresponding to percentages 0-100)
+    
+    
+    bool result=score > minimum_vector_coverage && score < maximum_vector_coverage;
+    
+   // if (result) {
+   //    Info("ALARM | SCORE ==> %d | VECS ==> %d(%d) | vector threshold %d <> %d |SCORE RANGE ==> %d  <>  %d", score, vec_count, num_blocks, minimum_vector_threshold, maximum_vector_threshold,  minimum_vector_coverage, maximum_vector_coverage);
+   // } else
+   //    Info("IDLE  | SCORE ==> %d | VECS ==> %d(%d) | vector threshold %d <> %d |SCORE RANGE ==> %d  <>  %d", score, vec_count, num_blocks, minimum_vector_threshold, maximum_vector_threshold,  minimum_vector_coverage, maximum_vector_coverage);
+ 
+    
+    
+    if( score ) {
+      if( min_alarm_pixels && (score < minimum_vector_coverage) ) {
+        /* Not enough pixels alarmed */
+        return (false);
+      } else if( max_alarm_pixels && (score > maximum_vector_coverage) ) {
+        /* Too many pixels alarmed */
+        overload_count = overload_frames;
+        return (false);
+      }
+    } else {
+      /* No pixels */
+      return (false);
+    }
+    
+    
+    if ( type == INCLUSIVE ) {
+    // score >>= 1;
+    score /= 2;
+    } else if ( type == EXCLUSIVE ) {
+    // score <<= 1;
+    score *= 2;
+    }
+    
+    Debug( 5, "Adjusted score is %d", score );
+    return true; 
+};
+
+
 bool Zone::CheckAlarms( const Image *delta_image ) {
   ResetStats();
 

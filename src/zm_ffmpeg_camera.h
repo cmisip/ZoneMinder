@@ -15,7 +15,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-// 
 
 #ifndef ZM_FFMPEG_CAMERA_H
 #define ZM_FFMPEG_CAMERA_H
@@ -27,6 +26,14 @@
 #include "zm_ffmpeg.h"
 #include "zm_videostore.h"
 #include "zm_packetqueue.h"
+
+#ifdef __arm__
+extern "C" {
+#include "interface/mmal/mmal.h"
+#include "interface/mmal/util/mmal_default_components.h"
+#include "interface/mmal/util/mmal_util_params.h"
+}
+#endif
 
 //
 // Class representing 'ffmpeg' cameras, i.e. those which are
@@ -82,11 +89,43 @@ class FfmpegCamera : public Camera {
 #if HAVE_LIBSWSCALE
     struct SwsContext   *mConvertContext;
 #endif
-
     int64_t             startTime;
 
   public:
-    FfmpegCamera( int p_id, const std::string &path, const std::string &p_method, const std::string &p_options, int p_width, int p_height, int p_colours, int p_brightness, int p_contrast, int p_hue, int p_colour, bool p_capture, bool p_record_audio );
+      
+#ifdef __arm__
+    MMAL_COMPONENT_T *encoder;
+    MMAL_POOL_T *pool_in, *pool_out;
+
+    struct CONTEXT_T {
+    MMAL_QUEUE_T *queue;
+    } context;
+
+    struct mmal_motion_vector {
+     char x_vector;
+     char y_vector; 
+     short sad;
+    };
+#endif
+    enum h264_codec {
+        software,
+        hardware
+    };
+    h264_codec ctype; 
+    
+    Monitor::Function cfunction;
+    
+    struct motion_vector {
+    char x_vector;
+    char y_vector;
+    uint16_t xcoord;  //location of top left corner
+    uint16_t ycoord;
+    uint8_t width;    //dimensions of macroblock
+    uint8_t height;
+    //unsigned short sad;
+  };
+  
+    FfmpegCamera( int p_id, const std::string &path, const std::string &p_method, const std::string &p_options, int p_width, int p_height, int p_colours, int p_brightness, int p_contrast, int p_hue, int p_colour, bool p_capture, bool p_record_audio, h264_codec ictype, Monitor::Function cfunction );
     ~FfmpegCamera();
 
     const std::string &Path() const { return( mPath ); }
@@ -101,6 +140,14 @@ class FfmpegCamera : public Camera {
     int Capture( Image &image );
     int CaptureAndRecord( Image &image, timeval recording, char* event_directory );
     int PostCapture();
+    
+#ifdef __arm__
+    static void input_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
+    static void output_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
+    int OpenMmal(AVCodecContext *mVideoCodecContext);
+    int CloseMmal();
+#endif
 };
 
 #endif // ZM_FFMPEG_CAMERA_H
+

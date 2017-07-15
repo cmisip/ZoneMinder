@@ -60,6 +60,7 @@ public:
     NONE=1,
     MONITOR,
     MODECT,
+    MVDECT,
     RECORD,
     MOCORD,
     NODECT
@@ -454,7 +455,7 @@ public:
   int Capture();
   int PostCapture();
 
-  unsigned int DetectMotion( const Image &comp_image, Event::StringSet &zoneSet );
+  unsigned int DetectMotion( const Image &comp_image, Event::StringSet &zoneSet, Function function );
    // DetectBlack seems to be unused. Check it on zm_monitor.cpp for more info.
    //unsigned int DetectBlack( const Image &comp_image, Event::StringSet &zoneSet );
   bool CheckSignal( const Image *image );
@@ -476,6 +477,7 @@ public:
   static int LoadRemoteMonitors( const char *protocol, const char *host, const char*port, const char*path, Monitor **&monitors, Purpose purpose );
   static int LoadFileMonitors( const char *file, Monitor **&monitors, Purpose purpose );
 #if HAVE_LIBAVFORMAT
+  static int LoadFfmpegMonitorsHW( const char *file, Monitor **&monitors, Purpose purpose );
   static int LoadFfmpegMonitors( const char *file, Monitor **&monitors, Purpose purpose );
 #endif // HAVE_LIBAVFORMAT
   static Monitor *Load( unsigned int id, bool load_zones, Purpose purpose );

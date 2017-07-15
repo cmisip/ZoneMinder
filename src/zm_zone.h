@@ -46,6 +46,17 @@ public:
   typedef enum { ACTIVE=1, INCLUSIVE, EXCLUSIVE, PRECLUSIVE, INACTIVE, PRIVACY } ZoneType;
   typedef enum { ALARMED_PIXELS=1, FILTERED_PIXELS, BLOBS } CheckMethod;
 
+  
+  struct motion_vector {
+    char x_vector;
+    char y_vector;
+    uint16_t xcoord;  //location of top left corner
+    uint16_t ycoord;
+    uint8_t width;    //dimensions of macroblock
+    uint8_t height;
+    unsigned short sad;
+};
+
 protected:
   // Inputs
   Monitor      *monitor;
@@ -153,6 +164,7 @@ public:
   }
   void RecordStats( const Event *event );
   bool CheckAlarms( const Image *delta_image );
+  bool CheckAlarms( uint8_t *& mvect_buffer);
   bool DumpSettings( char *output, bool verbose );
 
   static bool ParsePolygonString( const char *polygon_string, Polygon &polygon );

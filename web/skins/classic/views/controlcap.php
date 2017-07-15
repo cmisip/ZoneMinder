@@ -345,7 +345,7 @@ switch ( $tab )
 ?>
             <tr><th scope="row"><?php echo translate('Name') ?></th><td><input type="text" name="newControl[Name]" value="<?php echo validHtmlStr($newControl['Name']) ?>" size="24"/></td></tr>
 <?php
-        $types = array( 'Local'=>translate('Local'), 'Remote'=>translate('Remote'), 'Ffmpeg'=>translate('Ffmpeg'), 'Libvlc'=>translate('Libvlc'), 'cURL'=>"cURL");
+        $types = array( 'Local'=>translate('Local'), 'Remote'=>translate('Remote'), 'Ffmpeg'=>translate('Ffmpeg'), 'Ffmpeghw'=>translate('Ffmpeghw'), 'Libvlc'=>translate('Libvlc'), 'cURL'=>"cURL");
 ?>
             <tr><th scope="row"><?php echo translate('Type') ?></th><td><?php echo buildSelect( "newControl[Type]", $types ); ?></td></tr>
             <tr><th scope="row"><?php echo translate('Protocol') ?></th><td><input type="text" name="newControl[Protocol]" value="<?php echo validHtmlStr($newControl['Protocol']) ?>" size="24"/></td></tr>
