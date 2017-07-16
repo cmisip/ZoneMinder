@@ -382,7 +382,7 @@ if (!ctype) { //motion vectors from software h264 decoding
                             
                             if (vec_count > vector_ceiling) {  
                               memset(mvect_buffer,0,vector_ceiling);
-.                              vec_count=0;
+                              vec_count=0;
                               break;
                             }    
                             
