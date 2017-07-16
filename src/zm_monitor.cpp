@@ -370,10 +370,10 @@ Monitor::Monitor(
   Debug( 1, "monitor purpose=%d", purpose );
 
   uint16_t mv_buffer_size= 0;
-  if (camera->Type()  == 3 ) //Software
-          mv_buffer_size = ( ((((width * height)/16)*(double)20)/100)+2);
-  if (camera->Type()  == 6 ) //Hardware
-          mv_buffer_size = ( ((((width * height)/256)*(double)20)/100)+2);
+  if (camera->Type()  == Camera::FFMPEG_SRC ) //Software
+          mv_buffer_size = ( ((((width * height)/16)*(double)20)/100)+4);
+  if (camera->Type()  == Camera::FFMPEGHW_SRC ) //Hardware
+          mv_buffer_size = ( ((((width * height)/256)*(double)20)/100)+4);
   
   
   mem_size = sizeof(SharedData)
@@ -567,16 +567,14 @@ bool Monitor::connect() {
   image_buffer = new Snapshot[image_buffer_count];
 
 
-  //uint16_t mv_buffer_size=(((width*height)/16)*8)+2; 
   uint16_t mv_buffer_size=0;
-  if (camera->Type()  == 3 )
-      mv_buffer_size = ( ((((width * height)/16)*(double)20)/100)+2);
+  if (camera->Type()  == Camera::FFMPEG_SRC )
+      mv_buffer_size = ( ((((width * height)/16)*(double)20)/100)+4);
   
-  if (camera->Type()  == 6 )
-      mv_buffer_size = ( ((((width * height)/256)*(double)20)/100)+2);
+  if (camera->Type()  == Camera::FFMPEGHW_SRC )
+      mv_buffer_size = ( ((((width * height)/256)*(double)20)/100)+4);
   
   
-  //uint16_t mv_buffer_size = (((((width * height)/16)*(double)20)/100)+2);
   for ( int i = 0; i < image_buffer_count; i++ ) {
     image_buffer[i].timestamp = &(shared_timestamps[i]);
     image_buffer[i].image = new Image( width, height, camera->Colours(), camera->SubpixelOrder(), &(shared_images[i*camera->ImageSize()]) );
@@ -3213,10 +3211,10 @@ unsigned int Monitor::DetectMotion( const Image &comp_image, Event::StringSet &z
 
   if (function == MVDECT ) {
       int mv_buffer_size=0;
-      if (camera->Type()  == 3 ) //Software
-          mv_buffer_size = ( ((((width * height)/16)*(double)20)/100)+2);
-      if (camera->Type()  == 6 ) //Hardware
-          mv_buffer_size = ( ((((width * height)/256)*(double)20)/100)+2);
+      if (camera->Type()  == Camera::FFMPEG_SRC ) //Software
+          mv_buffer_size = ( ((((width * height)/16)*(double)20)/100)+4);
+      if (camera->Type()  == Camera::FFMPEGHW_SRC ) //Hardware
+          mv_buffer_size = ( ((((width * height)/256)*(double)20)/100)+4);
       mvect_buffer=const_cast<Image*>(&comp_image)->VectBuffer(mv_buffer_size);
       
   } else

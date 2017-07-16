@@ -83,6 +83,7 @@ Image::Image() {
   colours = 0;
   subpixelorder = 0;
   size = 0;
+  mv_size = 0;
   allocation = 0;
   buffer = 0;
   buffertype = 0;
@@ -99,6 +100,7 @@ Image::Image( const char *filename ) {
   colours = 0;
   subpixelorder = 0;  
   size = 0;
+  mv_size = 0;
   allocation = 0;
   buffer = 0;
   buffertype = 0;
@@ -117,6 +119,7 @@ Image::Image( int p_width, int p_height, int p_colours, int p_subpixelorder, uin
   colours = p_colours;
   subpixelorder = p_subpixelorder;
   size = pixels*colours;
+  mv_size = 0;
   buffer = 0;
   holdbuffer = 0;
   if ( p_buffer )
@@ -142,10 +145,13 @@ Image::Image( const Image &p_image )
   colours = p_image.colours;
   subpixelorder = p_image.subpixelorder;
   size = p_image.size; // allocation is set in AllocImgBuffer
+  mv_size = p_image.mv_size;
   buffer = 0;
   holdbuffer = 0;
   AllocImgBuffer(size);
   (*fptr_imgbufcpy)(buffer, p_image.buffer, size);
+  VectBuffer(mv_size);
+  memcpy(mv_buffer,p_image.mv_buffer,mv_size);
   strncpy( text, p_image.text, sizeof(text) );
 }
 
@@ -429,14 +435,16 @@ void Image::Initialise()
   initialised = true;
 }
 
-uint8_t *& Image::VectBuffer(uint16_t mv_size) {
-    
+uint8_t *& Image::VectBuffer(uint16_t imv_size) {
+  if (imv_size) {  
     if (!mv_buffer) {
-        mv_buffer=(uint8_t *) malloc(mv_size);
+        mv_buffer=(uint8_t *) malloc(imv_size);
     } else {
         free(mv_buffer);
-        mv_buffer=(uint8_t *) malloc(mv_size);
+        mv_buffer=(uint8_t *) malloc(imv_size);
     }
+    mv_size=imv_size;
+  }  
     return mv_buffer;
 }    
 
@@ -635,6 +643,7 @@ void Image::Assign( const Image &image ) {
 
   if(image.buffer != buffer) {
     (*fptr_imgbufcpy)(buffer, image.buffer, size);
+    
   }  
 }
 

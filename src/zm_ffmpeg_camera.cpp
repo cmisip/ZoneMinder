@@ -43,7 +43,10 @@ FfmpegCamera::FfmpegCamera( int p_id, const std::string &p_path, const std::stri
   mOptions( p_options ),
   ctype( ictype),
   cfunction(icfunction)
-{
+{ 
+  if (ctype) //HW
+        type=FFMPEGHW_SRC;
+    
   if ( capture ) {
     Initialise();
   }
@@ -378,8 +381,8 @@ if (!ctype) { //motion vectors from software h264 decoding
                             offset+=sizeof(motion_vector);
                             
                             if (vec_count > vector_ceiling) {  
-                              memset(mvect_buffer,0,image.mv_size);
-                              vec_count=0;
+                              memset(mvect_buffer,0,vector_ceiling);
+.                              vec_count=0;
                               break;
                             }    
                             

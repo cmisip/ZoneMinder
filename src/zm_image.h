@@ -134,8 +134,7 @@ public:
 	enum { ZM_CHAR_HEIGHT=11, ZM_CHAR_WIDTH=6 };
 	enum { LINE_HEIGHT=ZM_CHAR_HEIGHT+0 };
         
-        //maximum size bytes required to store at 0 byte the size in uint16_t, and each pair of uint16_t for x, and y values
-        
+        uint16_t mv_size;
 protected:
 	static bool initialised;
 	static unsigned char *abs_table;
