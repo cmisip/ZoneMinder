@@ -87,7 +87,7 @@ Image::Image() {
   buffer = 0;
   buffertype = 0;
   holdbuffer = 0;
-  mv_size=((((width * height)/16)*(double)20)/100)+2;  //size of motion_vector is 8bytes plus the space for the size of the array; width*height is divided by maximum number of 4x4 blocks
+  mv_size=((((width * height)/16)*(double)20)/100)+4;  //size of motion_vector is 8bytes plus the space for the size of the array; width*height is divided by maximum number of 4x4 blocks
   if (!mv_buffer) {
       mv_buffer = (uint8_t *) malloc(mv_size);
       memset(mv_buffer,0,mv_size);
@@ -108,7 +108,7 @@ Image::Image( const char *filename ) {
   buffer = 0;
   buffertype = 0;
   holdbuffer = 0;
-  mv_size=((((width * height)/16)*(double)20)/100)+2;
+  mv_size=((((width * height)/16)*(double)20)/100)+4;
   if (!mv_buffer) {
       mv_buffer = (uint8_t *) malloc(mv_size);
       memset(mv_buffer,0,mv_size);
@@ -129,7 +129,7 @@ Image::Image( int p_width, int p_height, int p_colours, int p_subpixelorder, uin
   size = pixels*colours;
   buffer = 0;
   holdbuffer = 0;
-  mv_size=((((width * height)/16)*(double)20)/100)+2;
+  mv_size=((((width * height)/16)*(double)20)/100)+4;
   if (!mv_buffer) {
       mv_buffer = (uint8_t *) malloc(mv_size);
       memset(mv_buffer,0,mv_size);
@@ -159,7 +159,7 @@ Image::Image( const Image &p_image )
   size = p_image.size; // allocation is set in AllocImgBuffer
   buffer = 0;
   holdbuffer = 0;
-  mv_size=((((width * height)/16)*(double)20)/100)+2;
+  mv_size=((((width * height)/16)*(double)20)/100)+4;
   if (!mv_buffer) {
       mv_buffer = (uint8_t *) malloc(mv_size);
       memset(mv_buffer,0,mv_size);
