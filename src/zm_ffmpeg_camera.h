@@ -114,13 +114,8 @@ class FfmpegCamera : public Camera {
     Monitor::Function cfunction;
     
     struct motion_vector { //SW vectors will be 4x4, HW vectors will be 16x16
-    //char x_vector;    //displacement
-    //char y_vector;
     uint16_t xcoord;  //location of top left corner
     uint16_t ycoord;
-    //uint8_t width;    //dimensions of macroblock
-    //uint8_t height;
-    //unsigned short sad;
   };
   
   

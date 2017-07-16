@@ -375,7 +375,7 @@ Monitor::Monitor(
        + sizeof(VideoStoreData) //Information to pass back to the capture process
        + (image_buffer_count*sizeof(struct timeval))
        + (image_buffer_count*camera->ImageSize())
-       + (image_buffer_count*( ((((width * height)/16)*(double)20)/100)+2)  )
+       + (image_buffer_count*( ((((width * height)/16)*(double)20)/100)+4)  )
        + 64; /* Padding used to permit aligning the images buffer to 64 byte boundary */
 
   Debug( 1, "mem.size=%d", mem_size );
@@ -561,9 +561,8 @@ bool Monitor::connect() {
   image_buffer = new Snapshot[image_buffer_count];
 
 
-  //uint16_t mv_buffer_size=(((width*height)/16)*8)+2; 
   
-  uint16_t mv_buffer_size = (((((width * height)/16)*(double)20)/100)+2);
+  uint16_t mv_buffer_size = (((((width * height)/16)*(double)20)/100)+4);
   for ( int i = 0; i < image_buffer_count; i++ ) {
     image_buffer[i].timestamp = &(shared_timestamps[i]);
     image_buffer[i].image = new Image( width, height, camera->Colours(), camera->SubpixelOrder(), &(shared_images[i*camera->ImageSize()]) );

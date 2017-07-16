@@ -249,7 +249,6 @@ if (!ctype) { //motion vectors from software h264 decoding
                    
                    uint8_t offset=sizeof(uint16_t)*2;
                    const AVMotionVector *mvs = (const AVMotionVector *)sd->data;
-                   //uint16_t size=sd->size / sizeof(AVMotionVector);
                    uint16_t vec_count=0;
                    for (unsigned int i = 0; i < sd->size / sizeof(*mvs); i++) {
                         const AVMotionVector *mv = &mvs[i];
@@ -259,16 +258,9 @@ if (!ctype) { //motion vectors from software h264 decoding
                         int x_disp = mv->src_x - mv->dst_x;
                         int y_disp = mv->src_y - mv->dst_y;
                         
-                       // if ((mvt.x_vector == 0) && (mvt.y_vector == 0))
-                        //    continue;
-                        
                         
                         if ((abs(x_disp) + abs(y_disp)) < 1)
                             continue;
-                        
-                       
-                       
-                        
                         
                         for (uint16_t i=0 ; i< mv->w/4; i++) {
                            for (uint16_t j=0 ; j< mv->h/4; j++) {
@@ -280,12 +272,6 @@ if (!ctype) { //motion vectors from software h264 decoding
                                 vec_count++;
                            }
                        }
-                        
-                        
-                        
-                        
-                        
-                        
                       
                         if (vec_count > vector_ceiling) {  
                             memset(mvect_buffer,0,image.mv_size);
@@ -306,7 +292,6 @@ if (!ctype) { //motion vectors from software h264 decoding
 #ifdef __arm__        
  if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels and there are a fixed number covering the entire frame.
                 MMAL_BUFFER_HEADER_T *buffer;
-               // MMAL_BUFFER_HEADER_T *fbuffer;
                 
                 //send free buffer to encoder
                 if ((buffer = mmal_queue_get(pool_out->queue)) != NULL) {
@@ -335,8 +320,6 @@ if (!ctype) { //motion vectors from software h264 decoding
                        goto end;
                   }
                 } 
-                
-                
                 
                 
                 while ((buffer = mmal_queue_get(context.queue)) != NULL) {
