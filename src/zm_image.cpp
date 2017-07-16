@@ -87,11 +87,6 @@ Image::Image() {
   buffer = 0;
   buffertype = 0;
   holdbuffer = 0;
-  mv_size=((((width * height)/16)*(double)20)/100)+2;  //size of motion_vector is 8bytes plus the space for the size of the array; width*height is divided by maximum number of 4x4 blocks
-  if (!mv_buffer) {
-      mv_buffer = (uint8_t *) malloc(mv_size);
-      memset(mv_buffer,0,mv_size);
-  }
   text[0] = '\0';
 }
 
@@ -108,11 +103,6 @@ Image::Image( const char *filename ) {
   buffer = 0;
   buffertype = 0;
   holdbuffer = 0;
-  mv_size=((((width * height)/16)*(double)20)/100)+2;
-  if (!mv_buffer) {
-      mv_buffer = (uint8_t *) malloc(mv_size);
-      memset(mv_buffer,0,mv_size);
-  }
   ReadJpeg( filename, ZM_COLOUR_RGB24, ZM_SUBPIX_ORDER_RGB);
   text[0] = '\0';
 }
@@ -129,11 +119,6 @@ Image::Image( int p_width, int p_height, int p_colours, int p_subpixelorder, uin
   size = pixels*colours;
   buffer = 0;
   holdbuffer = 0;
-  mv_size=((((width * height)/16)*(double)20)/100)+2;
-  if (!mv_buffer) {
-      mv_buffer = (uint8_t *) malloc(mv_size);
-      memset(mv_buffer,0,mv_size);
-  }
   if ( p_buffer )
   {
     allocation = size;
@@ -159,14 +144,8 @@ Image::Image( const Image &p_image )
   size = p_image.size; // allocation is set in AllocImgBuffer
   buffer = 0;
   holdbuffer = 0;
-  mv_size=((((width * height)/16)*(double)20)/100)+2;
-  if (!mv_buffer) {
-      mv_buffer = (uint8_t *) malloc(mv_size);
-      memset(mv_buffer,0,mv_size);
-  }
   AllocImgBuffer(size);
   (*fptr_imgbufcpy)(buffer, p_image.buffer, size);
-  memcpy(mv_buffer,p_image.mv_buffer,mv_size);
   strncpy( text, p_image.text, sizeof(text) );
 }
 
@@ -219,14 +198,16 @@ void Image::Initialise()
       fptr_blend = &sse2_fastblend; /* SSE2 fast blend */
       Debug(4,"Blend: Using SSE2 fast blend function");
     } else if(config.cpu_extensions && neonversion >= 1) {
-#if defined(__aarch64__)
+//#if defined(__aarch64__)
+#if (defined(__aarch64__) && !defined(ZM_STRIP_NEON))
       fptr_blend = &neon64_armv8_fastblend;  /* ARM Neon (AArch64) fast blend */
       Debug(4,"Blend: Using ARM Neon (AArch64) fast blend function");
-#elif defined(__arm__)
+//#elif defined(__arm__)
+#elif (defined(__arm__) && !defined(ZM_STRIP_NEON))      
       fptr_blend = &neon32_armv7_fastblend;  /* ARM Neon (AArch32) fast blend */
       Debug(4,"Blend: Using ARM Neon (AArch32) fast blend function");
-#else
-      Panic("Bug: Non ARM platform but neon present");
+//#else
+      //Panic("Bug: Non ARM platform but neon present");
 #endif
     } else {
       fptr_blend = &std_fastblend;  /* standard fast blend */
@@ -290,22 +271,24 @@ void Image::Initialise()
       Debug(4,"Delta: Using SSE2 delta functions");
     } else if(neonversion >= 1) {
       /* ARM Neon available */
-#if defined(__aarch64__)
+//#if defined(__aarch64__)
+#if (defined(__aarch64__) && !defined(ZM_STRIP_NEON))
       fptr_delta8_rgba = &neon64_armv8_delta8_rgba;
       fptr_delta8_bgra = &neon64_armv8_delta8_bgra;
       fptr_delta8_argb = &neon64_armv8_delta8_argb;
       fptr_delta8_abgr = &neon64_armv8_delta8_abgr;
       fptr_delta8_gray8 = &neon64_armv8_delta8_gray8;
       Debug(4,"Delta: Using ARM Neon (AArch64) delta functions");
-#elif defined(__arm__)
+//#elif defined(__arm__)
+#elif (defined(__arm__) && !defined(ZM_STRIP_NEON))
       fptr_delta8_rgba = &neon32_armv7_delta8_rgba;
       fptr_delta8_bgra = &neon32_armv7_delta8_bgra;
       fptr_delta8_argb = &neon32_armv7_delta8_argb;
       fptr_delta8_abgr = &neon32_armv7_delta8_abgr;
       fptr_delta8_gray8 = &neon32_armv7_delta8_gray8;
       Debug(4,"Delta: Using ARM Neon (AArch32) delta functions");
-#else
-      Panic("Bug: Non ARM platform but neon present");
+//#else
+//      Panic("Bug: Non ARM platform but neon present");
 #endif
     } else {
       /* No suitable SSE version available */
@@ -446,9 +429,13 @@ void Image::Initialise()
   initialised = true;
 }
 
-uint8_t *& Image::VectBuffer() {
+uint8_t *& Image::VectBuffer(uint16_t mv_size) {
+    
     if (!mv_buffer) {
-        Fatal("mv_buffer with no allocation");
+        mv_buffer=(uint8_t *) malloc(mv_size);
+    } else {
+        free(mv_buffer);
+        mv_buffer=(uint8_t *) malloc(mv_size);
     }
     return mv_buffer;
 }    
@@ -537,8 +524,7 @@ void Image::AssignDirect( const unsigned int p_width, const unsigned int p_heigh
       /* Copy into the held buffer */
       if(new_buffer != buffer) {
         (*fptr_imgbufcpy)(buffer, new_buffer, size);
-        memset(mv_buffer,0,mv_size);  //FIXMEC just reset the mv_buffer since it is not valid with a new image buffer, 
-      }                               //FIXMEC custom mv_buffer memcpy function pointer ? 
+      }                              
 
       /* Free the new buffer */
       DumpBuffer(new_buffer, p_buffertype);
@@ -557,7 +543,6 @@ void Image::AssignDirect( const unsigned int p_width, const unsigned int p_heigh
     allocation = buffer_size;
     buffertype = p_buffertype;
     buffer = new_buffer;
-    memset(mv_buffer,0,mv_size); //just reset the mv_buffer since it is not valid with a new image buffer
   }
 
 }
@@ -609,7 +594,6 @@ void Image::Assign(const unsigned int p_width, const unsigned int p_height, cons
 
   if(new_buffer != buffer) {
     (*fptr_imgbufcpy)(buffer, new_buffer, size);
-    memset(mv_buffer,0,mv_size);
   }  
 
 }
@@ -651,7 +635,6 @@ void Image::Assign( const Image &image ) {
 
   if(image.buffer != buffer) {
     (*fptr_imgbufcpy)(buffer, image.buffer, size);
-    memcpy(mv_buffer,image.mv_buffer,mv_size);
   }  
 }
 
@@ -3491,8 +3474,8 @@ void neon32_armv7_fastblend(const uint8_t* col1, const uint8_t* col2, uint8_t* r
   : "r" (col1), "r" (col2), "r" (result), "r" (count), "r" (divider)
   : "%r12", "%q0", "%q1", "%q2", "%q3", "%q4", "%q5", "%q6", "%q7", "%q8", "%q9", "%q10", "%q11", "%q12", "cc", "memory"
   );
-#else
-  Panic("Neon function called on a non-ARM platform or Neon code is absent");
+//#else
+//  Panic("Neon function called on a non-ARM platform or Neon code is absent");
 #endif
 }
 
@@ -3835,8 +3818,8 @@ void neon32_armv7_delta8_gray8(const uint8_t* col1, const uint8_t* col2, uint8_t
   : "r" (col1), "r" (col2), "r" (result), "r" (count)
   : "%q0", "%q1", "%q2", "%q3", "%q4", "%q5", "%q6", "%q7", "cc", "memory"
   );
-#else
-  Panic("Neon function called on a non-ARM platform or Neon code is absent");
+//#else
+  //Panic("Neon function called on a non-ARM platform or Neon code is absent");
 #endif
 }
 

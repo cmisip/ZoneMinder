@@ -36,7 +36,7 @@ class Camera;
 class Camera
 {
 protected:
-  typedef enum { LOCAL_SRC, REMOTE_SRC, FILE_SRC, FFMPEG_SRC, LIBVLC_SRC, CURL_SRC } SourceType;
+  typedef enum { LOCAL_SRC, REMOTE_SRC, FILE_SRC, FFMPEG_SRC, LIBVLC_SRC, CURL_SRC, FFMPEGHW_SRC } SourceType;
 
   unsigned int  monitor_id;
   Monitor *     monitor; // Null on instantiation, set as soon as possible.

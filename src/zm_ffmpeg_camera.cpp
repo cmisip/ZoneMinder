@@ -223,8 +223,9 @@ if (!( cfunction == Monitor::MVDECT )) {
 }
 
         
-      {   
+  /*    {   
         mvect_buffer=image.VectBuffer();   
+        
         if (mvect_buffer ==  NULL ){
                 Error("Failed requesting vector buffer for the captured image.");
                 return (-1); 
@@ -234,7 +235,7 @@ if (!( cfunction == Monitor::MVDECT )) {
         
         
       }
-
+*/
      
         
 if (!ctype) { //motion vectors from software h264 decoding
@@ -246,10 +247,13 @@ if (!ctype) { //motion vectors from software h264 decoding
             uint16_t vector_ceiling=((((mRawFrame->width * mRawFrame->height)/16)*(double)20)/100);  //FIXMEC, just 20% of the maximum number of 4x4 blocks that will fit
         
             if (sd) {
+                   mvect_buffer=image.VectBuffer(vector_ceiling); 
+                   if (mvect_buffer ==  NULL ) 
+                       goto end;
                    
                    uint8_t offset=sizeof(uint16_t)*2;
                    const AVMotionVector *mvs = (const AVMotionVector *)sd->data;
-                   uint16_t size=sd->size / sizeof(AVMotionVector);
+                   //uint16_t size=sd->size / sizeof(AVMotionVector);
                    uint16_t vec_count=0;
                    for (unsigned int i = 0; i < sd->size / sizeof(*mvs); i++) {
                         const AVMotionVector *mv = &mvs[i];
@@ -288,8 +292,8 @@ if (!ctype) { //motion vectors from software h264 decoding
                         
                       
                         if (vec_count > vector_ceiling) {  
-                            memset(mvect_buffer,0,image.mv_size);
-                            size=0;
+                            memset(mvect_buffer,0,vector_ceiling);
+                            vec_count=0;
                             break;
                         }    
                         
@@ -351,10 +355,14 @@ if (!ctype) { //motion vectors from software h264 decoding
                         memcpy(mvarray,buffer->data,buffer->length);
                         mmal_buffer_header_mem_unlock(buffer);
                         
+                        uint16_t vector_ceiling=(((mRawFrame->width * mRawFrame->height)/256)*(double)20)/100;
                         
+                        mvect_buffer=image.VectBuffer(vector_ceiling); 
+                        if (mvect_buffer ==  NULL ) 
+                            goto end;
                         
                         uint8_t offset=sizeof(uint16_t)*2;
-                        uint16_t vector_ceiling=(((mRawFrame->width * mRawFrame->height)/256)*(double)20)/100;
+                        
                         uint16_t vec_count=0;
                         for (int i=0;i < size ; i++) {
                             motion_vector mvt;
@@ -370,10 +378,10 @@ if (!ctype) { //motion vectors from software h264 decoding
                             offset+=sizeof(motion_vector);
                             
                             if (vec_count > vector_ceiling) {  
-                            memset(mvect_buffer,0,image.mv_size);
-                            size=0;
-                            break;
-                        }    
+                              memset(mvect_buffer,0,image.mv_size);
+                              vec_count=0;
+                              break;
+                            }    
                             
                          } 
                          memcpy(mvect_buffer,&vec_count, 2);  //size at first byte

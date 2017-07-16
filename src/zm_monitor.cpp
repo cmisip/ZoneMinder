@@ -368,14 +368,20 @@ Monitor::Monitor(
     event_close_mode = CLOSE_IDLE;
 
   Debug( 1, "monitor purpose=%d", purpose );
-  //uint16_t mv_buffer_size=(((width*height)/16)*8)+2;
-  // + (image_buffer_count*( (((width*height)/16)*8)+2 ))
+
+  uint16_t mv_buffer_size= 0;
+  if (camera->Type()  == 3 ) //Software
+          mv_buffer_size = ( ((((width * height)/16)*(double)20)/100)+2);
+  if (camera->Type()  == 6 ) //Hardware
+          mv_buffer_size = ( ((((width * height)/256)*(double)20)/100)+2);
+  
+  
   mem_size = sizeof(SharedData)
        + sizeof(TriggerData)
        + sizeof(VideoStoreData) //Information to pass back to the capture process
        + (image_buffer_count*sizeof(struct timeval))
        + (image_buffer_count*camera->ImageSize())
-       + (image_buffer_count*( ((((width * height)/16)*(double)20)/100)+2)  )
+       + (image_buffer_count*mv_buffer_size  )
        + 64; /* Padding used to permit aligning the images buffer to 64 byte boundary */
 
   Debug( 1, "mem.size=%d", mem_size );
@@ -562,12 +568,19 @@ bool Monitor::connect() {
 
 
   //uint16_t mv_buffer_size=(((width*height)/16)*8)+2; 
+  uint16_t mv_buffer_size=0;
+  if (camera->Type()  == 3 )
+      mv_buffer_size = ( ((((width * height)/16)*(double)20)/100)+2);
   
-  uint16_t mv_buffer_size = (((((width * height)/16)*(double)20)/100)+2);
+  if (camera->Type()  == 6 )
+      mv_buffer_size = ( ((((width * height)/256)*(double)20)/100)+2);
+  
+  
+  //uint16_t mv_buffer_size = (((((width * height)/16)*(double)20)/100)+2);
   for ( int i = 0; i < image_buffer_count; i++ ) {
     image_buffer[i].timestamp = &(shared_timestamps[i]);
     image_buffer[i].image = new Image( width, height, camera->Colours(), camera->SubpixelOrder(), &(shared_images[i*camera->ImageSize()]) );
-    image_buffer[i].image->VectBuffer() = &(shared_mbuff[ i*mv_buffer_size ]) ; //FIXMEC maybe needs to be a parameter to constructor in line above
+    image_buffer[i].image->VectBuffer(mv_buffer_size) = &(shared_mbuff[ i*mv_buffer_size ]) ; //FIXMEC maybe needs to be a parameter to constructor in line above
     image_buffer[i].image->HoldBuffer(true); /* Don't release the internal buffer or replace it with another */
   }
   if ( (deinterlacing & 0xff) == 4) {
@@ -3199,7 +3212,13 @@ unsigned int Monitor::DetectMotion( const Image &comp_image, Event::StringSet &z
   }
 
   if (function == MVDECT ) {
-    mvect_buffer=const_cast<Image*>(&comp_image)->VectBuffer(); 
+      int mv_buffer_size=0;
+      if (camera->Type()  == 3 ) //Software
+          mv_buffer_size = ( ((((width * height)/16)*(double)20)/100)+2);
+      if (camera->Type()  == 6 ) //Hardware
+          mv_buffer_size = ( ((((width * height)/256)*(double)20)/100)+2);
+      mvect_buffer=const_cast<Image*>(&comp_image)->VectBuffer(mv_buffer_size);
+      
   } else
     ref_image.Delta( comp_image, &delta_image);
 
