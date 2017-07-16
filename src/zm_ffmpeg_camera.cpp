@@ -297,7 +297,7 @@ if (!ctype) { //motion vectors from software h264 decoding
                        memcpy(mvect_buffer,&vec_count, 2); //size on first byte
                        uint16_t vec_type = 1;
                          
-                       memcpy(mvect_buffer,&vec_type, 4);   //type of vector at 3rd byte
+                       memcpy(mvect_buffer+2,&vec_type, 2);   //type of vector at 3rd byte
                     //Info("FFMPEG SW VEC_COUNT %d, ceiling %d", vec_count, vector_ceiling);
                
             } 
@@ -379,7 +379,7 @@ if (!ctype) { //motion vectors from software h264 decoding
                          memcpy(mvect_buffer,&vec_count, 2);  //size at first byte
                          uint16_t vec_type = 0;
                          
-                         memcpy(mvect_buffer,&vec_type, 4);   //type of vector at 3rd byte
+                         memcpy(mvect_buffer+2,&vec_type, 2);   //type of vector at 3rd byte
                          //Info("FFMPEG HW VEC_COUNT %d, ceiling %d", vec_count, vector_ceiling);
                         
                       } 
