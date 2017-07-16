@@ -227,8 +227,8 @@ void Image::Initialise()
 #elif (defined(__arm__) && !defined(ZM_STRIP_NEON))
       fptr_blend = &neon32_armv7_fastblend;  /* ARM Neon (AArch32) fast blend */
       Debug(4,"Blend: Using ARM Neon (AArch32) fast blend function");
-#else
-      Panic("Bug: Non ARM platform but neon present");
+//#else
+//      Panic("Bug: Non ARM platform but neon present");
 #endif
     } else {
       fptr_blend = &std_fastblend;  /* standard fast blend */
@@ -3579,8 +3579,8 @@ __attribute__((noinline)) void neon64_armv8_fastblend(const uint8_t* col1, const
   : "r" (col1), "r" (col2), "r" (result), "r" (count), "r" (divider)
   : "%x12", "%v16", "%v17", "%v18", "%v19", "%v20", "%v21", "%v22", "%v23", "%v24", "%v25", "%v26", "%v27", "%v28", "cc", "memory"
 );
-#else
-  Panic("Neon function called on a non-ARM platform or Neon code is absent");
+//#else
+  //Panic("Neon function called on a non-ARM platform or Neon code is absent");
 #endif
 }
 
@@ -3877,8 +3877,8 @@ __attribute__((noinline)) void neon64_armv8_delta8_gray8(const uint8_t* col1, co
   : "r" (col1), "r" (col2), "r" (result), "r" (count)
   : "%v16", "%v17", "%v18", "%v19", "%v20", "%v21", "%v22", "%v23", "cc", "memory"
   );
-#else
-  Panic("Neon function called on a non-ARM platform or Neon code is absent");
+//#else
+  //Panic("Neon function called on a non-ARM platform or Neon code is absent");
 #endif
 }
 
@@ -3990,8 +3990,8 @@ __attribute__((noinline)) void neon64_armv8_delta8_rgb32(const uint8_t* col1, co
   : "r" (col1), "r" (col2), "r" (result), "r" (count), "r" (multiplier)
   : "%x12", "%v16", "%v17", "%v18", "%v19", "%v20", "%v21", "%v22", "%v23", "%v24", "cc", "memory"
   );
-#else
-  Panic("Neon function called on a non-ARM platform or Neon code is absent");
+//#else
+//  Panic("Neon function called on a non-ARM platform or Neon code is absent");
 #endif
 }
 
