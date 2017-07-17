@@ -293,6 +293,8 @@ if (!ctype) { //motion vectors from software h264 decoding
  if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels and there are a fixed number covering the entire frame.
                 MMAL_BUFFER_HEADER_T *buffer;
                 
+                
+                
                 //send free buffer to encoder
                 if ((buffer = mmal_queue_get(pool_out->queue)) != NULL) {
                    if (mmal_port_send_buffer(encoder->output[0], buffer) != MMAL_SUCCESS) {
@@ -328,7 +330,10 @@ if (!ctype) { //motion vectors from software h264 decoding
                         
                         mmal_buffer_header_mem_lock(buffer);
                         uint16_t size=buffer->length/4;
-                        struct mmal_motion_vector mvarray[size];
+                        
+                        uint8_t * mvarray = (uint8_t *) malloc(buffer->length);
+                        if (!mvarray)
+                            goto end;
                         
                         //copy buffer->data to temporary
                         memcpy(mvarray,buffer->data,buffer->length);
@@ -336,34 +341,49 @@ if (!ctype) { //motion vectors from software h264 decoding
                         
                         
                         
-                        uint8_t offset=sizeof(uint16_t)*2;
+                        uint8_t offset=sizeof(uint16_t);
                         uint16_t vector_ceiling=(((mRawFrame->width * mRawFrame->height)/256)*(double)20)/100;
                         uint16_t vec_count=0;
+                        
+                        const mmal_motion_vector *mvs = (const mmal_motion_vector *)mvarray;
+                        
                         for (int i=0;i < size ; i++) {
-                            motion_vector mvt;
-                            
-                            if ((abs(mvarray[i].x_vector) + abs(mvarray[i].y_vector)) < 1)
+                            const mmal_motion_vector *mv = &mvs[i]; 
+                            if ((abs(mv->x_vector) + abs(mv->y_vector)) < 1)
                                continue;
                           
-                            mvt.xcoord = (i*16) % (mVideoCodecContext->width + 16);
-                            mvt.ycoord = ((i*16)/(mVideoCodecContext->width+16))*16;
-                            vec_count++;
+                            uint16_t x = (i*16) % (mVideoCodecContext->width + 16);
+                            uint16_t y = ((i*16)/(mVideoCodecContext->width+16))*16;
                             
-                            memcpy(mvect_buffer+offset,&mvt,sizeof(motion_vector));
-                            offset+=sizeof(motion_vector);
+                            uint8_t x8bit[2]={ x & 0xff, x >> 8 };
+                            memcpy(mvect_buffer+offset,&x8bit,2);
+                            offset+=2;
+                            
+                            uint8_t y8bit[2]={ y & 0xff, y >> 8 };
+                            memcpy(mvect_buffer+offset,&y8bit,2);
+                            offset+=2;
+                             
+                            vec_count++;
                             
                             if (vec_count > vector_ceiling) {  
                               memset(mvect_buffer,0,image.mv_size);
                               vec_count=0;
-                            break;
-                        }    
+                              break;
+                            }    
                             
-                         } 
-                         memcpy(mvect_buffer,&vec_count, 2);  //size at first byte
-                         uint16_t vec_type = 0;
-                         
-                         memcpy(mvect_buffer+2,&vec_type, 2);   //type of vector at 3rd byte
-                         //Info("FFMPEG HW VEC_COUNT %d, ceiling %d", vec_count, vector_ceiling);
+                        } 
+                        
+                        uint8_t vc8bit[2] = { vec_count & 0xff, vec_count >> 8 };
+                        memcpy(mvect_buffer,&vc8bit, 2);
+                        
+                        uint16_t vec_type = 0;
+                        uint8_t vt8bit[2] = { vec_type & 0xff, vec_type >> 8 };
+                        memcpy(mvect_buffer,&vt8bit, 2);
+                        
+                        if (mvarray)
+                            free(mvarray);
+                        
+                        //Info("FFMPEG HW VEC_COUNT %d, ceiling %d", vec_count, vector_ceiling);
                         
                       } 
                     

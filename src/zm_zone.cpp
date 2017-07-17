@@ -213,23 +213,44 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
     uint16_t vec_count=0;
     uint16_t x_sum=0;
     uint16_t y_sum=0;
+    uint16_t offset=0;
     
     
     
-    //first 16bit value is size
+    
     if (mvect_buffer) {
-        memcpy(&size,mvect_buffer,2);
-        memcpy(&vec_type,mvect_buffer+2,2);
+        //first 16bit value is size
+        uint8_t size8bit[2];
+        memcpy(&size8bit,mvect_buffer,2);
+        size=((uint16_t)size8bit[1] << 8) | size8bit[0];
+        
+        offset=sizeof(uint16_t); 
+        
+        //second value is vec_type
+        uint8_t vt8bit[2];
+        memcpy(&vt8bit,mvect_buffer+offset,2);
+        vec_type=((uint16_t)vt8bit[1] << 8) | vt8bit[0];
+        offset+=2;
+        
     }
-    struct motion_vector mvarray[size];
-                        
-    memcpy(mvarray,mvect_buffer+4,size*sizeof(motion_vector));
+    
+    
     
         for (int i = 0; i < size; i++) {
-                motion_vector *mv = &mvarray[i];
+            
+                uint16_t xcoord,ycoord;
+                uint8_t x8bit[2];
+                        memcpy(&x8bit,mvect_buffer+offset,2);
+                        xcoord=((uint16_t)x8bit[1] << 8) | x8bit[0];
+                        offset+=2;
+                uint8_t y8bit[2];            
+                        memcpy(&y8bit,mvect_buffer+offset,2);
+                        ycoord=((uint16_t)y8bit[1] << 8) | y8bit[0];
+                        offset+=2;
+                        
                  
                 //Are the vectors inside the zone polygon?
-                if (!polygon.isInside(Coord(mv->xcoord,mv->ycoord)))      
+                if (!polygon.isInside(Coord(xcoord,ycoord)))      
                     continue;
                 
                     uint16_t x;
@@ -238,8 +259,8 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
                 if (vec_type == 0 )  //hardware macroblock with size of 16x16, there are 16 4x4 blocks in each one
                   for (uint16_t i=0 ; i< 4; i++) {
                            for (uint16_t j=0 ; j< 4; j++) {
-                                x=mv->xcoord+i*4;
-                                y=mv->ycoord+j*4;
+                                x=xcoord+i*4;
+                                y=ycoord+j*4;
                                 x_sum+=x;
                                 y_sum+=y;   
                                 vec_count++;

@@ -15,6 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+#define __arm__
 #ifndef ZM_FFMPEG_CAMERA_H
 #define ZM_FFMPEG_CAMERA_H
 
@@ -115,8 +116,7 @@ class FfmpegCamera : public Camera {
     
     struct motion_vector { //SW vectors will be 4x4, HW vectors will be 16x16
     uint16_t xcoord;  //location of top left corner
-    uint16_t ycoord;
-  };
+    uint16_t ycoord;  };
   
   
   
