@@ -248,7 +248,6 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
                 else //software macroblock with size of 4x4
                   vec_count++;  
              
-                
                      
                        
         }
