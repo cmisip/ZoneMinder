@@ -378,12 +378,12 @@ if (!ctype) { //motion vectors from software h264 decoding
                         
                         uint16_t vec_type = 0;
                         uint8_t vt8bit[2] = { vec_type & 0xff, vec_type >> 8 };
-                        memcpy(mvect_buffer,&vt8bit, 2);
+                        memcpy(mvect_buffer+2,&vt8bit, 2);
                         
                         if (mvarray)
                             free(mvarray);
                         
-                        //Info("FFMPEG HW VEC_COUNT %d, ceiling %d", vec_count, vector_ceiling);
+                        Info("FFMPEG HW VEC_COUNT %d, ceiling %d", vec_count, vector_ceiling);
                         
                       } 
                     
