@@ -217,7 +217,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
     
     
     
-    
+    /*
     if (mvect_buffer) {
         //first 16bit value is size
         uint8_t size8bit[2];
@@ -233,7 +233,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
         offset+=2;
         
     }
-    
+    */
     
     
     /*    for (int i = 0; i < size; i++) {
