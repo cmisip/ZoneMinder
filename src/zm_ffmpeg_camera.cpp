@@ -383,7 +383,7 @@ if (!ctype) { //motion vectors from software h264 decoding
                         if (mvarray)
                             free(mvarray);
                         
-                        Info("FFMPEG HW VEC_COUNT %d, ceiling %d", vec_count, vector_ceiling);
+                        //Info("FFMPEG HW VEC_COUNT %d, ceiling %d", vec_count, vector_ceiling);
                         
                       } 
                     
