@@ -236,7 +236,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
     
     
     
-        for (int i = 0; i < size; i++) {
+    /*    for (int i = 0; i < size; i++) {
             
                 uint16_t xcoord,ycoord;
                 uint8_t x8bit[2];
@@ -276,7 +276,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
         if (vec_count) {
           alarm_centre=Coord((uint16_t)(x_sum/vec_count),(uint16_t)(y_sum/vec_count));
         }
-  
+  */
    
     alarm_pixels = vec_count*20 ; //4 pixels per 4x4 macroblock multiplied by the skew value
     score = ((double) alarm_pixels/(polygon.Area()))*100;  //score adjusted to faux pixel values for users who insist on using pixels for setting min_alarm_pixels and max_alarm_pixels instead of percentages, value is in the stat UI of the event score. 
