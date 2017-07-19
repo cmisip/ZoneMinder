@@ -217,36 +217,37 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
     
     
     
-    /*
+    
     if (mvect_buffer) {
         //first 16bit value is size
-        uint8_t size8bit[2];
-        memcpy(&size8bit,mvect_buffer,2);
+        uint8_t size8bit[4] ;
+        memcpy(&size8bit,mvect_buffer,4);
         size=((uint16_t)size8bit[1] << 8) | size8bit[0];
+        vec_type=((uint16_t)size8bit[3] << 8) | size8bit[2];
         
-        offset=sizeof(uint16_t); 
+        offset=sizeof(uint16_t)*2; 
         
         //second value is vec_type
-        uint8_t vt8bit[2];
-        memcpy(&vt8bit,mvect_buffer+offset,2);
-        vec_type=((uint16_t)vt8bit[1] << 8) | vt8bit[0];
-        offset+=2;
+        //uint8_t vt8bit[2] __attribute__((packed));
+        //memcpy(&vt8bit,mvect_buffer+offset,2);
         
-    }
-    */
+        //offset+=2;
+        
     
     
-    /*    for (int i = 0; i < size; i++) {
+    
+    
+        for (int i = 0; i < size; i++) {
             
                 uint16_t xcoord,ycoord;
-                uint8_t x8bit[2];
-                        memcpy(&x8bit,mvect_buffer+offset,2);
+                uint8_t x8bit[4];
+                        memcpy(&x8bit,mvect_buffer+offset,4);
                         xcoord=((uint16_t)x8bit[1] << 8) | x8bit[0];
-                        offset+=2;
-                uint8_t y8bit[2];            
-                        memcpy(&y8bit,mvect_buffer+offset,2);
-                        ycoord=((uint16_t)y8bit[1] << 8) | y8bit[0];
-                        offset+=2;
+                        offset+=4;
+                //uint8_t y8bit[2];            
+                //        memcpy(&y8bit,mvect_buffer+offset,2);
+                        ycoord=((uint16_t)x8bit[3] << 8) | x8bit[2];
+                //        offset+=2;
                         
                  
                 //Are the vectors inside the zone polygon?
@@ -272,11 +273,13 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
                      
                        
         }
+      
+    }
         
         if (vec_count) {
           alarm_centre=Coord((uint16_t)(x_sum/vec_count),(uint16_t)(y_sum/vec_count));
         }
-  */
+  
    
     alarm_pixels = vec_count*20 ; //4 pixels per 4x4 macroblock multiplied by the skew value
     score = ((double) alarm_pixels/(polygon.Area()))*100;  //score adjusted to faux pixel values for users who insist on using pixels for setting min_alarm_pixels and max_alarm_pixels instead of percentages, value is in the stat UI of the event score. 

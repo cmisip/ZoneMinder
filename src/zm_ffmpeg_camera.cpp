@@ -341,7 +341,8 @@ if (!ctype) { //motion vectors from software h264 decoding
                         
                         
                         
-                        uint8_t offset=sizeof(uint16_t);
+                        //uint8_t offset=sizeof(uint16_t); //COULD have been the error, since offset should be zero not 2 initially
+                        uint8_t offset = 0;
                         uint16_t vector_ceiling=(((mRawFrame->width * mRawFrame->height)/256)*(double)20)/100;
                         uint16_t vec_count=0;
                         
@@ -355,13 +356,13 @@ if (!ctype) { //motion vectors from software h264 decoding
                             uint16_t x = (i*16) % (mVideoCodecContext->width + 16);
                             uint16_t y = ((i*16)/(mVideoCodecContext->width+16))*16;
                             
-                            uint8_t x8bit[2]={ x & 0xff, x >> 8 };
-                            memcpy(mvect_buffer+offset,&x8bit,2);
-                            offset+=2;
+                            uint8_t x8bit[4]={ x & 0xff, x >> 8,  y & 0xff, y >> 8};
+                            memcpy(mvect_buffer+offset,&x8bit,4);
+                            offset+=4;
                             
-                            uint8_t y8bit[2]={ y & 0xff, y >> 8 };
-                            memcpy(mvect_buffer+offset,&y8bit,2);
-                            offset+=2;
+                            //uint8_t y8bit[2]={ y & 0xff, y >> 8 };
+                            //memcpy(mvect_buffer+offset,&y8bit,2);
+                            //offset+=2;
                              
                             vec_count++;
                             
@@ -373,12 +374,13 @@ if (!ctype) { //motion vectors from software h264 decoding
                             
                         } 
                         
-                        uint8_t vc8bit[2] = { vec_count & 0xff, vec_count >> 8 };
-                        memcpy(mvect_buffer,&vc8bit, 2);
-                        
                         uint16_t vec_type = 0;
-                        uint8_t vt8bit[2] = { vec_type & 0xff, vec_type >> 8 };
-                        memcpy(mvect_buffer+2,&vt8bit, 2);
+                        uint8_t vc8bit[4] = { vec_count & 0xff, vec_count >> 8, vec_type & 0xff, vec_type >> 8 };
+                        memcpy(mvect_buffer,&vc8bit, 4);
+                        
+                        
+                        //uint8_t vt8bit[2] = { vec_type & 0xff, vec_type >> 8 };
+                        //memcpy(mvect_buffer+2,&vt8bit, 2);
                         
                         if (mvarray)
                             free(mvarray);
