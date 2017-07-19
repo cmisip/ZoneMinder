@@ -208,18 +208,22 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
     uint16_t minimum_vector_coverage=((double)min_alarm_pixels/polygon.Area())*100; //best case assumed, all vectors are within polygon resulting in minimum score
     uint16_t maximum_vector_coverage=((double)max_alarm_pixels/polygon.Area())*100; //worst case assumed, all vectors could be thrown out
     
-    uint16_t size=0;
-    uint16_t vec_type;
+    //uint16_t size=0;
+    //uint16_t vec_type;
     uint16_t vec_count=0;
     uint16_t x_sum=0;
     uint16_t y_sum=0;
+    uint16_t *size;
+    uint16_t *vec_type;
     
     
     
     //first 16bit value is size
     if (mvect_buffer) {
-        memcpy(&size,mvect_buffer,2);
-        memcpy(&vec_type,mvect_buffer+2,2);
+        size=(uint16_t * )mvect_buffer;
+        vec_type=(uint16_t * )mvect_buffer+2;
+        //memcpy(&size,mvect_buffer,2);
+        //memcpy(&vec_type,mvect_buffer+2,2);
     }
    //struct motion_vector mvarray[size];
                         
@@ -227,7 +231,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
     
     const motion_vector *mvo = (const motion_vector *)mvect_buffer+4;
     
-        for (int i = 0; i < size; i++) {
+        for (int i = 0; i < *size; i++) {
                 const motion_vector *mv = &mvo[i];
                  
                 //Are the vectors inside the zone polygon?
@@ -237,7 +241,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
                     uint16_t x;
                     uint16_t y;
                         
-                if (vec_type == 0 )  //hardware macroblock with size of 16x16, there are 16 4x4 blocks in each one
+                if (*vec_type == 0 )  //hardware macroblock with size of 16x16, there are 16 4x4 blocks in each one
                   for (uint16_t i=0 ; i< 4; i++) {
                            for (uint16_t j=0 ; j< 4; j++) {
                                 x=mv->xcoord+i*4;
