@@ -325,24 +325,20 @@ if (!ctype) { //motion vectors from software h264 decoding
                 while ((buffer = mmal_queue_get(context.queue)) != NULL) {
                         
                       if(buffer->flags & MMAL_BUFFER_HEADER_FLAG_CODECSIDEINFO) {
+                          
+                        uint8_t offset=sizeof(uint16_t)*2;
+                        uint16_t vector_ceiling=(((mRawFrame->width * mRawFrame->height)/256)*(double)20)/100;
+                        uint16_t vec_count=0;  
                         
                         mmal_buffer_header_mem_lock(buffer);
                         uint16_t size=buffer->length/4;
-                        struct mmal_motion_vector mvarray[size];
                         
-                        //copy buffer->data to temporary
-                        memcpy(mvarray,buffer->data,buffer->length);
-                        mmal_buffer_header_mem_unlock(buffer);
-                        
-                        
-                        
-                        uint8_t offset=sizeof(uint16_t)*2;
-                        uint16_t vector_ceiling=(((mRawFrame->width * mRawFrame->height)/256)*(double)20)/100;
-                        uint16_t vec_count=0;
+                        const mmal_motion_vector *mvi = (const mmal_motion_vector *)buffer->data;
                         for (int i=0;i < size ; i++) {
                             motion_vector mvt;
+                            const mmal_motion_vector *mv = &mvi[i]; 
                             
-                            if ((abs(mvarray[i].x_vector) + abs(mvarray[i].y_vector)) < 1)
+                            if ((abs(mv->x_vector) + abs(mv->y_vector)) < 1)
                                continue;
                           
                             mvt.xcoord = (i*16) % (mVideoCodecContext->width + 16);
@@ -357,6 +353,8 @@ if (!ctype) { //motion vectors from software h264 decoding
                               vec_count=0;
                             break;
                         }    
+                            
+                         mmal_buffer_header_mem_unlock(buffer);    
                             
                          } 
                          memcpy(mvect_buffer,&vec_count, 2);  //size at first byte

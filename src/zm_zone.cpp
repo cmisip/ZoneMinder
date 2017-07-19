@@ -221,12 +221,14 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
         memcpy(&size,mvect_buffer,2);
         memcpy(&vec_type,mvect_buffer+2,2);
     }
-    struct motion_vector mvarray[size];
+   //struct motion_vector mvarray[size];
                         
-    memcpy(mvarray,mvect_buffer+4,size*sizeof(motion_vector));
+    //memcpy(mvarray,mvect_buffer+4,size*sizeof(motion_vector));
+    
+    const motion_vector *mvo = (const motion_vector *)mvect_buffer+4;
     
         for (int i = 0; i < size; i++) {
-                motion_vector *mv = &mvarray[i];
+                const motion_vector *mv = &mvo[i];
                  
                 //Are the vectors inside the zone polygon?
                 if (!polygon.isInside(Coord(mv->xcoord,mv->ycoord)))      
