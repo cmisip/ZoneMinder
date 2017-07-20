@@ -224,7 +224,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
         vec_type=(uint16_t * )mvect_buffer+2;
         //memcpy(&size,mvect_buffer,2);
         //memcpy(&vec_type,mvect_buffer+2,2);
-    }
+    //}
    //struct motion_vector mvarray[size];
                         
     //memcpy(mvarray,mvect_buffer+4,size*sizeof(motion_vector));
@@ -257,7 +257,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
                      
                        
         }
-        
+    }    
         if (vec_count) {
           alarm_centre=Coord((uint16_t)(x_sum/vec_count),(uint16_t)(y_sum/vec_count));
         }
