@@ -282,7 +282,7 @@ if (!ctype) { //motion vectors from software h264 decoding
                        memcpy(mvect_buffer,&vec_count, sizeof(vec_count)); //size on first byte
                        uint16_t vec_type = 1;
                          
-                       memcpy(mvect_buffer+2,&vec_type, sizeof(vec_type));   //type of vector at 3rd byte
+                       memcpy(mvect_buffer+sizeof(vec_count),&vec_type, sizeof(vec_type));   //type of vector at 3rd byte
 
                        //Info("FFMPEG SW VEC_COUNT %d, ceiling %d", vec_count, vector_ceiling);
                
@@ -366,7 +366,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                          memcpy(mvect_buffer,&vec_count, sizeof(vec_count));  //size at first byte
                          uint16_t vec_type = 0;
                          
-                         memcpy(mvect_buffer+2,&vec_type, sizeof(vec_type));   //type of vector at 3rd byte
+                         memcpy(mvect_buffer+sizeof(vec_count),&vec_type, sizeof(vec_type));   //type of vector at 3rd byte
                          
                          //Info("FFMPEG HW VEC_COUNT %d, ceiling %d", vec_count, vector_ceiling);
                         
