@@ -221,11 +221,10 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
         //first 16bit value is size
         size=(uint16_t * )mvect_buffer;
         //second 16 bit value is source type of macroblock : 0 hardware, 1 software.  //FIXME, could be 8 bit value but probably better to keep things even
-        //vec_type=(uint16_t * )mvect_buffer+sizeof(*size);
-        vec_type=(uint16_t * )mvect_buffer+2;
+        vec_type=(uint16_t * )(mvect_buffer+sizeof(*size));  
     
-        //const motion_vector *mvo = (const motion_vector *)mvect_buffer+(sizeof(*size)+sizeof(*vec_type));  //sizeof would be safer in the long run if we decide to make changes to these types
-        const motion_vector *mvo = (const motion_vector *)mvect_buffer+4;
+        //sizeof would be safer in the long run if we decide to make changes to these types
+        const motion_vector *mvo = (const motion_vector *)(mvect_buffer+sizeof(*size)+sizeof(*vec_type));
         
         for (int i = 0; i < *size; i++) {
                 const motion_vector *mv = &mvo[i];
