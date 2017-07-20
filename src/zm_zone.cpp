@@ -208,8 +208,6 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
     uint16_t minimum_vector_coverage=((double)min_alarm_pixels/polygon.Area())*100; //best case assumed, all vectors are within polygon resulting in minimum score
     uint16_t maximum_vector_coverage=((double)max_alarm_pixels/polygon.Area())*100; //worst case assumed, all vectors could be thrown out
     
-    //uint16_t size=0;
-    //uint16_t vec_type;
     uint16_t vec_count=0;
     uint16_t x_sum=0;
     uint16_t y_sum=0;
@@ -218,18 +216,14 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
     
     
     
-    //first 16bit value is size
+  
     if (mvect_buffer) {
+        //first 16bit value is size
         size=(uint16_t * )mvect_buffer;
-        vec_type=(uint16_t * )mvect_buffer+2;
-        //memcpy(&size,mvect_buffer,2);
-        //memcpy(&vec_type,mvect_buffer+2,2);
-    //}
-   //struct motion_vector mvarray[size];
-                        
-    //memcpy(mvarray,mvect_buffer+4,size*sizeof(motion_vector));
+        //second 16 bit value is source type of macroblock : 0 hardware, 1 software.  //FIXME, could be 8 bit value but probably better to keep things even
+        vec_type=(uint16_t * )mvect_buffer+sizeof(size);
     
-    const motion_vector *mvo = (const motion_vector *)mvect_buffer+4;
+        const motion_vector *mvo = (const motion_vector *)mvect_buffer+(sizeof(size)+sizeof(vec_type));  //sizeof would be safer in the long run if we decide to make changes to these types
     
         for (int i = 0; i < *size; i++) {
                 const motion_vector *mv = &mvo[i];
@@ -257,10 +251,12 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
                      
                        
         }
-    }    
-        if (vec_count) {
+    }   
+    
+    
+    if (vec_count) {
           alarm_centre=Coord((uint16_t)(x_sum/vec_count),(uint16_t)(y_sum/vec_count));
-        }
+    }
   
    
     alarm_pixels = vec_count*20 ; //4 pixels per 4x4 macroblock multiplied by the skew value
