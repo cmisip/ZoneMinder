@@ -355,7 +355,8 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                             offset+=sizeof(motion_vector);
                             
                             if (vec_count > vector_ceiling) {  
-                              memset(mvect_buffer,0,image.mv_size);
+                              char * temp_ptr = (char *)mvect_buffer;
+                              memset(temp_ptr,0,image.mv_size);
                               vec_count=0;
                             break;
                         }    
