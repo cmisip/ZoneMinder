@@ -331,6 +331,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                           
                         uint8_t offset=sizeof(uint16_t)*2; //skip the first 4 bytes, reserved for size and vec_type
                         uint16_t vector_ceiling=(((mRawFrame->width * mRawFrame->height)/256)*(double)20)/100;  //FIXMEC, the size of hardware buffer is smaller than software buffer so can save memory by requesting smaller buffer size
+                        vector_ceiling--;
                         uint16_t vec_count=0;  
                         
                         mmal_buffer_header_mem_lock(buffer);
@@ -360,12 +361,12 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                               char * temp_ptr = (char *)mvect_buffer;
                               memset(temp_ptr,0,image.mv_size);
                               vec_count=0;
-                            break;
-                        }    
+                              break;
+                            }    
                             
                          mmal_buffer_header_mem_unlock(buffer);    
                             
-                         } 
+                        } 
                          memcpy(mvect_buffer,&vec_count, sizeof(vec_count));  //size at first byte
                          uint16_t vec_type = 0;
                          
