@@ -266,7 +266,7 @@ if (!ctype) { //motion vectors from software h264 decoding
                                 mvt.xcoord=mv->dst_x+i*4;
                                 mvt.ycoord=mv->dst_y+j*4;
                                 
-                                memcpy((motion_vector *)(mvect_buffer+offset),&mvt,sizeof(motion_vector));
+                                memcpy(mvect_buffer+offset,&mvt,sizeof(motion_vector));
                                 offset+=sizeof(motion_vector);
                                 vec_count++;
                            }
@@ -281,10 +281,10 @@ if (!ctype) { //motion vectors from software h264 decoding
                         }    
                         
                     }
-                       memcpy((uint16_t *)mvect_buffer,&vec_count, sizeof(vec_count)); //size on first byte
+                       memcpy(mvect_buffer,&vec_count, sizeof(vec_count)); //size on first byte
                        uint16_t vec_type = 1;
                          
-                       memcpy((uint16_t *)(mvect_buffer+sizeof(vec_count)),&vec_type, sizeof(vec_type));   //type of vector at 3rd byte
+                       memcpy(mvect_buffer+sizeof(vec_count),&vec_type, sizeof(vec_type));   //type of vector at 3rd byte
 
                        //Info("FFMPEG SW VEC_COUNT %d, ceiling %d", vec_count, vector_ceiling);
                
@@ -353,7 +353,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                             //mvt.y_vector = mv->y_vector;
                             vec_count++;
                             
-                            memcpy((motion_vector *)(mvect_buffer+offset),&mvt,sizeof(motion_vector));
+                            memcpy(mvect_buffer+offset,&mvt,sizeof(motion_vector));
                             offset+=sizeof(motion_vector);
                             
                             if (vec_count > vector_ceiling) {  
@@ -366,10 +366,10 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                          mmal_buffer_header_mem_unlock(buffer);    
                             
                          } 
-                         memcpy((uint16_t *)mvect_buffer,&vec_count, sizeof(vec_count));  //size at first byte
+                         memcpy(mvect_buffer,&vec_count, sizeof(vec_count));  //size at first byte
                          uint16_t vec_type = 0;
                          
-                         memcpy((uint16_t *)(mvect_buffer+sizeof(vec_count)),&vec_type, sizeof(vec_type));   //type of vector at 3rd byte
+                         memcpy(mvect_buffer+sizeof(vec_count),&vec_type, sizeof(vec_type));   //type of vector at 3rd byte
                          
                          //Info("FFMPEG HW VEC_COUNT %d, ceiling %d", vec_count, vector_ceiling);
                         
