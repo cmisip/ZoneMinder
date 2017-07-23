@@ -329,7 +329,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                         
                       if(buffer->flags & MMAL_BUFFER_HEADER_FLAG_CODECSIDEINFO) {
                           
-                        uint16_t s_offset=0;  
+                        //uint16_t s_offset=0;  
                         uint16_t t_offset=sizeof(uint16_t)*2; //skip the first 4 bytes, reserved for size and vec_type
                         uint16_t vector_ceiling=(((mRawFrame->width * mRawFrame->height)/256)*(double)20)/100;  //FIXMEC, the size of hardware buffer is smaller than software buffer so can save memory by requesting smaller buffer size
                         vector_ceiling--;
@@ -337,14 +337,16 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                         
                         mmal_buffer_header_mem_lock(buffer);
                         uint16_t size=buffer->length/sizeof(mmal_motion_vector);
+                        struct mmal_motion_vector mvarray[size];
                         
-                        uint8_t * buffer_ptr=(uint8_t*) buffer->data;
-                        
+                        //copy buffer->data to temporary
+                        memcpy(mvarray,buffer->data,buffer->length);
+                        mmal_buffer_header_mem_unlock(buffer);   
                         
                         for (int i=0;i < size ; i++) {
                             mmal_motion_vector mvs;
                             motion_vector mvt;
-                            memcpy(&mvs,buffer_ptr+s_offset,sizeof(mmal_motion_vector));
+                            memcpy(&mvs,mvarray+i,sizeof(mmal_motion_vector));
                             
                             if ((abs(mvs.x_vector) + abs(mvs.y_vector)) < 1)
                                continue;
@@ -358,17 +360,17 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                             vec_count++;
                             
                             memcpy(mvect_buffer+t_offset,&mvt,sizeof(motion_vector));
-                            s_offset+=sizeof(mmal_motion_vector);
+                            //s_offset+=sizeof(mmal_motion_vector);
                             t_offset+=sizeof(motion_vector);
                             
                             if (vec_count > vector_ceiling) {  
                               memset(mvect_buffer,0,image.mv_size);
                               vec_count=0;
-                              mmal_buffer_header_mem_unlock(buffer);   
+                              
                               break;
                             }    
                          
-                         mmal_buffer_header_mem_unlock(buffer);    
+                        //mmal_buffer_header_mem_unlock(buffer);    
                             
                         } 
                          memcpy(mvect_buffer,&vec_count, sizeof(vec_count));  //size at first byte
