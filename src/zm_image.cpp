@@ -153,7 +153,7 @@ Image::Image( const Image &p_image )
 
 Image::~Image() {
   DumpImgBuffer();
-}
+  }
 
 /* Should be called as part of program shutdown to free everything */
 void Image::Deinitialise() {
@@ -195,16 +195,6 @@ void Image::Initialise()
     if(config.cpu_extensions && sseversion >= 20) {
       fptr_blend = &sse2_fastblend; /* SSE2 fast blend */
       Debug(4,"Blend: Using SSE2 fast blend function");
-    } else if(config.cpu_extensions && neonversion >= 1) {
-#if defined(__aarch64__)
-      fptr_blend = &neon64_armv8_fastblend;  /* ARM Neon (AArch64) fast blend */
-      Debug(4,"Blend: Using ARM Neon (AArch64) fast blend function");
-#elif defined(__arm__)
-      fptr_blend = &neon32_armv7_fastblend;  /* ARM Neon (AArch32) fast blend */
-      Debug(4,"Blend: Using ARM Neon (AArch32) fast blend function");
-#else
-      Panic("Bug: Non ARM platform but neon present");
-#endif
     } else {
       fptr_blend = &std_fastblend;  /* standard fast blend */
       Debug(4,"Blend: Using fast blend function");
@@ -265,26 +255,7 @@ void Image::Initialise()
       fptr_delta8_abgr = &sse2_delta8_abgr;
       fptr_delta8_gray8 = &sse2_delta8_gray8;
       Debug(4,"Delta: Using SSE2 delta functions");
-    } else if(neonversion >= 1) {
-      /* ARM Neon available */
-#if defined(__aarch64__)
-      fptr_delta8_rgba = &neon64_armv8_delta8_rgba;
-      fptr_delta8_bgra = &neon64_armv8_delta8_bgra;
-      fptr_delta8_argb = &neon64_armv8_delta8_argb;
-      fptr_delta8_abgr = &neon64_armv8_delta8_abgr;
-      fptr_delta8_gray8 = &neon64_armv8_delta8_gray8;
-      Debug(4,"Delta: Using ARM Neon (AArch64) delta functions");
-#elif defined(__arm__)
-      fptr_delta8_rgba = &neon32_armv7_delta8_rgba;
-      fptr_delta8_bgra = &neon32_armv7_delta8_bgra;
-      fptr_delta8_argb = &neon32_armv7_delta8_argb;
-      fptr_delta8_abgr = &neon32_armv7_delta8_abgr;
-      fptr_delta8_gray8 = &neon32_armv7_delta8_gray8;
-      Debug(4,"Delta: Using ARM Neon (AArch32) delta functions");
-#else
-      Panic("Bug: Non ARM platform but neon present");
-#endif
-    } else {
+    }  else {
       /* No suitable SSE version available */
       fptr_delta8_rgba = &std_delta8_rgba;
       fptr_delta8_bgra = &std_delta8_bgra;
@@ -504,7 +475,7 @@ void Image::AssignDirect( const unsigned int p_width, const unsigned int p_heigh
       size = new_buffer_size; // was pixels*colours, but we already calculated it above as new_buffer_size
 
       /* Copy into the held buffer */
-      if(new_buffer != buffer)
+      if(new_buffer != buffer) 
         (*fptr_imgbufcpy)(buffer, new_buffer, size);
 
       /* Free the new buffer */
@@ -573,7 +544,7 @@ void Image::Assign(const unsigned int p_width, const unsigned int p_height, cons
     size = new_size;
   }
 
-  if(new_buffer != buffer)
+  if(new_buffer != buffer) 
     (*fptr_imgbufcpy)(buffer, new_buffer, size);
 
 }
@@ -613,9 +584,9 @@ void Image::Assign( const Image &image ) {
     size = new_size;
   }
 
-  if(image.buffer != buffer)
+  if(image.buffer != buffer) 
     (*fptr_imgbufcpy)(buffer, image.buffer, size);
-}
+  }  
 
 Image *Image::HighlightEdges( Rgb colour, unsigned int p_colours, unsigned int p_subpixelorder, const Box *limits )
 {
@@ -3798,7 +3769,7 @@ void neon32_armv7_delta8_gray8(const uint8_t* col1, const uint8_t* col2, uint8_t
   : "%q0", "%q1", "%q2", "%q3", "%q4", "%q5", "%q6", "%q7", "cc", "memory"
   );
 //#else
- // Panic("Neon function called on a non-ARM platform or Neon code is absent");
+  //Panic("Neon function called on a non-ARM platform or Neon code is absent");
 #endif
 }
 
@@ -3949,7 +3920,7 @@ __attribute__((noinline)) void neon64_armv8_delta8_rgb32(const uint8_t* col1, co
   : "%x12", "%v16", "%v17", "%v18", "%v19", "%v20", "%v21", "%v22", "%v23", "%v24", "cc", "memory"
   );
 //#else
-  //Panic("Neon function called on a non-ARM platform or Neon code is absent");
+//  Panic("Neon function called on a non-ARM platform or Neon code is absent");
 #endif
 }
 
