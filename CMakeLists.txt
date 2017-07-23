@@ -294,7 +294,7 @@ endif(ZLIB_FOUND)
 #mmal
 
 if(${CMAKE_SYSTEM_PROCESSOR} MATCHES arm*) 
-find_package(MMAL)
+MESSAGE(STATUS, "System Processor is ARM, Looking for MMAL")
 FIND_LIBRARY(mmalcore_LIBS NAMES mmal_core PATHS /opt/vc/lib)
 FIND_LIBRARY(mmalutil_LIBS NAMES mmal_util PATHS /opt/vc/lib)
 FIND_LIBRARY(mmal_LIBS NAMES mmal PATHS /opt/vc/lib)
