@@ -246,36 +246,37 @@ if (!ctype) { //motion vectors from software h264 decoding
         
             if (sd) {
                    
-                   uint8_t offset=sizeof(uint16_t)*2; //skip first 4 bytes for size and vec_type
-                   const AVMotionVector *mvs = (const AVMotionVector *)sd->data;
+                   uint16_t t_offset=sizeof(uint16_t)*2; //skip first 4 bytes for size and vec_type
                    uint16_t vec_count=0;
-                   for (unsigned int i = 0; i < sd->size / sizeof(*mvs); i++) {
-                        const AVMotionVector *mv = &mvs[i];
+                   uint16_t size=sd->size/sizeof(AVMotionVector);
+                   
+                   AVMotionVector mvarray[size];
+                   for (unsigned int i = 0; i < size; i++) {
                       
+                        AVMotionVector mvs;
                         motion_vector mvt;
                         
-                        int x_disp = mv->src_x - mv->dst_x;
-                        int y_disp = mv->src_y - mv->dst_y;
+                        memcpy(&mvs,mvarray+i,sizeof(AVMotionVector));
+                        int x_disp = mvs.src_x - mvs.dst_x;
+                        int y_disp = mvs.src_y - mvs.dst_y;
                         
                         
                         if ((abs(x_disp) + abs(y_disp)) < 1)
                             continue;
                         
-                        for (uint16_t i=0 ; i< mv->w/4; i++) {
-                           for (uint16_t j=0 ; j< mv->h/4; j++) {
-                                mvt.xcoord=mv->dst_x+i*4;
-                                mvt.ycoord=mv->dst_y+j*4;
+                        for (uint16_t i=0 ; i< mvs.w/4; i++) {
+                           for (uint16_t j=0 ; j< mvs.h/4; j++) {
+                                mvt.xcoord=mvs.dst_x+i*4;
+                                mvt.ycoord=mvs.dst_y+j*4;
                                 
-                                memcpy(mvect_buffer+offset,&mvt,sizeof(motion_vector));
-                                offset+=sizeof(motion_vector);
+                                memcpy(mvect_buffer+t_offset,&mvt,sizeof(motion_vector));
+                                t_offset+=sizeof(motion_vector);
                                 vec_count++;
                            }
                        }
                       
                         if (vec_count > vector_ceiling) {  
-                            //memset(mvect_buffer,0,image.mv_size);
-                            char * temp_ptr = (char *)mvect_buffer;
-                            memset(temp_ptr,0,image.mv_size);
+                            memset(mvect_buffer,0,image.mv_size);
                             vec_count=0;
                             break;
                         }    
@@ -286,7 +287,8 @@ if (!ctype) { //motion vectors from software h264 decoding
                          
                        memcpy(mvect_buffer+sizeof(vec_count),&vec_type, sizeof(vec_type));   //type of vector at 3rd byte
 
-                       //Info("FFMPEG SW VEC_COUNT %d, ceiling %d", vec_count, vector_ceiling);
+                       if (vec_count > 4)
+                          Info("FFMPEG SW VEC_COUNT %d, ceiling %d", vec_count, vector_ceiling);
                
             } 
 }    
@@ -329,7 +331,6 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                         
                       if(buffer->flags & MMAL_BUFFER_HEADER_FLAG_CODECSIDEINFO) {
                           
-                        //uint16_t s_offset=0;  
                         uint16_t t_offset=sizeof(uint16_t)*2; //skip the first 4 bytes, reserved for size and vec_type
                         uint16_t vector_ceiling=(((mRawFrame->width * mRawFrame->height)/256)*(double)20)/100;  //FIXMEC, the size of hardware buffer is smaller than software buffer so can save memory by requesting smaller buffer size
                         vector_ceiling--;
@@ -360,7 +361,6 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                             vec_count++;
                             
                             memcpy(mvect_buffer+t_offset,&mvt,sizeof(motion_vector));
-                            //s_offset+=sizeof(mmal_motion_vector);
                             t_offset+=sizeof(motion_vector);
                             
                             if (vec_count > vector_ceiling) {  
@@ -370,7 +370,6 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                               break;
                             }    
                          
-                        //mmal_buffer_header_mem_unlock(buffer);    
                             
                         } 
                          memcpy(mvect_buffer,&vec_count, sizeof(vec_count));  //size at first byte
@@ -378,7 +377,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                          
                          memcpy(mvect_buffer+sizeof(vec_count),&vec_type, sizeof(vec_type));   //type of vector at 3rd byte
                          
-                         if (vec_count)
+                         if (vec_count > 4)
                              Info("FFMPEG HW VEC_COUNT %d, ceiling %d", vec_count, vector_ceiling);
                         
                       } 
