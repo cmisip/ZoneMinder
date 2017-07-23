@@ -376,7 +376,8 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                          
                          memcpy(mvect_buffer+sizeof(vec_count),&vec_type, sizeof(vec_type));   //type of vector at 3rd byte
                          
-                         Info("FFMPEG HW VEC_COUNT %d, ceiling %d", vec_count, vector_ceiling);
+                         if (vec_count)
+                             Info("FFMPEG HW VEC_COUNT %d, ceiling %d", vec_count, vector_ceiling);
                         
                       } 
                     

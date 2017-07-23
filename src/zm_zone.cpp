@@ -271,8 +271,8 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
     
     if (result) {
        Info("ALARM | SCORE ==> %d | VECS ==> %d | SCORE RANGE ==> %d  <>  %d", score, vec_count,   minimum_vector_coverage, maximum_vector_coverage);
-    } else
-       Info("IDLE  | SCORE ==> %d | VECS ==> %d | SCORE RANGE ==> %d  <>  %d", score, vec_count,   minimum_vector_coverage, maximum_vector_coverage);
+    } //else
+      // Info("IDLE  | SCORE ==> %d | VECS ==> %d | SCORE RANGE ==> %d  <>  %d", score, vec_count,   minimum_vector_coverage, maximum_vector_coverage);
  
     
     
