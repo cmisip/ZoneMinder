@@ -211,36 +211,36 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
     uint16_t vec_count=0;
     uint16_t x_sum=0;
     uint16_t y_sum=0;
-    uint16_t *size;
-    uint16_t *vec_type;
+    uint16_t size;
+    uint16_t vec_type;
     
     
     
   
     if (mvect_buffer) {
         //first 16bit value is size
-        size=(uint16_t * )mvect_buffer;
+        memcpy(&size,mvect_buffer,sizeof(size));
         //second 16 bit value is source type of macroblock : 0 hardware, 1 software.  //FIXME, could be 8 bit value but probably better to keep things even
-        vec_type=(uint16_t * )(mvect_buffer+sizeof(*size));  
-    
+        memcpy(&vec_type,mvect_buffer+2,sizeof(vec_type));    
         //sizeof would be safer in the long run if we decide to make changes to these types
-        const motion_vector *mvo = (const motion_vector *)(mvect_buffer+sizeof(*size)+sizeof(*vec_type));
         
-        for (int i = 0; i < *size; i++) {
-                const motion_vector *mv = &mvo[i];
-                 
+        uint16_t offset=4;
+        for (int i = 0; i < size; i++) {
+                //const motion_vector *mv = &mvo[i];
+                motion_vector mv;
+                memcpy(&mv,mvect_buffer+offset,sizeof(motion_vector));
                 //Are the vectors inside the zone polygon?
-                if (!polygon.isInside(Coord(mv->xcoord,mv->ycoord)))      
+                if (!polygon.isInside(Coord(mv.xcoord,mv.ycoord)))      
                     continue;
                 
                     uint16_t x;
                     uint16_t y;
                         
-                if (*vec_type == 0 )  //hardware macroblock with size of 16x16, there are 16 4x4 blocks in each one
+                if (vec_type == 0 )  //hardware macroblock with size of 16x16, there are 16 4x4 blocks in each one
                   for (uint16_t i=0 ; i< 4; i++) {
                            for (uint16_t j=0 ; j< 4; j++) {
-                                x=mv->xcoord+i*4;
-                                y=mv->ycoord+j*4;
+                                x=mv.xcoord+i*4;
+                                y=mv.ycoord+j*4;
                                 x_sum+=x;
                                 y_sum+=y;   
                                 vec_count++;

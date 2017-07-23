@@ -329,7 +329,8 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                         
                       if(buffer->flags & MMAL_BUFFER_HEADER_FLAG_CODECSIDEINFO) {
                           
-                        uint8_t offset=sizeof(uint16_t)*2; //skip the first 4 bytes, reserved for size and vec_type
+                        uint16_t s_offset=0;  
+                        uint16_t t_offset=sizeof(uint16_t)*2; //skip the first 4 bytes, reserved for size and vec_type
                         uint16_t vector_ceiling=(((mRawFrame->width * mRawFrame->height)/256)*(double)20)/100;  //FIXMEC, the size of hardware buffer is smaller than software buffer so can save memory by requesting smaller buffer size
                         vector_ceiling--;
                         uint16_t vec_count=0;  
@@ -337,13 +338,13 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                         mmal_buffer_header_mem_lock(buffer);
                         uint16_t size=buffer->length/sizeof(mmal_motion_vector);
                         
-                        const mmal_motion_vector *mvi = (const mmal_motion_vector *)buffer->data;  //FIXMEC, would it be faster to memcpy to a temporary buffer so we dont hold up the hardware buffer as the encoder is not synchronous
                         
                         for (int i=0;i < size ; i++) {
+                            mmal_motion_vector mvs;
                             motion_vector mvt;
-                            const mmal_motion_vector *mv = &mvi[i]; 
+                            memcpy(&mvs,buffer->data+s_offset,sizeof(mmal_motion_vector));
                             
-                            if ((abs(mv->x_vector) + abs(mv->y_vector)) < 1)
+                            if ((abs(mvs.x_vector) + abs(mvs.y_vector)) < 1)
                                continue;
                           
                             mvt.xcoord = (i*16) % (mVideoCodecContext->width + 16);
@@ -354,16 +355,17 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                             //mvt.y_vector = mv->y_vector;
                             vec_count++;
                             
-                            memcpy(mvect_buffer+offset,&mvt,sizeof(motion_vector));
-                            offset+=sizeof(motion_vector);
+                            memcpy(mvect_buffer+t_offset,&mvt,sizeof(motion_vector));
+                            s_offset+=sizeof(mmal_motion_vector);
+                            t_offset+=sizeof(motion_vector);
                             
                             if (vec_count > vector_ceiling) {  
-                              char * temp_ptr = (char *)mvect_buffer;
-                              memset(temp_ptr,0,image.mv_size);
+                              memset(mvect_buffer,0,image.mv_size);
                               vec_count=0;
+                              mmal_buffer_header_mem_unlock(buffer);   
                               break;
                             }    
-                            
+                         
                          mmal_buffer_header_mem_unlock(buffer);    
                             
                         } 
@@ -412,7 +414,7 @@ end:
           mConvertContext = sws_getContext(mVideoCodecContext->width,
                                            mVideoCodecContext->height,
                                            mVideoCodecContext->pix_fmt,
-                                           width, height, imagePixFormat,
+                                           width-1, height, imagePixFormat,
                                            SWS_BICUBIC, NULL, NULL, NULL);
 
           if(mConvertContext == NULL)
