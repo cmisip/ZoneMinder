@@ -224,11 +224,15 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
         memcpy(&vec_type,mvect_buffer+2,sizeof(vec_type));    
         //sizeof would be safer in the long run if we decide to make changes to these types
         
+        //struct motion_vector mvarray[size];
+        
         uint16_t offset=4;
         for (int i = 0; i < size; i++) {
                 //const motion_vector *mv = &mvo[i];
                 motion_vector mv;
                 memcpy(&mv,mvect_buffer+offset,sizeof(motion_vector));
+                offset+=sizeof(motion_vector);
+                //memcpy(&mv,mvarray+i,sizeof(motion_vector));
                 //Are the vectors inside the zone polygon?
                 if (!polygon.isInside(Coord(mv.xcoord,mv.ycoord)))      
                     continue;
