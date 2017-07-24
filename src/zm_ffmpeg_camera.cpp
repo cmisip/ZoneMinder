@@ -344,7 +344,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                         memcpy(mvarray,buffer->data,buffer->length);
                         mmal_buffer_header_mem_unlock(buffer);   
                         
-                        for (int i=0;i < size ; i++) {
+                        /*for (int i=0;i < size ; i++) {
                             mmal_motion_vector mvs;
                             motion_vector mvt;
                             memcpy(&mvs,mvarray+i,sizeof(mmal_motion_vector));
@@ -371,7 +371,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                             }    
                          
                             
-                        } 
+                        } */
                          memcpy(mvect_buffer,&vec_count, sizeof(vec_count));  //size at first byte
                          uint16_t vec_type = 0;
                          
@@ -383,7 +383,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                       } 
                     
                     
-                    mmal_buffer_header_release(buffer);
+                    //mmal_buffer_header_release(buffer);
                     
                   
                     if ((buffer = mmal_queue_get(pool_out->queue)) != NULL) {
