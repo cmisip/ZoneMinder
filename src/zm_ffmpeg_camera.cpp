@@ -228,8 +228,8 @@ if (!( cfunction == Monitor::MVDECT )) {
         if (mvect_buffer ==  NULL ){
                 Error("Failed requesting vector buffer for the captured image.");
                 return (-1); 
-        } else
-                memset(mvect_buffer,0,image.mv_size);
+        } //else
+                //memset(mvect_buffer,0,image.mv_size);
         
         
         
@@ -276,7 +276,7 @@ if (!ctype) { //motion vectors from software h264 decoding
                        }
                       
                         if (vec_count > vector_ceiling) {  
-                            memset(mvect_buffer,0,image.mv_size);
+                            //memset(mvect_buffer,0,image.mv_size);
                             vec_count=0;
                             break;
                         }    
@@ -364,7 +364,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                             t_offset+=sizeof(motion_vector);
                             
                             if (vec_count > vector_ceiling) {  
-                              memset(mvect_buffer,0,image.mv_size);
+                              //memset(mvect_buffer,0,image.mv_size);
                               vec_count=0;
                               
                               break;
