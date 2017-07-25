@@ -223,7 +223,7 @@ if (!( cfunction == Monitor::MVDECT )) {
 }
 
         
-{   
+/*{   
         mvect_buffer=image.VectBuffer();   
         if (mvect_buffer ==  NULL ){
                 Error("Failed requesting vector buffer for the captured image.");
@@ -233,10 +233,11 @@ if (!( cfunction == Monitor::MVDECT )) {
         
         
         
-}
-
-     
-        
+}*/
+      uint8_t * tmvect_buffer;
+      {      
+       tmvect_buffer =  (uint8_t *)malloc(image.mv_size);
+            } 
 if (!ctype) { //motion vectors from software h264 decoding
          
             AVFrameSideData *sd=NULL;
@@ -269,7 +270,7 @@ if (!ctype) { //motion vectors from software h264 decoding
                                 mvt.xcoord=mvs.dst_x+i*4;
                                 mvt.ycoord=mvs.dst_y+j*4;
                                 
-                                memcpy(mvect_buffer+t_offset,&mvt,sizeof(Image::motion_vector));
+                                memcpy(tmvect_buffer+t_offset,&mvt,sizeof(Image::motion_vector));
                                 t_offset+=sizeof(Image::motion_vector);
                                 vec_count++;
                            }
@@ -282,13 +283,22 @@ if (!ctype) { //motion vectors from software h264 decoding
                         }    
                         
                     }
-                       memcpy(mvect_buffer,&vec_count, sizeof(vec_count)); //size on first byte
+                       memcpy(tmvect_buffer,&vec_count, sizeof(vec_count)); //size on first byte
                        uint16_t vec_type = 1;
                          
-                       memcpy(mvect_buffer+sizeof(vec_count),&vec_type, sizeof(vec_type));   //type of vector at 3rd byte
+                       memcpy(tmvect_buffer+sizeof(vec_count),&vec_type, sizeof(vec_type));   //type of vector at 3rd byte
 
                       // if (vec_count > 4)
                        //   Info("FFMPEG SW VEC_COUNT %d, ceiling %d", vec_count, vector_ceiling);
+                       
+                        mvect_buffer=image.VectBuffer();   
+                        if (mvect_buffer ==  NULL ){
+                           Error("Failed requesting vector buffer for the captured image.");
+                           return (-1); 
+                        } else {
+                           memcpy(mvect_buffer,tmvect_buffer,image.mv_size);
+                           free(tmvect_buffer);  
+                        }   
                
             } 
 }    
@@ -360,7 +370,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                             //mvt.y_vector = mv->y_vector;
                             vec_count++;
                             
-                            memcpy(mvect_buffer+t_offset,&mvt,sizeof(Image::motion_vector));
+                            memcpy(tmvect_buffer+t_offset,&mvt,sizeof(Image::motion_vector));
                             t_offset+=sizeof(Image::motion_vector);
                             
                             if (vec_count > vector_ceiling) {  
@@ -373,18 +383,29 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                          
                             
                         } 
-                         memcpy(mvect_buffer,&vec_count, sizeof(vec_count));  //size at first byte
+                         memcpy(tmvect_buffer,&vec_count, sizeof(vec_count));  //size at first byte
                          uint16_t vec_type = 0;
                          
-                         memcpy(mvect_buffer+sizeof(vec_count),&vec_type, sizeof(vec_type));   //type of vector at 3rd byte
+                         memcpy(tmvect_buffer+sizeof(vec_count),&vec_type, sizeof(vec_type));   //type of vector at 3rd byte
                          
-                        // if (vec_count > 4)
-                            // Info("FFMPEG HW VEC_COUNT %d, ceiling %d", vec_count, vector_ceiling);
+                         if (vec_count > 4)
+                             Info("FFMPEG HW VEC_COUNT %d, ceiling %d", vec_count, vector_ceiling);
+                         
+                        mvect_buffer=image.VectBuffer();   
+                        if (mvect_buffer ==  NULL ){
+                           Error("Failed requesting vector buffer for the captured image.");
+                           return (-1); 
+                        } else {
+                           memcpy(mvect_buffer,tmvect_buffer,image.mv_size);
+                           free(tmvect_buffer);  
+                        }    
                         
                       } 
                     
                     
                     mmal_buffer_header_release(buffer);
+                    
+                    memcpy(mvect_buffer, tmvect_buffer, image.mv_size);
                     
                   
                     if ((buffer = mmal_queue_get(pool_out->queue)) != NULL) {
@@ -571,6 +592,7 @@ int FfmpegCamera::OpenMmal(AVCodecContext *mVideoCodecContext){
 }
 
 int FfmpegCamera::CloseMmal(){ 
+   Info("Shutting down MMAL");
    if (encoder)
       mmal_component_destroy(encoder);
    if (pool_in)

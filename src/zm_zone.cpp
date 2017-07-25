@@ -218,17 +218,23 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
     
   
     if (mvect_buffer) {
+        
         //first 16bit value is size
         memcpy(&size,mvect_buffer,sizeof(size));
+        
+        uint8_t *tmvect_buffer =  (uint8_t *)malloc(size*sizeof(Image::motion_vector)+4);
+        memcpy(tmvect_buffer,mvect_buffer,size*sizeof(Image::motion_vector)+4);
+        
         //second 16 bit value is source type of macroblock : 0 hardware, 1 software.  //FIXME, could be 8 bit value but probably better to keep things even
-        memcpy(&vec_type,mvect_buffer+2,sizeof(vec_type));    
+        memcpy(&vec_type,tmvect_buffer+2,sizeof(vec_type));    
         //sizeof would be safer in the long run if we decide to make changes to these types
         
         
         uint16_t offset=sizeof(uint16_t)*2;
         for (int i = 0; i < size; i++) {
+            
                 Image::motion_vector mv;
-                memcpy(&mv,mvect_buffer+offset,sizeof(Image::motion_vector));
+                memcpy(&mv,tmvect_buffer+offset,sizeof(Image::motion_vector));
                 offset+=sizeof(Image::motion_vector);
 
                 //Are the vectors inside the zone polygon?
@@ -254,6 +260,8 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
                      
                        
         }
+        
+        free(tmvect_buffer);
     }   
     
     
@@ -269,11 +277,11 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
     //User expects value of percent min_alarm_pixels and max_alarm_pixels to be 0-100, I think 0.0 - 0.2 is practical (corresponding to percentages 0-100)
     
     
-  //  bool result=score > minimum_vector_coverage && score < maximum_vector_coverage;
+    bool result=score > minimum_vector_coverage && score < maximum_vector_coverage;
     
-   // if (result) {
-  //     Info("ALARM | SCORE ==> %d | VECS ==> %d | SCORE RANGE ==> %d  <>  %d", score, vec_count,   minimum_vector_coverage, maximum_vector_coverage);
-  //  } //else
+    if (result) {
+       Info("ALARM | SCORE ==> %d | VECS ==> %d | SCORE RANGE ==> %d  <>  %d", score, vec_count,   minimum_vector_coverage, maximum_vector_coverage);
+    } //else
       // Info("IDLE  | SCORE ==> %d | VECS ==> %d | SCORE RANGE ==> %d  <>  %d", score, vec_count,   minimum_vector_coverage, maximum_vector_coverage);
  
     
