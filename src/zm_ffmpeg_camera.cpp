@@ -384,7 +384,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                       } 
                     
                     
-                    //mmal_buffer_header_release(buffer);
+                    mmal_buffer_header_release(buffer);
                     
                   
                     if ((buffer = mmal_queue_get(pool_out->queue)) != NULL) {

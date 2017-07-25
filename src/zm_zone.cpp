@@ -225,7 +225,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
         //sizeof would be safer in the long run if we decide to make changes to these types
         
         
-        uint16_t offset=4;
+        uint16_t offset=sizeof(uint16_t)*2;
         for (int i = 0; i < size; i++) {
                 Image::motion_vector mv;
                 memcpy(&mv,mvect_buffer+offset,sizeof(Image::motion_vector));
