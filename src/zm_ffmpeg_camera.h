@@ -103,7 +103,7 @@ class FfmpegCamera : public Camera {
      char x_vector;
      char y_vector; 
      short sad;
-    };
+    }__attribute__((packed));
 #endif
     enum h264_codec {
         software,
@@ -120,7 +120,7 @@ class FfmpegCamera : public Camera {
     //Future expansion
     //int16_t x_vector;  //magnitude of displacement could be a negative number       
     //int16_t y_vector;
-  };
+  } __attribute__((packed));
   
   
   
