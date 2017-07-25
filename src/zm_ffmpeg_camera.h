@@ -103,7 +103,8 @@ class FfmpegCamera : public Camera {
      char x_vector;
      char y_vector; 
      short sad;
-    }__attribute__((packed));
+    //}__attribute__((packed));
+    };
 #endif
     enum h264_codec {
         software,
