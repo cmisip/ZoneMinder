@@ -345,7 +345,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                         mmal_buffer_header_mem_unlock(buffer);   
                         
                         for (int i=0;i < size ; i++) {
-                            Image::mmal_motion_vector mvs;
+                            mmal_motion_vector mvs;
                             Image::motion_vector mvt;
                             memcpy(&mvs,mvarray+i,sizeof(mmal_motion_vector));
                             
