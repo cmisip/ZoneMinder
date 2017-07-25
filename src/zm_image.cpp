@@ -181,6 +181,9 @@ Image::~Image() {
   DumpImgBuffer();
   if (mv_buffer) {
         //zm_freealigned(mv_buffer);
+      while (*mv_buffer == 0) {
+          usleep(1000);
+      }            
       free(mv_buffer);
         mv_buffer = NULL;
   }
