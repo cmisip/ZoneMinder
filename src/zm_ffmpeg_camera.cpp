@@ -345,8 +345,8 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                         mmal_buffer_header_mem_unlock(buffer);   
                         
                         for (int i=0;i < size ; i++) {
-                            mmal_motion_vector mvs;
-                            motion_vector mvt;
+                            Image::mmal_motion_vector mvs;
+                            Image::motion_vector mvt;
                             memcpy(&mvs,mvarray+i,sizeof(mmal_motion_vector));
                             
                             if ((abs(mvs.x_vector) + abs(mvs.y_vector)) < 1)
@@ -360,8 +360,8 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                             //mvt.y_vector = mv->y_vector;
                             vec_count++;
                             
-                            memcpy(mvect_buffer+t_offset,&mvt,sizeof(motion_vector));
-                            t_offset+=sizeof(motion_vector);
+                            memcpy(mvect_buffer+t_offset,&mvt,sizeof(Image::motion_vector));
+                            t_offset+=sizeof(Image::motion_vector);
                             
                             if (vec_count > vector_ceiling) {  
                               //memset(mvect_buffer,0,image.mv_size);
