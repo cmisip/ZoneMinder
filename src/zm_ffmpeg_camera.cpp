@@ -365,6 +365,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                             
                             if (vec_count > vector_ceiling) {  
                               //memset(mvect_buffer,0,image.mv_size);
+                                Info("Exceeded vector ceiling");
                               vec_count=0;
                               
                               break;
