@@ -227,9 +227,9 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
         
         uint16_t offset=4;
         for (int i = 0; i < size; i++) {
-                motion_vector mv;
-                memcpy(&mv,mvect_buffer+offset,sizeof(motion_vector));
-                offset+=sizeof(motion_vector);
+                Image::motion_vector mv;
+                memcpy(&mv,mvect_buffer+offset,sizeof(Image::motion_vector));
+                offset+=sizeof(Image::motion_vector);
 
                 //Are the vectors inside the zone polygon?
                 if (!polygon.isInside(Coord(mv.xcoord,mv.ycoord)))      

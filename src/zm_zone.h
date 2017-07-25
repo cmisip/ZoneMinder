@@ -47,16 +47,6 @@ public:
   typedef enum { ALARMED_PIXELS=1, FILTERED_PIXELS, BLOBS } CheckMethod;
 
   
-  struct motion_vector {
-    char x_vector;
-    char y_vector;
-    uint16_t xcoord;  //location of top left corner
-    uint16_t ycoord;
-    uint8_t width;    //dimensions of macroblock
-    uint8_t height;
-    unsigned short sad;
-};
-
 protected:
   // Inputs
   Monitor      *monitor;

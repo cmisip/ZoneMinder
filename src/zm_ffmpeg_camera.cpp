@@ -254,7 +254,7 @@ if (!ctype) { //motion vectors from software h264 decoding
                    for (unsigned int i = 0; i < size; i++) {
                       
                         AVMotionVector mvs;
-                        motion_vector mvt;
+                        Image::motion_vector mvt;
                         
                         memcpy(&mvs,mvarray+i,sizeof(AVMotionVector));
                         int x_disp = mvs.src_x - mvs.dst_x;
@@ -269,8 +269,8 @@ if (!ctype) { //motion vectors from software h264 decoding
                                 mvt.xcoord=mvs.dst_x+i*4;
                                 mvt.ycoord=mvs.dst_y+j*4;
                                 
-                                memcpy(mvect_buffer+t_offset,&mvt,sizeof(motion_vector));
-                                t_offset+=sizeof(motion_vector);
+                                memcpy(mvect_buffer+t_offset,&mvt,sizeof(Image::motion_vector));
+                                t_offset+=sizeof(Image::motion_vector);
                                 vec_count++;
                            }
                        }

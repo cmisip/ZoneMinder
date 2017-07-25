@@ -146,6 +146,17 @@ public:
         
         //maximum size bytes required to store at 0 byte the size in uint16_t, and each pair of uint16_t for x, and y values
         unsigned int mv_size;
+ 
+struct motion_vector { //SW vectors will be 4x4, HW vectors will be 16x16
+    uint16_t xcoord;  //location of top left corner
+    uint16_t ycoord;
+    
+    //Future expansion
+    //int16_t x_vector;  //magnitude of displacement could be a negative number       
+    //int16_t y_vector;
+  //} __attribute__((packed));
+    };
+  
         
 protected:
 	static bool initialised;
