@@ -603,7 +603,7 @@ Monitor::~Monitor() {
     timestamps = 0;
   }
   if ( images ) {
-    delete[] images;
+          delete[] images;
     images = 0;
   }
   if ( privacy_bitmask ) {
@@ -621,8 +621,12 @@ Monitor::~Monitor() {
       delete next_buffer.timestamp;
     }
     for ( int i = 0; i < image_buffer_count; i++ ) {
-      delete image_buffer[i].image;
-    }
+        if (function == MVDECT) {
+          while (*(image_buffer[i].image->VectBuffer()) != 0)
+            usleep(1000);
+        }
+        delete image_buffer[i].image;
+        }
     delete[] image_buffer;
   } // end if mem_ptr
 
