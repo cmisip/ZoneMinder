@@ -559,11 +559,11 @@ bool Monitor::connect() {
     shared_images = (uint8_t*)((unsigned long)shared_images + (64 - ((unsigned long)shared_images % 64)));
   }
   
-  if(((unsigned long)shared_mbuff % 64) != 0) {
-    /* Align images buffer to nearest 64 byte boundary */
+  /*if(((unsigned long)shared_mbuff % 64) != 0) {
+    // Align images buffer to nearest 64 byte boundary 
     Debug(3,"Aligning shared memory buffer to the next 64 byte boundary");
     shared_mbuff = (uint8_t*)((unsigned long)shared_mbuff + (64 - ((unsigned long)shared_mbuff % 64)));
-  }
+  }*/
   image_buffer = new Snapshot[image_buffer_count];
 
 
