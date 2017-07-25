@@ -223,7 +223,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
         memcpy(&size,mvect_buffer,sizeof(size));
         
         uint8_t *tmvect_buffer =  (uint8_t *)malloc(size*sizeof(Image::motion_vector)+4);
-        memcpy(tmvect_buffer,mvect_buffer,size*sizeof(Image::motion_vector)+4);
+        memcpy(tmvect_buffer,mvect_buffer,(size*sizeof(Image::motion_vector))+4);
         
         //second 16 bit value is source type of macroblock : 0 hardware, 1 software.  //FIXME, could be 8 bit value but probably better to keep things even
         memcpy(&vec_type,tmvect_buffer+2,sizeof(vec_type));    
