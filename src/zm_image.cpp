@@ -93,7 +93,7 @@ Image::Image() {
   if (!mv_buffer) {
       mv_buffer = (uint8_t *) malloc(mv_size);
       //mv_buffer = (uint8_t*)zm_mallocaligned(64,mv_size);
-      //memset(mv_buffer,0,mv_size);
+      memset(mv_buffer,0,mv_size);
   }
   text[0] = '\0';
 }
@@ -115,7 +115,7 @@ Image::Image( const char *filename ) {
   if (!mv_buffer) {
       mv_buffer = (uint8_t *) malloc(mv_size);
       //mv_buffer = (uint8_t*)zm_mallocaligned(64,mv_size);
-      //memset(mv_buffer,0,mv_size);
+      memset(mv_buffer,0,mv_size);
   }
   ReadJpeg( filename, ZM_COLOUR_RGB24, ZM_SUBPIX_ORDER_RGB);
   text[0] = '\0';
@@ -137,7 +137,7 @@ Image::Image( int p_width, int p_height, int p_colours, int p_subpixelorder, uin
   if (!mv_buffer) {
       mv_buffer = (uint8_t *) malloc(mv_size);
       //mv_buffer = (uint8_t*)zm_mallocaligned(64,mv_size);
-      //memset(mv_buffer,0,mv_size);
+      memset(mv_buffer,0,mv_size);
   }
   if ( p_buffer )
   {
@@ -169,7 +169,7 @@ Image::Image( const Image &p_image )
   if (!mv_buffer) {
       mv_buffer = (uint8_t *) malloc(mv_size);
       //mv_buffer = (uint8_t*)zm_mallocaligned(64,mv_size);
-      //memset(mv_buffer,0,mv_size);
+      memset(mv_buffer,0,mv_size);
   }
   AllocImgBuffer(size);
   (*fptr_imgbufcpy)(buffer, p_image.buffer, size);
@@ -517,7 +517,7 @@ void Image::AssignDirect( const unsigned int p_width, const unsigned int p_heigh
       /* Copy into the held buffer */
       if(new_buffer != buffer) {
         (*fptr_imgbufcpy)(buffer, new_buffer, size);
-        //memset(mv_buffer,0,mv_size);  //FIXMEC just reset the mv_buffer since it is not valid with a new image buffer, 
+        memset(mv_buffer,0,mv_size);  //FIXMEC just reset the mv_buffer since it is not valid with a new image buffer, 
       }                               //FIXMEC custom mv_buffer memcpy function pointer ? 
 
       /* Free the new buffer */
@@ -537,7 +537,7 @@ void Image::AssignDirect( const unsigned int p_width, const unsigned int p_heigh
     allocation = buffer_size;
     buffertype = p_buffertype;
     buffer = new_buffer;
-    //memset(mv_buffer,0,mv_size); //just reset the mv_buffer since it is not valid with a new image buffer
+    memset(mv_buffer,0,mv_size); //just reset the mv_buffer since it is not valid with a new image buffer
   }
 
 }
@@ -589,7 +589,7 @@ void Image::Assign(const unsigned int p_width, const unsigned int p_height, cons
 
   if(new_buffer != buffer) {
     (*fptr_imgbufcpy)(buffer, new_buffer, size);
-    //memset(mv_buffer,0,mv_size);
+    memset(mv_buffer,0,mv_size);
   }  
 
 }
