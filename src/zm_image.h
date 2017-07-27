@@ -84,17 +84,6 @@ inline static void DumpBuffer(uint8_t* buffer, int buffertype) {
 	}
 }
 
-inline static void Mmemcpy(uint8_t * dst, uint8_t * src, uint16_t len){
-    char * source = (char *)src;
-    char * dest = (char *)dst;
-    memcpy(dest,source,len);
-}
-
-inline static void Mmemset(uint8_t * dst, uint16_t val, uint16_t len){
-    char * dest = (char *)dst;
-    memset(dest,val,len);
-}
-//
 // This is image class, and represents a frame captured from a 
 // camera in raw form.
 //
