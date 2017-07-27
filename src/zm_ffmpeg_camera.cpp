@@ -235,8 +235,8 @@ if (!( cfunction == Monitor::MVDECT )) {
         
       }
 
-     
-        
+  
+
 if (!ctype) { //motion vectors from software h264 decoding
             
          
