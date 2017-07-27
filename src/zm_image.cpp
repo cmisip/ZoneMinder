@@ -92,7 +92,7 @@ Image::Image() {
   mv_size=((((((width * height)/16)*(double)20)/100))*4)+4;  //size of motion_vector is 4bytes plus the space for the size of the array; width*height is divided by maximum number of 4x4 blocks
   if (!mv_buffer) {
       //mv_buffer = (uint8_t *) malloc(mv_size);
-      mv_buffer = (uint8_t*)zm_mallocaligned(4,mv_size);
+      mv_buffer = (uint8_t*)zm_mallocaligned(2,mv_size);
       memset(mv_buffer,0,mv_size);
   }
   text[0] = '\0';
@@ -114,7 +114,7 @@ Image::Image( const char *filename ) {
   mv_size=((((((width * height)/16)*(double)20)/100))*4)+4;
   if (!mv_buffer) {
       //mv_buffer = (uint8_t *) malloc(mv_size);
-      mv_buffer = (uint8_t*)zm_mallocaligned(4,mv_size);
+      mv_buffer = (uint8_t*)zm_mallocaligned(2,mv_size);
       memset(mv_buffer,0,mv_size);
   }
   ReadJpeg( filename, ZM_COLOUR_RGB24, ZM_SUBPIX_ORDER_RGB);
@@ -136,7 +136,7 @@ Image::Image( int p_width, int p_height, int p_colours, int p_subpixelorder, uin
   mv_size=((((((width * height)/16)*(double)20)/100))*4)+4;
   if (!mv_buffer) {
       //mv_buffer = (uint8_t *) malloc(mv_size);
-      mv_buffer = (uint8_t*)zm_mallocaligned(4,mv_size);
+      mv_buffer = (uint8_t*)zm_mallocaligned(2,mv_size);
       memset(mv_buffer,0,mv_size);
   }
   if ( p_buffer )
@@ -168,7 +168,7 @@ Image::Image( const Image &p_image )
 
   if (!mv_buffer) {
       //mv_buffer = (uint8_t *) malloc(mv_size);
-      mv_buffer = (uint8_t*)zm_mallocaligned(4,mv_size);
+      mv_buffer = (uint8_t*)zm_mallocaligned(2,mv_size);
       memset(mv_buffer,0,mv_size);
   }
   AllocImgBuffer(size);
