@@ -255,7 +255,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
                        
         }
         
-        memset(mvect_buffer,0,1);
+        //memset(mvect_buffer,0,1);
     }   
     
     

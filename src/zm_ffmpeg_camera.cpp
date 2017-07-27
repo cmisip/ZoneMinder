@@ -228,8 +228,8 @@ if (!( cfunction == Monitor::MVDECT )) {
         if (mvect_buffer ==  NULL ){
                 Error("Failed requesting vector buffer for the captured image.");
                 return (-1); 
-        } else
-                memset(mvect_buffer,0,image.mv_size);
+        } //else
+               // memset(mvect_buffer,0,image.mv_size);
         
         
         
