@@ -302,11 +302,10 @@ if (!ctype) { //motion vectors from software h264 decoding
                
             } 
         }    
-        
+
 #ifdef __arm__        
- if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels and there are a fixed number covering the entire frame.
+if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels and there are a fixed number covering the entire frame.
                 MMAL_BUFFER_HEADER_T *buffer;
-               // MMAL_BUFFER_HEADER_T *fbuffer;
                 
                 //send free buffer to encoder
                 if ((buffer = mmal_queue_get(pool_out->queue)) != NULL) {
@@ -326,7 +325,8 @@ if (!ctype) { //motion vectors from software h264 decoding
                   av_image_copy_to_buffer(buffer->data, bufsize, (const uint8_t **)mRawFrame->data, mRawFrame->linesize,
                                  AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 1);
                   buffer->length=bufsize;
-                  //buffer->offset = 0; buffer->pts = buffer->dts = MMAL_TIME_UNKNOWN;
+                  //buffer->offset = 0; buffer->pts = buffer->dts = MMAL_TIME_UNKNOWN;  //could be used to check if buffer and frame synchronized
+                                                                                        //if we supply a time stamp to pts, the first buffer returned with the same time stamp is the matching data for the frame sent
                   mmal_buffer_header_mem_unlock(buffer);
                   
            
@@ -337,50 +337,58 @@ if (!ctype) { //motion vectors from software h264 decoding
                 } 
                 
                 
-                
-                
                 while ((buffer = mmal_queue_get(context.queue)) != NULL) {
                         
                       if(buffer->flags & MMAL_BUFFER_HEADER_FLAG_CODECSIDEINFO) {
+                          
+                        uint16_t t_offset=sizeof(uint16_t)*2; //skip the first 4 bytes, reserved for size and vec_type
+                        uint16_t vector_ceiling=(((mRawFrame->width * mRawFrame->height)/256)*(double)20)/100;  //FIXMEC, the size of hardware buffer is smaller than software buffer so can save memory by requesting smaller buffer size
+                        vector_ceiling--;
+                        uint16_t vec_count=0;  
                         
                         mmal_buffer_header_mem_lock(buffer);
-                        uint16_t size=buffer->length/4;
+                        uint16_t size=buffer->length/sizeof(mmal_motion_vector);
                         struct mmal_motion_vector mvarray[size];
                         
                         //copy buffer->data to temporary
                         memcpy(mvarray,buffer->data,buffer->length);
-                        mmal_buffer_header_mem_unlock(buffer);
+                        mmal_buffer_header_mem_unlock(buffer);   
                         
-                        
-                        
-                        uint8_t offset=sizeof(uint16_t)*2;
-                        uint16_t vector_ceiling=(((mRawFrame->width * mRawFrame->height)/256)*(double)20)/100;
-                        uint16_t vec_count=0;
                         for (int i=0;i < size ; i++) {
+                            mmal_motion_vector mvs;
                             motion_vector mvt;
+                            memcpy(&mvs,mvarray+i,sizeof(mmal_motion_vector));
                             
-                            if ((abs(mvarray[i].x_vector) + abs(mvarray[i].y_vector)) < 1)
+                            if ((abs(mvs.x_vector) + abs(mvs.y_vector)) < 1)
                                continue;
                           
                             mvt.xcoord = (i*16) % (mVideoCodecContext->width + 16);
                             mvt.ycoord = ((i*16)/(mVideoCodecContext->width+16))*16;
+                            
+                            //Future expansion, save the magnitude of vectors
+                            //mvt.x_vector = mv->x_vector;
+                            //mvt.y_vector = mv->y_vector;
                             vec_count++;
                             
-                            memcpy(mvect_buffer+offset,&mvt,sizeof(motion_vector));
-                            offset+=sizeof(motion_vector);
+                            memcpy(mvect_buffer+t_offset,&mvt,sizeof(motion_vector));
+                            t_offset+=sizeof(motion_vector);
                             
                             if (vec_count > vector_ceiling) {  
                               memset(mvect_buffer,0,image.mv_size);
                               vec_count=0;
-                            break;
-                        }    
+                              
+                              break;
+                            }    
+                         
                             
-                         } 
-                         memcpy(mvect_buffer,&vec_count, 2);  //size at first byte
+                        } 
+                         memcpy(mvect_buffer,&vec_count, sizeof(vec_count));  //size at first byte
                          uint16_t vec_type = 0;
                          
-                         memcpy(mvect_buffer+2,&vec_type, 2);   //type of vector at 3rd byte
-                         //Info("FFMPEG HW VEC_COUNT %d, ceiling %d", vec_count, vector_ceiling);
+                         memcpy(mvect_buffer+sizeof(vec_count),&vec_type, sizeof(vec_type));   //type of vector at 3rd byte
+                         
+                         //if (vec_count > 4)
+                             //Info("FFMPEG HW VEC_COUNT %d, ceiling %d", vec_count, vector_ceiling);
                         
                       } 
                     
@@ -394,22 +402,16 @@ if (!ctype) { //motion vectors from software h264 decoding
                            } 
                     }         
                     
-                    
-                    
-                    
                 }
                 
-                
-
-                
-                
-        } //if ctype
+} //if ctype
         
-//  end:    
         
 #endif
         
-end:      
+end: 
+
+    
         
 
         
