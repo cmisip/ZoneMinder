@@ -245,42 +245,43 @@ if (!ctype) { //motion vectors from software h264 decoding
             uint16_t vector_ceiling=((((mRawFrame->width * mRawFrame->height)/16)*(double)20)/100);  //FIXMEC, just 20% of the maximum number of 4x4 blocks that will fit
         
             if (sd) {
-                   
-                   uint16_t t_offset=sizeof(uint16_t)*2; //skip first 4 bytes for size and vec_type
+		    
+		   uint8_t offset=sizeof(uint16_t)*2; //skip first 4 bytes for size and vec_type
+                   const AVMotionVector *mvs = (const AVMotionVector *)sd->data;
                    uint16_t vec_count=0;
-                   uint16_t size=sd->size/sizeof(AVMotionVector);
-                   
-                   AVMotionVector mvarray[size];
-                   for (unsigned int i = 0; i < size; i++) {
+                    
+                   for (unsigned int i = 0; i < sd->size / sizeof(*mvs); i++) {
+                        const AVMotionVector *mv = &mvs[i];
                       
-                        AVMotionVector mvs;
                         motion_vector mvt;
                         
-                        memcpy(&mvs,mvarray+i,sizeof(AVMotionVector));
-                        int x_disp = mvs.src_x - mvs.dst_x;
-                        int y_disp = mvs.src_y - mvs.dst_y;
+                        int x_disp = mv->src_x - mv->dst_x;
+                        int y_disp = mv->src_y - mv->dst_y;
                         
                         
                         if ((abs(x_disp) + abs(y_disp)) < 1)
                             continue;
                         
-                        for (uint16_t i=0 ; i< mvs.w/4; i++) {
-                           for (uint16_t j=0 ; j< mvs.h/4; j++) {
-                                mvt.xcoord=mvs.dst_x+i*4;
-                                mvt.ycoord=mvs.dst_y+j*4;
+                        for (uint16_t i=0 ; i< mv->w/4; i++) {
+                           for (uint16_t j=0 ; j< mv->h/4; j++) {
+                                mvt.xcoord=mv->dst_x+i*4;
+                                mvt.ycoord=mv->dst_y+j*4;
                                 
-                                memcpy(mvect_buffer+t_offset,&mvt,sizeof(motion_vector));
-                                t_offset+=sizeof(motion_vector);
+                                memcpy(mvect_buffer+offset,&mvt,sizeof(motion_vector));
+                                offset+=sizeof(motion_vector);
                                 vec_count++;
                            }
                        }
                       
                         if (vec_count > vector_ceiling) {  
-                            memset(mvect_buffer,0,image.mv_size);
+                            //memset(mvect_buffer,0,image.mv_size);
+                            char * temp_ptr = (char *)mvect_buffer;
+                            memset(temp_ptr,0,image.mv_size);
                             vec_count=0;
                             break;
-                        }    
-                        
+                        }     
+                   
+                  
                     }
                        memcpy(mvect_buffer,&vec_count, sizeof(vec_count)); //size on first byte
                        uint16_t vec_type = 1;
