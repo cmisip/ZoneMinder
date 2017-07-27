@@ -221,7 +221,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
         //first 16bit value is size
         memcpy(&size,mvect_buffer,sizeof(size));
         //second 16 bit value is source type of macroblock : 0 hardware, 1 software.  //FIXME, could be 8 bit value but probably better to keep things even
-        memcpy(&vec_type,mvect_buffer+2,sizeof(vec_type));    
+        memcpy(&vec_type,mvect_buffer+sizeof(size),sizeof(vec_type));    
         //sizeof would be safer in the long run if we decide to make changes to these types
         
         
