@@ -358,14 +358,10 @@ if (!ctype) { //motion vectors from software h264 decoding
                         for (int i=0;i < size ; i++) {
                             motion_vector mvt;
                             
-                            mvt.x_vector = mvarray[i].x_vector;
-                            mvt.y_vector = mvarray[i].y_vector;
                             
-                            if ((abs(mvt.x_vector) + abs(mvt.y_vector)) < 1)
+                            if ((abs(mvarray[i].x_vector) + abs(mvarray[i].y_vector)) < 1)
                                continue;
                             
-                            mvt.height = 16;
-                            mvt.width = 16;
                             mvt.xcoord = (i*16) % (mVideoCodecContext->width + 16);
                             mvt.ycoord = ((i*16)/(mVideoCodecContext->width+16))*16;
                             vec_count++;
