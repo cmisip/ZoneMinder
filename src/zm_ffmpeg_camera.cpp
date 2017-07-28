@@ -238,6 +238,7 @@ if (!( cfunction == Monitor::MVDECT )) {
      
         
 if (!ctype) { //motion vectors from software h264 decoding
+            
          
             AVFrameSideData *sd=NULL;
 
@@ -246,34 +247,45 @@ if (!ctype) { //motion vectors from software h264 decoding
         
             if (sd) {
                    
-                   uint16_t t_offset=sizeof(uint16_t)*2; //skip first 4 bytes for size and vec_type
+                   uint8_t offset=sizeof(uint16_t)*2;
+                   const AVMotionVector *mvs = (const AVMotionVector *)sd->data;
+                   //uint16_t size=sd->size / sizeof(AVMotionVector);
                    uint16_t vec_count=0;
-                   uint16_t size=sd->size/sizeof(AVMotionVector);
-                   
-                   AVMotionVector mvarray[size];
-                   for (unsigned int i = 0; i < size; i++) {
+                   for (unsigned int i = 0; i < sd->size / sizeof(*mvs); i++) {
+                        const AVMotionVector *mv = &mvs[i];
                       
-                        AVMotionVector mvs;
                         motion_vector mvt;
                         
-                        memcpy(&mvs,mvarray+i,sizeof(AVMotionVector));
-                        int x_disp = mvs.src_x - mvs.dst_x;
-                        int y_disp = mvs.src_y - mvs.dst_y;
+                        int x_disp = mv->src_x - mv->dst_x;
+                        int y_disp = mv->src_y - mv->dst_y;
+                        
+                       // if ((mvt.x_vector == 0) && (mvt.y_vector == 0))
+                        //    continue;
                         
                         
                         if ((abs(x_disp) + abs(y_disp)) < 1)
                             continue;
                         
-                        for (uint16_t i=0 ; i< mvs.w/4; i++) {
-                           for (uint16_t j=0 ; j< mvs.h/4; j++) {
-                                mvt.xcoord=mvs.dst_x+i*4;
-                                mvt.ycoord=mvs.dst_y+j*4;
+                       
+                       
+                        
+                        
+                        for (uint16_t i=0 ; i< mv->w/4; i++) {
+                           for (uint16_t j=0 ; j< mv->h/4; j++) {
+                                mvt.xcoord=mv->dst_x+i*4;
+                                mvt.ycoord=mv->dst_y+j*4;
                                 
-                                memcpy(mvect_buffer+t_offset,&mvt,sizeof(motion_vector));
-                                t_offset+=sizeof(motion_vector);
+                                memcpy(mvect_buffer+offset,&mvt,sizeof(motion_vector));
+                                offset+=sizeof(motion_vector);
                                 vec_count++;
                            }
                        }
+                        
+                        
+                        
+                        
+                        
+                        
                       
                         if (vec_count > vector_ceiling) {  
                             memset(mvect_buffer,0,image.mv_size);
@@ -282,17 +294,15 @@ if (!ctype) { //motion vectors from software h264 decoding
                         }    
                         
                     }
-                       memcpy(mvect_buffer,&vec_count, sizeof(vec_count)); //size on first byte
+                       memcpy(mvect_buffer,&vec_count, 2); //size on first byte
                        uint16_t vec_type = 1;
                          
-                       memcpy(mvect_buffer+sizeof(vec_count),&vec_type, sizeof(vec_type));   //type of vector at 3rd byte
-
-                       if (vec_count > 4)
-                          Info("FFMPEG SW VEC_COUNT %d, ceiling %d", vec_count, vector_ceiling);
+                       memcpy(mvect_buffer+2,&vec_type, 2);   //type of vector at 3rd byte
+                    //Info("FFMPEG SW VEC_COUNT %d, ceiling %d", vec_count, vector_ceiling);
                
             } 
-}    
-        
+}         
+
 #ifdef __arm__        
 if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels and there are a fixed number covering the entire frame.
                 MMAL_BUFFER_HEADER_T *buffer;
