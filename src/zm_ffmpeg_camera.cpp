@@ -341,39 +341,62 @@ if (!ctype) { //motion vectors from software h264 decoding
                 
                 while ((buffer = mmal_queue_get(context.queue)) != NULL) {
                         
-                      if(buffer->flags & MMAL_BUFFER_HEADER_FLAG_CODECSIDEINFO) {
+                     if(buffer->flags & MMAL_BUFFER_HEADER_FLAG_CODECSIDEINFO) {
+                          
+                        //uint16_t t_offset=sizeof(uint16_t)*2; //skip the first 4 bytes, reserved for size and vec_type
+                        uint16_t t_offset=4;
+                        uint16_t vector_ceiling=(((mRawFrame->width * mRawFrame->height)/256)*(double)20)/100;  //FIXMEC, the size of hardware buffer is smaller than software buffer so can save memory by requesting smaller buffer size
+                        vector_ceiling--;
+                        uint16_t vec_count=0;  
                         
                         mmal_buffer_header_mem_lock(buffer);
+                        //uint16_t size=buffer->length/sizeof(mmal_motion_vector);
                         uint16_t size=buffer->length/4;
                         struct mmal_motion_vector mvarray[size];
                         
                         //copy buffer->data to temporary
                         memcpy(mvarray,buffer->data,buffer->length);
-                        mmal_buffer_header_mem_unlock(buffer);
+                        mmal_buffer_header_mem_unlock(buffer);   
                         
-                        
-                        int offset=2;
-                        
-                        uint16_t vec_count=0;
                         for (int i=0;i < size ; i++) {
+                            //mmal_motion_vector mvs;
+                            const mmal_motion_vector *mvs=&mvarray[i];
                             motion_vector mvt;
+                            //memcpy(&mvs,mvarray+i,sizeof(mmal_motion_vector));
                             
-                            
-                            if ((abs(mvarray[i].x_vector) + abs(mvarray[i].y_vector)) < 1)
+                            //if ((abs(mvs.x_vector) + abs(mvs.y_vector)) < 1)
+                            if ((abs(mvs->x_vector) + abs(mvs->y_vector)) < 1)
                                continue;
-                            
+                          
                             mvt.xcoord = (i*16) % (mVideoCodecContext->width + 16);
                             mvt.ycoord = ((i*16)/(mVideoCodecContext->width+16))*16;
+                            
+                            //Future expansion, save the magnitude of vectors
+                            //mvt.x_vector = mv->x_vector;
+                            //mvt.y_vector = mv->y_vector;
                             vec_count++;
                             
-                            memcpy(mvect_buffer+offset,&mvt,sizeof(motion_vector));
-                            offset+=sizeof(motion_vector);
-                         } 
-                         memcpy(mvect_buffer,&vec_count, 2);
-                         Info("FFMPEG HW VEC_COUNT %d", vec_count);
+                            memcpy(mvect_buffer+t_offset,&mvt,sizeof(motion_vector));
+                            t_offset+=sizeof(motion_vector);
+                            
+                            if (vec_count > vector_ceiling) {  
+                              memset(mvect_buffer,0,image.mv_size);
+                              vec_count=0;
+                              
+                              break;
+                            }    
+                         
+                            
+                        } 
+                         memcpy(mvect_buffer,&vec_count, sizeof(vec_count));  //size at first byte
+                         uint16_t vec_type = 0;
+                         
+                         memcpy(mvect_buffer+sizeof(vec_count),&vec_type, sizeof(vec_type));   //type of vector at 3rd byte
+                         
+                         //if (vec_count > 4)
+                             //Info("FFMPEG HW VEC_COUNT %d, ceiling %d", vec_count, vector_ceiling);
                         
-                      } 
-                    
+} 
                     
                     mmal_buffer_header_release(buffer);
                     
