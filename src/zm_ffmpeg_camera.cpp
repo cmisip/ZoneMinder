@@ -350,8 +350,8 @@ if (!ctype) { //motion vectors from software h264 decoding
                         uint16_t vec_count=0;  
                         
                         mmal_buffer_header_mem_lock(buffer);
-                        //uint16_t size=buffer->length/sizeof(mmal_motion_vector);
-                        uint16_t size=buffer->length/4;
+                        uint16_t size=buffer->length/sizeof(mmal_motion_vector);
+                        //uint16_t size=buffer->length/4;
                         struct mmal_motion_vector mvarray[size];
                         
                         //copy buffer->data to temporary
@@ -359,13 +359,13 @@ if (!ctype) { //motion vectors from software h264 decoding
                         mmal_buffer_header_mem_unlock(buffer);   
                         
                         for (int i=0;i < size ; i++) {
-                            //mmal_motion_vector mvs;
-                            const mmal_motion_vector *mvs=&mvarray[i];
+                            mmal_motion_vector mvs;
+                            //const mmal_motion_vector *mvs=&mvarray[i];
                             motion_vector mvt;
-                            //memcpy(&mvs,mvarray+i,sizeof(mmal_motion_vector));
+                            memcpy(&mvs,mvarray+i,sizeof(mmal_motion_vector));
                             
-                            //if ((abs(mvs.x_vector) + abs(mvs.y_vector)) < 1)
-                            if ((abs(mvs->x_vector) + abs(mvs->y_vector)) < 1)
+                            if ((abs(mvs.x_vector) + abs(mvs.y_vector)) < 1)
+                            //if ((abs(mvs->x_vector) + abs(mvs->y_vector)) < 1)
                                continue;
                           
                             mvt.xcoord = (i*16) % (mVideoCodecContext->width + 16);
@@ -393,8 +393,8 @@ if (!ctype) { //motion vectors from software h264 decoding
                          
                          memcpy(mvect_buffer+sizeof(vec_count),&vec_type, sizeof(vec_type));   //type of vector at 3rd byte
                          
-                         //if (vec_count > 4)
-                             //Info("FFMPEG HW VEC_COUNT %d, ceiling %d", vec_count, vector_ceiling);
+                         if (vec_count > 4)
+                             Info("FFMPEG HW VEC_COUNT %d, ceiling %d", vec_count, vector_ceiling);
                         
 } 
                     
