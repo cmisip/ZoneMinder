@@ -306,7 +306,7 @@ if (!ctype) { //motion vectors from software h264 decoding
 #ifdef __arm__        
  if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels and there are a fixed number covering the entire frame.
                 MMAL_BUFFER_HEADER_T *buffer;
-                MMAL_BUFFER_HEADER_T *fbuffer;
+                //MMAL_BUFFER_HEADER_T *fbuffer;
                 
                 //send free buffer to encoder
                 if ((buffer = mmal_queue_get(pool_out->queue)) != NULL) {
@@ -370,7 +370,7 @@ if (!ctype) { //motion vectors from software h264 decoding
                             offset+=sizeof(motion_vector);
                          } 
                          memcpy(mvect_buffer,&vec_count, 2);
-                        // Info("FFMPEG HW VEC_COUNT %d", vec_count);
+                         Info("FFMPEG HW VEC_COUNT %d", vec_count);
                         
                       } 
                     
