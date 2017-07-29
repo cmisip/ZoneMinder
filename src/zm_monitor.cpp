@@ -615,6 +615,10 @@ Monitor::~Monitor() {
       delete next_buffer.timestamp;
     }
     for ( int i = 0; i < image_buffer_count; i++ ) {
+         if (function == MVDECT) {
+          while (*(image_buffer[i].image->VectBuffer()) != 0)
+            usleep(1000);
+           }
       delete image_buffer[i].image;
     }
     delete[] image_buffer;
