@@ -15,6 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+#define __arm__
 #ifndef ZM_FFMPEG_CAMERA_H
 #define ZM_FFMPEG_CAMERA_H
 
@@ -97,7 +98,12 @@ class FfmpegCamera : public Camera {
 
     struct CONTEXT_T {
     MMAL_QUEUE_T *queue;
-    } context;
+    } context,contextr;
+    
+    MMAL_COMPONENT_T *resizer;
+    MMAL_POOL_T *pool_inr, *pool_outr;
+
+    
 
     struct mmal_motion_vector {
      char x_vector;
@@ -143,7 +149,10 @@ class FfmpegCamera : public Camera {
 #ifdef __arm__
     static void input_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
     static void output_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
+    static void input_callbackr(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
+    static void output_callbackr(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
     int OpenMmal(AVCodecContext *mVideoCodecContext);
+    int OpenMmalSWS(AVCodecContext *mVideoCodecContext);
     int CloseMmal();
 #endif
 };

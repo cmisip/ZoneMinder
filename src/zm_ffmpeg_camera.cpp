@@ -464,6 +464,16 @@ void FfmpegCamera::output_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buff
 }
 
 
+void FfmpegCamera::input_callbackr(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer) {
+   //CONTEXT_T *ctx = (struct CONTEXT_T *)port->userdata;
+   mmal_buffer_header_release(buffer);
+}
+
+void FfmpegCamera::output_callbackr(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer) {
+   CONTEXT_T *ctx = (struct CONTEXT_T *)port->userdata;
+   mmal_queue_put(ctx->queue, buffer);
+}
+
 int FfmpegCamera::OpenMmal(AVCodecContext *mVideoCodecContext){  
    
 
@@ -511,7 +521,7 @@ int FfmpegCamera::OpenMmal(AVCodecContext *mVideoCodecContext){
    }   
 
    /* Display the input port format */
-   Info("INPUT FORMAT \n");
+   Info("ENCODER INPUT FORMAT \n");
    Info("%s\n", encoder->input[0]->name);
    Info(" type: %i, fourcc: %4.4s\n", format_in->type, (char *)&format_in->encoding);
    Info(" bitrate: %i, framed: %i\n", format_in->bitrate,
@@ -523,7 +533,7 @@ int FfmpegCamera::OpenMmal(AVCodecContext *mVideoCodecContext){
            format_in->es->video.crop.width, format_in->es->video.crop.height);
 
    /* Display the output port format */
-   Info("OUTPUT FORMAT \n");
+   Info("ENCODER OUTPUT FORMAT \n");
    Info("%s\n", encoder->output[0]->name);
    Info(" type: %i, fourcc: %4.4s\n", format_out->type, (char *)&format_out->encoding);
    Info(" bitrate: %i, framed: %i\n", format_out->bitrate,
@@ -572,6 +582,127 @@ int FfmpegCamera::OpenMmal(AVCodecContext *mVideoCodecContext){
 
 }
 
+int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){  
+   
+
+   // Create the encoder component.
+   if ( mmal_component_create("vc.ril.resize", &resizer)  != MMAL_SUCCESS) {
+      Fatal("failed to create mmal resizer");
+   }   
+
+   /* Set format of video resizer input port */
+   MMAL_ES_FORMAT_T *format_in = resizer->input[0]->format;
+   format_in->type = MMAL_ES_TYPE_VIDEO;
+   format_in->encoding = MMAL_ENCODING_I420;
+   format_in->encoding_variant = MMAL_ENCODING_I420;
+   format_in->es->video.width = width;
+   format_in->es->video.height = height;
+   format_in->es->video.frame_rate.num = 30;
+   format_in->es->video.frame_rate.den = 1;
+   format_in->es->video.par.num = 1;
+   format_in->es->video.par.den = 1;
+   format_in->es->video.crop.width = width;
+   format_in->es->video.crop.height = height;
+   
+   
+ 
+
+   
+   if ( mmal_port_format_commit(resizer->input[0]) != MMAL_SUCCESS ) {
+      Fatal("failed to commit mmal resizer input format");
+   }   
+
+   
+   
+   MMAL_ES_FORMAT_T *format_out = resizer->output[0]->format;
+   
+   mmal_format_copy(format_out,format_in);
+   
+  
+   
+   if ( colours == ZM_COLOUR_RGB32 ) {
+       format_out->encoding = MMAL_ENCODING_RGBA;
+       format_out->encoding_variant = MMAL_ENCODING_RGBA;
+   } else if ( colours == ZM_COLOUR_RGB24 ) {
+       format_out->encoding = MMAL_ENCODING_RGB24;
+       format_out->encoding_variant = MMAL_ENCODING_RGB24;
+   } /*else if(colours == ZM_COLOUR_GRAY8) { //FIXME
+       format_out->encoding = MMAL_ENCODING_GRAY8;
+       format_out->encoding_variant = MMAL_ENCODING_GRAY;
+   }*/
+   
+   
+   format_out->es->video.width = width;
+   format_out->es->video.height = height;
+   
+   
+   if ( mmal_port_format_commit(resizer->output[0]) != MMAL_SUCCESS ) {
+     Fatal("failed to commit mmal resizer output format");
+   }
+   
+
+   /* Display the input port format */
+   Info("RESIZER INPUT FORMAT \n");
+   Info("%s\n", resizer->input[0]->name);
+   Info(" type: %i, fourcc: %4.4s\n", format_in->type, (char *)&format_in->encoding);
+   Info(" bitrate: %i, framed: %i\n", format_in->bitrate,
+           !!(format_in->flags & MMAL_ES_FORMAT_FLAG_FRAMED));
+   Info(" extra data: %i, %p\n", format_in->extradata_size, format_in->extradata);
+   Info(" width: %i, height: %i, (%i,%i,%i,%i)\n",
+           format_in->es->video.width, format_in->es->video.height,
+           format_in->es->video.crop.x, format_in->es->video.crop.y,
+           format_in->es->video.crop.width, format_in->es->video.crop.height);
+
+   /* Display the output port format */
+   Info("RESIZER OUTPUT FORMAT \n");
+   Info("%s\n", resizer->output[0]->name);
+   Info(" type: %i, fourcc: %4.4s\n", format_out->type, (char *)&format_out->encoding);
+   Info(" bitrate: %i, framed: %i\n", format_out->bitrate,
+           !!(format_out->flags & MMAL_ES_FORMAT_FLAG_FRAMED));
+   Info(" extra data: %i, %p\n", format_out->extradata_size, format_out->extradata);
+   Info(" width: %i, height: %i, (%i,%i,%i,%i)\n",
+           format_out->es->video.width, format_out->es->video.height,
+           format_out->es->video.crop.x, format_out->es->video.crop.y,
+           format_out->es->video.crop.width, format_out->es->video.crop.height);
+
+
+   /* The format of both ports is now set so we can get their buffer requirements and create
+    * our buffer headers. We use the buffer pool API to create these. */
+   resizer->input[0]->buffer_num = resizer->input[0]->buffer_num_min;
+   resizer->input[0]->buffer_size = resizer->input[0]->buffer_size_min;
+   resizer->output[0]->buffer_num = resizer->output[0]->buffer_num_min;
+   resizer->output[0]->buffer_size = resizer->output[0]->buffer_size_min;
+   pool_inr = mmal_pool_create(resizer->input[0]->buffer_num,
+                              resizer->input[0]->buffer_size);
+   pool_outr = mmal_pool_create(resizer->output[0]->buffer_num,
+                               resizer->output[0]->buffer_size);
+
+   /* Create a queue to store our decoded video frames. The callback we will get when
+    * a frame has been decoded will put the frame into this queue. */
+   contextr.queue = mmal_queue_create();
+
+   /* Store a reference to our context in each port (will be used during callbacks) */
+   resizer->input[0]->userdata = (MMAL_PORT_USERDATA_T *)&contextr;
+   resizer->output[0]->userdata = (MMAL_PORT_USERDATA_T *)&contextr;
+   
+   // Enable all the input port and the output port.
+   if ( mmal_port_enable(resizer->input[0], input_callbackr) != MMAL_SUCCESS ) {
+     Fatal("failed to enable mmal resizer input port");
+   }  
+   
+   if ( mmal_port_enable(resizer->output[0], output_callbackr) != MMAL_SUCCESS ) {
+     Fatal("failed to enable mmal resizer output port");
+   }
+   
+   /* Component won't start processing data until it is enabled. */
+   if ( mmal_component_enable(resizer) != MMAL_SUCCESS ) {
+     Fatal("failed to enable mmal resizer component");
+   }  
+
+   return 0;
+
+}
+
 int FfmpegCamera::CloseMmal(){ 
    if (encoder)
       mmal_component_destroy(encoder);
@@ -581,6 +712,15 @@ int FfmpegCamera::CloseMmal(){
       mmal_pool_destroy(pool_out);
    if (context.queue)
    mmal_queue_destroy(context.queue);
+   
+   if (resizer)
+      mmal_component_destroy(resizer);
+   if (pool_inr)
+      mmal_pool_destroy(pool_inr);
+   if (pool_outr)
+      mmal_pool_destroy(pool_outr);
+   if (contextr.queue)
+   mmal_queue_destroy(contextr.queue);
    
    return 0;
 }
@@ -838,6 +978,7 @@ int FfmpegCamera::OpenFfmpeg() {
 #ifdef __arm__
   if (ctype) { 
     OpenMmal(mVideoCodecContext);
+    OpenMmalSWS(mVideoCodecContext);
   }
 #endif  
 
