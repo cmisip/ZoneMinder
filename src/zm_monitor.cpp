@@ -1149,6 +1149,8 @@ bool Monitor::CheckSignal( const Image *image ) {
 }
 
 bool Monitor::Analyse() {
+  if (zm_terminate)  
+       return -1;    
   if ( shared_data->last_read_index == shared_data->last_write_index ) {
     // I wonder how often this happens. Maybe if this happens we should sleep or something?
     return( false );
@@ -2975,6 +2977,8 @@ Monitor *Monitor::Load( unsigned int p_id, bool load_zones, Purpose purpose ) {
  * Returns -1 on failure.
  */
 int Monitor::Capture() {
+    if (zm_terminate)  
+       return -1;     
   static int FirstCapture = 1; // Used in de-interlacing to indicate whether this is the even or odd image
   int captureResult;
 
