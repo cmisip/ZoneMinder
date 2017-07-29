@@ -297,12 +297,20 @@ if (!ctype) { //motion vectors from software h264 decoding
 
 #ifdef __arm__        
 if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels and there are a fixed number covering the entire frame.
-                MMAL_BUFFER_HEADER_T *buffer;
+                MMAL_BUFFER_HEADER_T *buffer, *rbuffer;
                 
                 //send free buffer to encoder
                 if ((buffer = mmal_queue_get(pool_out->queue)) != NULL) {
                    if (mmal_port_send_buffer(encoder->output[0], buffer) != MMAL_SUCCESS) {
                       Warning("failed to send buffer to encoder for frame %d\n", frameCount);
+                      goto end;
+                   }
+                } 
+                
+                //send free buffer to resizer
+                if ((rbuffer = mmal_queue_get(pool_outr->queue)) != NULL) {
+                   if (mmal_port_send_buffer(resizer->output[0], rbuffer) != MMAL_SUCCESS) {
+                      Warning("failed to send buffer to resizer for frame %d\n", frameCount);
                       goto end;
                    }
                 } 
@@ -323,7 +331,28 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                   
            
                   if (mmal_port_send_buffer(encoder->input[0], buffer) != MMAL_SUCCESS) {
-                       Warning("failed to send YUV420 buffer for frame %d\n", frameCount);
+                       Warning("failed to send YUV420 buffer to encoder for frame %d\n", frameCount);
+                       goto end;
+                  }
+                } 
+                
+                //send buffer with yuv420 data to resizer
+                if ((rbuffer = mmal_queue_get(pool_inr->queue)) != NULL)  {
+                    
+                  int bufsize=av_image_get_buffer_size(AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 1);  
+                    
+                  mmal_buffer_header_mem_lock(rbuffer);
+                   
+                  av_image_copy_to_buffer(rbuffer->data, bufsize, (const uint8_t **)mRawFrame->data, mRawFrame->linesize,
+                                 AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 1);
+                  rbuffer->length=bufsize;
+                  //buffer->offset = 0; buffer->pts = buffer->dts = MMAL_TIME_UNKNOWN;  //could be used to check if buffer and frame synchronized
+                                                                                        //if we supply a time stamp to pts, the first buffer returned with the same time stamp is the matching data for the frame sent
+                  mmal_buffer_header_mem_unlock(rbuffer);
+                  
+           
+                  if (mmal_port_send_buffer(resizer->input[0], rbuffer) != MMAL_SUCCESS) {
+                       Warning("failed to send YUV420 buffer to resizer for frame %d\n", frameCount);
                        goto end;
                   }
                 } 
@@ -601,8 +630,8 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
    format_in->es->video.frame_rate.den = 1;
    format_in->es->video.par.num = 1;
    format_in->es->video.par.den = 1;
-   format_in->es->video.crop.width = width;
-   format_in->es->video.crop.height = height;
+   format_in->es->video.crop.width = 640;
+   format_in->es->video.crop.height = 360;
    
    
  
@@ -624,16 +653,16 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
        format_out->encoding = MMAL_ENCODING_RGBA;
        format_out->encoding_variant = MMAL_ENCODING_RGBA;
    } else if ( colours == ZM_COLOUR_RGB24 ) {
-       format_out->encoding = MMAL_ENCODING_RGB24;
-       format_out->encoding_variant = MMAL_ENCODING_RGB24;
+       format_out->encoding = MMAL_ENCODING_RGBA;
+       format_out->encoding_variant = MMAL_ENCODING_RGBA;
    } /*else if(colours == ZM_COLOUR_GRAY8) { //FIXME
        format_out->encoding = MMAL_ENCODING_GRAY8;
        format_out->encoding_variant = MMAL_ENCODING_GRAY;
    }*/
    
    
-   format_out->es->video.width = width;
-   format_out->es->video.height = height;
+   format_out->es->video.width = 640;
+   format_out->es->video.height = 360;
    
    
    if ( mmal_port_format_commit(resizer->output[0]) != MMAL_SUCCESS ) {
