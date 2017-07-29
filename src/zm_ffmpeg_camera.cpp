@@ -676,8 +676,8 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
        format_out->encoding = MMAL_ENCODING_RGBA;
        format_out->encoding_variant = MMAL_ENCODING_RGBA;
    } else if ( colours == ZM_COLOUR_RGB24 ) {
-       format_out->encoding = MMAL_ENCODING_RGBA;
-       format_out->encoding_variant = MMAL_ENCODING_RGBA;
+       format_out->encoding = MMAL_ENCODING_RGB24;
+       format_out->encoding_variant = MMAL_ENCODING_RGB24;
    } /*else if(colours == ZM_COLOUR_GRAY8) { //FIXME
        format_out->encoding = MMAL_ENCODING_GRAY8;
        format_out->encoding_variant = MMAL_ENCODING_GRAY;
