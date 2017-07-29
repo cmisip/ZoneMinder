@@ -426,6 +426,26 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                     
                 }
                 
+                while ((rbuffer = mmal_queue_get(contextr.queue)) != NULL) {
+                       
+                    mmal_buffer_header_mem_lock(rbuffer);
+                        
+                    //copy buffer->data to directbuffer
+                    memcpy(directbuffer,rbuffer->data,rbuffer->length);
+                    
+                    mmal_buffer_header_mem_unlock(rbuffer);   
+                    
+                    mmal_buffer_header_release(rbuffer);
+                    
+                  
+                    if ((rbuffer = mmal_queue_get(pool_outr->queue)) != NULL) {
+                           if (mmal_port_send_buffer(resizer->output[0], rbuffer) != MMAL_SUCCESS) {
+                              goto end;
+                           } 
+                    }         
+                    
+                }
+                
 } //if ctype
         
         
@@ -436,7 +456,7 @@ end:
 
         
 
-        
+if (!ctype) {        
 #if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
         av_image_fill_arrays(mFrame->data, mFrame->linesize,
             directbuffer, imagePixFormat, width, height, 1);
@@ -462,6 +482,9 @@ end:
 #else // HAVE_LIBSWSCALE
         Fatal( "You must compile ffmpeg with the --enable-swscale option to use ffmpeg cameras" );
 #endif // HAVE_LIBSWSCALE
+
+}
+
 
         frameCount++;
       } // end if frameComplete
