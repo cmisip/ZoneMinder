@@ -630,8 +630,8 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
    format_in->es->video.frame_rate.den = 1;
    format_in->es->video.par.num = 1;
    format_in->es->video.par.den = 1;
-   format_in->es->video.crop.width = 640;
-   format_in->es->video.crop.height = 360;
+   format_in->es->video.crop.width = mVideoCodecContext->width;;
+   format_in->es->video.crop.height = mVideoCodecContext->height;;
    
    
  
@@ -661,8 +661,8 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
    }*/
    
    
-   format_out->es->video.width = 640;
-   format_out->es->video.height = 360;
+   format_out->es->video.width = width;
+   format_out->es->video.height = height;
    
    
    if ( mmal_port_format_commit(resizer->output[0]) != MMAL_SUCCESS ) {
