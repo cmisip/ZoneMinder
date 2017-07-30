@@ -674,10 +674,15 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
    
    if ( colours == ZM_COLOUR_RGB32 ) {
        format_out->encoding = MMAL_ENCODING_RGBA;
-       format_out->encoding_variant = MMAL_ENCODING_RGBA;
+       //format_out->encoding_variant = MMAL_ENCODING_RGBA;
    } else if ( colours == ZM_COLOUR_RGB24 ) {
-       format_out->encoding = MMAL_ENCODING_RGB24;
-       format_out->encoding_variant = MMAL_ENCODING_RGB24;
+     //  if (mmal_util_rgb_order_fixed(encoder->output[0]))
+      //         format->encoding = MMAL_ENCODING_RGB24;
+     //       else
+      // format->encoding = MMAL_ENCODING_BGR24;
+       
+       format_out->encoding = MMAL_ENCODING_RGBA;
+       format_out->encoding_variant = MMAL_ENCODING_RGBA;
    } /*else if(colours == ZM_COLOUR_GRAY8) { //FIXME
        format_out->encoding = MMAL_ENCODING_GRAY8;
        format_out->encoding_variant = MMAL_ENCODING_GRAY;
