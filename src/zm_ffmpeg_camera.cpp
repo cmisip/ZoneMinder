@@ -433,7 +433,6 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                     //copy buffer->data to directbuffer
                      if (rbuffer->pts >= frameCount)
                        memcpy(directbuffer,rbuffer->data,rbuffer->length);
-                    memcpy(directbuffer,rbuffer->data,rbuffer->length);
                     
                     mmal_buffer_header_mem_unlock(rbuffer);   
                     
