@@ -298,6 +298,7 @@ if (!ctype) { //motion vectors from software h264 decoding
 #ifdef __arm__        
 if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels and there are a fixed number covering the entire frame.
                 MMAL_BUFFER_HEADER_T *buffer, *rbuffer;
+                bool received=false;
                 
                 //send free buffer to encoder
                 if ((buffer = mmal_queue_get(pool_out->queue)) != NULL) {
@@ -431,20 +432,26 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                     mmal_buffer_header_mem_lock(rbuffer);
                         
                     //copy buffer->data to directbuffer
-                    // if (rbuffer->pts >= frameCount)
+                    if (rbuffer->pts == frameCount) {
                        memcpy(directbuffer,rbuffer->data,rbuffer->length);
-                    
+                       received=true;
+                    }
                     mmal_buffer_header_mem_unlock(rbuffer);   
                     
                     mmal_buffer_header_release(rbuffer);
                     
-                  
+                    if (received)
+                        break;
                     if ((rbuffer = mmal_queue_get(pool_outr->queue)) != NULL) {
                            if (mmal_port_send_buffer(resizer->output[0], rbuffer) != MMAL_SUCCESS) {
                               goto end;
                            } 
                     }         
                     
+                }
+                
+                if (!received) {
+                    return -1;
                 }
                 
 } //if ctype
@@ -497,6 +504,10 @@ if (!ctype) {
     zm_av_packet_unref( &packet );
   } // end while ! frameComplete
   return (0);
+  
+  
+  
+  
 } // FfmpegCamera::Capture
 
 int FfmpegCamera::PostCapture() {
