@@ -438,20 +438,24 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                     }
                     mmal_buffer_header_mem_unlock(rbuffer);   
                     
-                    mmal_buffer_header_release(rbuffer);
-                    
-                   // if (received)
-                      //  break;
-                    if ((rbuffer = mmal_queue_get(pool_outr->queue)) != NULL) {
-                           if (mmal_port_send_buffer(resizer->output[0], rbuffer) != MMAL_SUCCESS) {
-                              goto end;
-                           } 
-                    }         
-                    
                 }
                 
                 if (!received) {
-                    Fatal("Did not receive the RGB Data");
+                    if (mmal_port_send_buffer(resizer->input[0], rbuffer) != MMAL_SUCCESS) {
+                       Warning("failed to resend YUV420 buffer to resizer for frame %d\n", frameCount);
+                       goto end;
+                } else {
+                   mmal_buffer_header_release(rbuffer);
+                   
+                   if ((rbuffer = mmal_queue_get(pool_outr->queue)) != NULL) {
+                           if (mmal_port_send_buffer(resizer->output[0], rbuffer) != MMAL_SUCCESS) {
+                              goto end;
+                           } 
+                   }         
+                   
+                   
+                }    
+                    //Fatal("Did not receive the RGB Data");
                 }
                 
 } //if ctype
