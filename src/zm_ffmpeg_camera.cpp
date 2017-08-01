@@ -440,8 +440,8 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                     
                     mmal_buffer_header_release(rbuffer);
                     
-                    if (received)
-                        break;
+                   // if (received)
+                      //  break;
                     if ((rbuffer = mmal_queue_get(pool_outr->queue)) != NULL) {
                            if (mmal_port_send_buffer(resizer->output[0], rbuffer) != MMAL_SUCCESS) {
                               goto end;
@@ -451,7 +451,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                 }
                 
                 if (!received) {
-                    return -1;
+                    Fatal("Did not receive the RGB Data");
                 }
                 
 } //if ctype
@@ -690,8 +690,8 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
        format_out->encoding_variant = MMAL_ENCODING_RGBA;
    } else if ( colours == ZM_COLOUR_RGB24 ) {
     
-       format_out->encoding = MMAL_ENCODING_RGB24;
-       format_out->encoding_variant = MMAL_ENCODING_RGB24;
+       format_out->encoding = MMAL_ENCODING_BGR24;
+       format_out->encoding_variant = MMAL_ENCODING_BGR24;
    } /*else if(colours == ZM_COLOUR_GRAY8) { //FIXME
        format_out->encoding = MMAL_ENCODING_GRAY8;
        format_out->encoding_variant = MMAL_ENCODING_GRAY;
@@ -718,6 +718,7 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
            format_in->es->video.width, format_in->es->video.height,
            format_in->es->video.crop.x, format_in->es->video.crop.y,
            format_in->es->video.crop.width, format_in->es->video.crop.height);
+   Info("Input buffer size is %d bytes, Number is %d", resizer->input[0]->buffer_size, resizer->input[0]->buffer_num);
 
    /* Display the output port format */
    Info("RESIZER OUTPUT FORMAT \n");
@@ -730,14 +731,15 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
            format_out->es->video.width, format_out->es->video.height,
            format_out->es->video.crop.x, format_out->es->video.crop.y,
            format_out->es->video.crop.width, format_out->es->video.crop.height);
+   Info("Output buffer size is %d bytes, Number is %d", resizer->output[0]->buffer_size, resizer->output[0]->buffer_num);
 
 
    /* The format of both ports is now set so we can get their buffer requirements and create
     * our buffer headers. We use the buffer pool API to create these. */
-   resizer->input[0]->buffer_num = resizer->input[0]->buffer_num_min;
-   resizer->input[0]->buffer_size = resizer->input[0]->buffer_size_min;
-   resizer->output[0]->buffer_num = resizer->output[0]->buffer_num_min;
-   resizer->output[0]->buffer_size = resizer->output[0]->buffer_size_min;
+   //resizer->input[0]->buffer_num = resizer->input[0]->buffer_num_min;
+   //resizer->input[0]->buffer_size = resizer->input[0]->buffer_size_min;
+   //resizer->output[0]->buffer_num = resizer->output[0]->buffer_num_min;
+   //resizer->output[0]->buffer_size = resizer->output[0]->buffer_size_min;
    pool_inr = mmal_pool_create(resizer->input[0]->buffer_num,
                               resizer->input[0]->buffer_size);
    pool_outr = mmal_pool_create(resizer->output[0]->buffer_num,
