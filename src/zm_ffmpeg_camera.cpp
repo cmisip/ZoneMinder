@@ -216,7 +216,8 @@ int FfmpegCamera::Capture( Image &image ) {
 
         
  
-      uint8_t* mvect_buffer=NULL;     
+      uint8_t* mvect_buffer=NULL;    
+      bool received=true;
 if (!( cfunction == Monitor::MVDECT )) {     
     //Info("Camera Function is not MVDECT.. Will not capture motion vectors.");
     goto end;
@@ -295,6 +296,8 @@ if (!ctype) { //motion vectors from software h264 decoding
             } 
 }         
 
+
+
 #ifdef __arm__        
 if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels and there are a fixed number covering the entire frame.
                 MMAL_BUFFER_HEADER_T *buffer, *rbuffer;
@@ -337,6 +340,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                 } 
                 
                 //send buffer with yuv420 data to resizer
+                received=false;
                 if ((rbuffer = mmal_queue_get(pool_inr->queue)) != NULL)  {
                     
                   int bufsize=av_image_get_buffer_size(AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 1);  
@@ -431,10 +435,11 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                     mmal_buffer_header_mem_lock(rbuffer);
                         
                     //copy buffer->data to directbuffer
-                     if (rbuffer->pts >= frameCount)
+                     if (rbuffer->pts == frameCount) {
                        memcpy(directbuffer,rbuffer->data,rbuffer->length);
-                    memcpy(directbuffer,rbuffer->data,rbuffer->length);
+                       received=true;
                     
+                     }  
                     mmal_buffer_header_mem_unlock(rbuffer);   
                     
                     mmal_buffer_header_release(rbuffer);
@@ -458,7 +463,9 @@ end:
 
         
 
-if (!ctype) {        
+if ((!ctype) || (!received)) {
+    
+    Info("Fallback on SWSCALE");
 #if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
         av_image_fill_arrays(mFrame->data, mFrame->linesize,
             directbuffer, imagePixFormat, width, height, 1);
