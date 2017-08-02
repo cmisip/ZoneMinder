@@ -408,12 +408,12 @@ void Image::Initialise()
 }
 
 uint8_t *& Image::VectBuffer(uint16_t imv_size) {
-    if (!mv_buffer) {
-        //mv_size=((((((width * height)/16)*(double)20)/100))*4)+4; 
+    if ((!mv_buffer) && (imv_size > 0)) {
         mv_size=imv_size;
         mv_buffer = (uint8_t *) malloc(mv_size);
         memset(mv_buffer,0,mv_size);
-    }
+    } 
+        
     return mv_buffer;
 }    
 
