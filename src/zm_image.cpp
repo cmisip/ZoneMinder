@@ -26,7 +26,7 @@
 #include <sys/stat.h>
 #include <errno.h>
 
-#define ZM_STRIP_NEON
+#define ZM_STRIP_NEON //FIXMEC because NEON is still broken
 
 static unsigned char y_table_global[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20, 22, 23, 24, 25, 26, 27, 29, 30, 31, 32, 33, 34, 36, 37, 38, 39, 40, 41, 43, 44, 45, 46, 47, 48, 50, 51, 52, 53, 54, 55, 57, 58, 59, 60, 61, 62, 64, 65, 66, 67, 68, 69, 71, 72, 73, 74, 75, 76, 78, 79, 80, 81, 82, 83, 85, 86, 87, 88, 89, 90, 91, 93, 94, 95, 96, 97, 98, 100, 101, 102, 103, 104, 105, 107, 108, 109, 110, 111, 112, 114, 115, 116, 117, 118, 119, 121, 122, 123, 124, 125, 126, 128, 129, 130, 131, 132, 133, 135, 136, 137, 138, 139, 140, 142, 143, 144, 145, 146, 147, 149, 150, 151, 152, 153, 154, 156, 157, 158, 159, 160, 161, 163, 164, 165, 166, 167, 168, 170, 171, 172, 173, 174, 175, 176, 178, 179, 180, 181, 182, 183, 185, 186, 187, 188, 189, 190, 192, 193, 194, 195, 196, 197, 199, 200, 201, 202, 203, 204, 206, 207, 208, 209, 210, 211, 213, 214, 215, 216, 217, 218, 220, 221, 222, 223, 224, 225, 227, 228, 229, 230, 231, 232, 234, 235, 236, 237, 238, 239, 241, 242, 243, 244, 245, 246, 248, 249, 250, 251, 252, 253, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255};
 
@@ -89,11 +89,8 @@ Image::Image() {
   buffer = 0;
   buffertype = 0;
   holdbuffer = 0;
-  mv_size=((((((width * height)/16)*(double)20)/100))*4)+4;  //size of motion_vector is 4bytes plus the space for the size of the array; width*height is divided by maximum number of 4x4 blocks
-  if (!mv_buffer) {
-      mv_buffer = (uint8_t *) malloc(mv_size);
-      memset(mv_buffer,0,mv_size);
-  }
+  mv_size = 0;
+  //VectBuffer();
   text[0] = '\0';
 }
 
@@ -110,11 +107,8 @@ Image::Image( const char *filename ) {
   buffer = 0;
   buffertype = 0;
   holdbuffer = 0;
-  mv_size=((((((width * height)/16)*(double)20)/100))*4)+4;
-  if (!mv_buffer) {
-      mv_buffer = (uint8_t *) malloc(mv_size);
-      memset(mv_buffer,0,mv_size);
-  }
+  mv_size = 0;
+  //VectBuffer();
   ReadJpeg( filename, ZM_COLOUR_RGB24, ZM_SUBPIX_ORDER_RGB);
   text[0] = '\0';
 }
@@ -131,11 +125,8 @@ Image::Image( int p_width, int p_height, int p_colours, int p_subpixelorder, uin
   size = pixels*colours;
   buffer = 0;
   holdbuffer = 0;
-  mv_size=((((((width * height)/16)*(double)20)/100))*4)+4;
-  if (!mv_buffer) {
-      mv_buffer = (uint8_t *) malloc(mv_size);
-      memset(mv_buffer,0,mv_size);
-  }
+  mv_size = 0;
+  //VectBuffer();
   if ( p_buffer )
   {
     allocation = size;
@@ -161,15 +152,13 @@ Image::Image( const Image &p_image )
   size = p_image.size; // allocation is set in AllocImgBuffer
   buffer = 0;
   holdbuffer = 0;
-  mv_size=((((((width * height)/16)*(double)20)/100))*4)+4;
-
-  if (!mv_buffer) {
-      mv_buffer = (uint8_t *) malloc(mv_size);
-      memset(mv_buffer,0,mv_size);
-  }
+  mv_size = 0;
   AllocImgBuffer(size);
   (*fptr_imgbufcpy)(buffer, p_image.buffer, size);
-  memcpy(mv_buffer,p_image.mv_buffer,mv_size);
+  if (p_image.mv_buffer) {
+     VectBuffer();
+     memcpy(mv_buffer,p_image.mv_buffer,mv_size);
+  }
   strncpy( text, p_image.text, sizeof(text) );
 }
 
@@ -422,7 +411,10 @@ void Image::Initialise()
 
 uint8_t *& Image::VectBuffer() {
     if (!mv_buffer) {
-        Fatal("mv_buffer with no allocation");
+        mv_size=((((((width * height)/16)*(double)20)/100))*4)+4; 
+        mv_buffer = (uint8_t *) malloc(mv_size);
+        memset(mv_buffer,0,mv_size);
+        //Fatal("mv_buffer with no allocation");
     }
     return mv_buffer;
 }    

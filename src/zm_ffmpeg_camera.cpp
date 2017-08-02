@@ -599,10 +599,10 @@ int FfmpegCamera::OpenMmal(AVCodecContext *mVideoCodecContext){
 
    /* The format of both ports is now set so we can get their buffer requirements and create
     * our buffer headers. We use the buffer pool API to create these. */
-   encoder->input[0]->buffer_num = encoder->input[0]->buffer_num_min;
-   encoder->input[0]->buffer_size = encoder->input[0]->buffer_size_min;
-   encoder->output[0]->buffer_num = encoder->output[0]->buffer_num_min;
-   encoder->output[0]->buffer_size = encoder->output[0]->buffer_size_min;
+   //encoder->input[0]->buffer_num = encoder->input[0]->buffer_num_min;
+   //encoder->input[0]->buffer_size = encoder->input[0]->buffer_size_min;
+   //encoder->output[0]->buffer_num = encoder->output[0]->buffer_num_min;
+   //encoder->output[0]->buffer_size = encoder->output[0]->buffer_size_min;
    pool_in = mmal_pool_create(encoder->input[0]->buffer_num,
                               encoder->input[0]->buffer_size);
    pool_out = mmal_pool_create(encoder->output[0]->buffer_num,
@@ -678,8 +678,8 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
        format_out->encoding_variant = MMAL_ENCODING_RGBA;
    } else if ( colours == ZM_COLOUR_RGB24 ) {
     
-       format_out->encoding = MMAL_ENCODING_RGB24;
-       format_out->encoding_variant = MMAL_ENCODING_RGB24;
+       format_out->encoding = MMAL_ENCODING_BGR24;
+       format_out->encoding_variant = MMAL_ENCODING_BGR24;
    } /*else if(colours == ZM_COLOUR_GRAY8) { //FIXME
        format_out->encoding = MMAL_ENCODING_GRAY8;
        format_out->encoding_variant = MMAL_ENCODING_GRAY;
@@ -722,10 +722,10 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
 
    /* The format of both ports is now set so we can get their buffer requirements and create
     * our buffer headers. We use the buffer pool API to create these. */
-   resizer->input[0]->buffer_num = resizer->input[0]->buffer_num_min;
-   resizer->input[0]->buffer_size = resizer->input[0]->buffer_size_min;
-   resizer->output[0]->buffer_num = resizer->output[0]->buffer_num_min;
-   resizer->output[0]->buffer_size = resizer->output[0]->buffer_size_min;
+   //resizer->input[0]->buffer_num = resizer->input[0]->buffer_num_min;
+   //resizer->input[0]->buffer_size = resizer->input[0]->buffer_size_min;
+   //resizer->output[0]->buffer_num = resizer->output[0]->buffer_num_min;
+   //resizer->output[0]->buffer_size = resizer->output[0]->buffer_size_min;
    pool_inr = mmal_pool_create(resizer->input[0]->buffer_num,
                               resizer->input[0]->buffer_size);
    pool_outr = mmal_pool_create(resizer->output[0]->buffer_num,
