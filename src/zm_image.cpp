@@ -154,6 +154,7 @@ Image::Image( const Image &p_image )
   (*fptr_imgbufcpy)(buffer, p_image.buffer, size);
   if (p_image.mv_buffer) {
      VectBuffer(p_image.mv_size);
+     mv_size=p_image.mv_size;
      memcpy(mv_buffer,p_image.mv_buffer,mv_size);
   }
   strncpy( text, p_image.text, sizeof(text) );

@@ -621,10 +621,7 @@ Monitor::~Monitor() {
       delete next_buffer.timestamp;
     }
     for ( int i = 0; i < image_buffer_count; i++ ) {
-         if (function == MVDECT) {
-          while (*(image_buffer[i].image->VectBuffer()) != 0)
-            usleep(1000);
-           }
+       
       delete image_buffer[i].image;
     }
     delete[] image_buffer;
@@ -3212,7 +3209,7 @@ unsigned int Monitor::DetectMotion( const Image &comp_image, Event::StringSet &z
   }
 
   if (function == MVDECT ) {
-    mvect_buffer=const_cast<Image*>(&comp_image)->VectBuffer(); 
+    mvect_buffer=const_cast<Image*>(&comp_image)->VectBuffer(mvbuffer_size); 
   } else
     ref_image.Delta( comp_image, &delta_image);
 
