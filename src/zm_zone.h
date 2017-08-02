@@ -25,7 +25,6 @@
 #include "zm_poly.h"
 #include "zm_image.h"
 #include "zm_event.h"
-#include "zm_ffmpeg_camera.h"
 
 class Monitor;
 
@@ -48,12 +47,7 @@ public:
   typedef enum { ALARMED_PIXELS=1, FILTERED_PIXELS, BLOBS } CheckMethod;
 
   
-/*  struct motion_vector {
-    uint16_t xcoord;  //location of top left corner
-    uint16_t ycoord;
-};*/
-  
-  typedef FfmpegCamera::motion_vector motion_vector;
+  typedef Image::motion_vector motion_vector;
   
 
 protected:
