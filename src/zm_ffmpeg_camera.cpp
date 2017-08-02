@@ -431,7 +431,10 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                     mmal_buffer_header_mem_lock(rbuffer);
                         
                     //copy buffer->data to directbuffer
-                    memcpy(directbuffer,rbuffer->data,rbuffer->length);
+                    if (colours == ZM_COLOUR_GRAY8)
+                        memcpy(directbuffer,rbuffer->data,encoder->output[0]->format->es->video.width * encoder->output[0]->format->es->video.height);
+                    else
+                        memcpy(directbuffer,rbuffer->data,rbuffer->length);
                     
                     mmal_buffer_header_mem_unlock(rbuffer);   
                     
@@ -680,10 +683,10 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
     
        format_out->encoding = MMAL_ENCODING_RGB24;
        format_out->encoding_variant = MMAL_ENCODING_RGB24;
-   } /*else if(colours == ZM_COLOUR_GRAY8) { //FIXME
-       format_out->encoding = MMAL_ENCODING_GRAY8;
-       format_out->encoding_variant = MMAL_ENCODING_GRAY;
-   }*/
+   } else if(colours == ZM_COLOUR_GRAY8) { //FIXME
+       format_out->encoding = MMAL_ENCODING_I420;
+       format_out->encoding_variant = MMAL_ENCODING_I420;
+   }
    
    
    format_out->es->video.width = width;
