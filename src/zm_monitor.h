@@ -321,6 +321,8 @@ protected:
 
   int      n_linked_monitors;
   MonitorLink    **linked_monitors;
+  
+  uint16_t mvbuffer_size;
 
 public:
   Monitor( int p_id );

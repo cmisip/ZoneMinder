@@ -190,7 +190,7 @@ public:
 	inline const uint8_t* Buffer() const { return( buffer ); }
 	inline const uint8_t* Buffer( unsigned int x, unsigned int y= 0 ) const { return( &buffer[colours*((y*width)+x)] ); }
         /* Request writeable mv_buffer */
-        uint8_t*& VectBuffer ();
+        uint8_t*& VectBuffer (uint16_t imv_size);
 	/* Request writeable image buffer */
 	uint8_t* WriteBuffer(const unsigned int p_width, const unsigned int p_height, const unsigned int p_colours, const unsigned int p_subpixelorder);
 	

@@ -90,7 +90,6 @@ Image::Image() {
   buffertype = 0;
   holdbuffer = 0;
   mv_size = 0;
-  //VectBuffer();
   text[0] = '\0';
 }
 
@@ -108,7 +107,6 @@ Image::Image( const char *filename ) {
   buffertype = 0;
   holdbuffer = 0;
   mv_size = 0;
-  //VectBuffer();
   ReadJpeg( filename, ZM_COLOUR_RGB24, ZM_SUBPIX_ORDER_RGB);
   text[0] = '\0';
 }
@@ -126,7 +124,6 @@ Image::Image( int p_width, int p_height, int p_colours, int p_subpixelorder, uin
   buffer = 0;
   holdbuffer = 0;
   mv_size = 0;
-  //VectBuffer();
   if ( p_buffer )
   {
     allocation = size;
@@ -156,7 +153,7 @@ Image::Image( const Image &p_image )
   AllocImgBuffer(size);
   (*fptr_imgbufcpy)(buffer, p_image.buffer, size);
   if (p_image.mv_buffer) {
-     VectBuffer();
+     VectBuffer(p_image.mv_size);
      memcpy(mv_buffer,p_image.mv_buffer,mv_size);
   }
   strncpy( text, p_image.text, sizeof(text) );
@@ -409,12 +406,12 @@ void Image::Initialise()
   initialised = true;
 }
 
-uint8_t *& Image::VectBuffer() {
+uint8_t *& Image::VectBuffer(uint16_t imv_size) {
     if (!mv_buffer) {
-        mv_size=((((((width * height)/16)*(double)20)/100))*4)+4; 
+        //mv_size=((((((width * height)/16)*(double)20)/100))*4)+4; 
+        mv_size=imv_size;
         mv_buffer = (uint8_t *) malloc(mv_size);
         memset(mv_buffer,0,mv_size);
-        //Fatal("mv_buffer with no allocation");
     }
     return mv_buffer;
 }    

@@ -44,6 +44,9 @@ FfmpegCamera::FfmpegCamera( int p_id, const std::string &p_path, const std::stri
   ctype( ictype),
   cfunction(icfunction)
 {
+  if (ctype)
+    type=FFMPEG_HW;
+  
   if ( capture ) {
     Initialise();
   }
@@ -223,7 +226,7 @@ if (!( cfunction == Monitor::MVDECT )) {
 }
 
         
-{   
+/*{   
         mvect_buffer=image.VectBuffer();   
         if (mvect_buffer ==  NULL ){
                 Error("Failed requesting vector buffer for the captured image.");
@@ -234,7 +237,7 @@ if (!( cfunction == Monitor::MVDECT )) {
         
         
 }
-
+*/
      
         
 if (!ctype) { //motion vectors from software h264 decoding
@@ -246,6 +249,13 @@ if (!ctype) { //motion vectors from software h264 decoding
             uint16_t vector_ceiling=((((mRawFrame->width * mRawFrame->height)/16)*(double)20)/100);  //FIXMEC, just 20% of the maximum number of 4x4 blocks that will fit
         
             if (sd) {
+                
+                   mvect_buffer=image.VectBuffer((vector_ceiling*4)+4);   
+                   if (mvect_buffer ==  NULL ){
+                        Error("Failed requesting vector buffer for the captured image.");
+                        return (-1); 
+                   } else
+                     memset(mvect_buffer,0,image.mv_size);
 
                    
                    uint8_t offset=sizeof(uint16_t)*2;
@@ -364,6 +374,13 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                           
                         uint16_t t_offset=sizeof(uint16_t)*2; //skip the first 4 bytes, reserved for size and vec_type
                         uint16_t vector_ceiling=(((mRawFrame->width * mRawFrame->height)/256)*(double)20)/100;  //FIXMEC, the size of hardware buffer is smaller than software buffer so can save memory by requesting smaller buffer size
+                        mvect_buffer=image.VectBuffer((vector_ceiling*4)+4);   
+                           if (mvect_buffer ==  NULL ){
+                              Error("Failed requesting vector buffer for the captured image.");
+                              return (-1); 
+                           } else
+                              memset(mvect_buffer,0,image.mv_size);
+                        
                         vector_ceiling--;
                         uint16_t vec_count=0;  
                         

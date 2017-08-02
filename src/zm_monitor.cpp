@@ -368,14 +368,20 @@ Monitor::Monitor(
     event_close_mode = CLOSE_IDLE;
 
   Debug( 1, "monitor purpose=%d", purpose );
-  //uint16_t mv_buffer_size=(((width*height)/16)*8)+2;
-  // + (image_buffer_count*( (((width*height)/16)*8)+2 ))
+  
+  if (camera->IsFfmpegHW())
+      mvbuffer_size=((((((width * height)/16)*(double)20)/100))*4)+4;
+  else if (camera->IsFfmpeg())
+      mvbuffer_size=((((((width * height)/256)*(double)20)/100))*4)+4;
+  else
+      mvbuffer_size=0;
+  
   mem_size = sizeof(SharedData)
        + sizeof(TriggerData)
        + sizeof(VideoStoreData) //Information to pass back to the capture process
        + (image_buffer_count*sizeof(struct timeval))
        + (image_buffer_count*camera->ImageSize())
-       + (image_buffer_count*( (((((width * height)/16)*(double)20)/100)*4)+4)  )
+       + (image_buffer_count*mvbuffer_size  )   
        + 64; /* Padding used to permit aligning the images buffer to 64 byte boundary */
 
   Debug( 1, "mem.size=%d", mem_size );
@@ -562,11 +568,11 @@ bool Monitor::connect() {
 
 
   
-  uint16_t mv_buffer_size = ((((((width * height)/16)*(double)20)/100)*4)+4);
+  //uint16_t mv_buffer_size = ((((((width * height)/16)*(double)20)/100)*4)+4);
   for ( int i = 0; i < image_buffer_count; i++ ) {
     image_buffer[i].timestamp = &(shared_timestamps[i]);
     image_buffer[i].image = new Image( width, height, camera->Colours(), camera->SubpixelOrder(), &(shared_images[i*camera->ImageSize()]) );
-    image_buffer[i].image->VectBuffer() = &(shared_mbuff[ i*mv_buffer_size ]) ; //FIXMEC maybe needs to be a parameter to constructor in line above
+    image_buffer[i].image->VectBuffer(mvbuffer_size) = &(shared_mbuff[ i*mvbuffer_size ]) ; //FIXMEC maybe needs to be a parameter to constructor in line above
     image_buffer[i].image->HoldBuffer(true); /* Don't release the internal buffer or replace it with another */
   }
   if ( (deinterlacing & 0xff) == 4) {
