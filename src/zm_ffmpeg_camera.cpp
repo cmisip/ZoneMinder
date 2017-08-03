@@ -207,7 +207,12 @@ int FfmpegCamera::Capture( Image &image ) {
         uint8_t* directbuffer;
 
         /* Request a writeable buffer of the target image */
-        directbuffer = image.WriteBuffer(width, height, colours, subpixelorder);
+        if (!ctype)
+            directbuffer = image.WriteBuffer(width, height, colours, subpixelorder);
+        
+        if (ctype)
+            directbuffer = image.WriteBuffer(encoder->output[0]->format->es->video.width, encoder->output[0]->format->es->video.height, colours, subpixelorder);
+        
         if(directbuffer == NULL) {
           Error("Failed requesting writeable buffer for the captured image.");
           return (-1);
@@ -363,7 +368,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                       if(buffer->flags & MMAL_BUFFER_HEADER_FLAG_CODECSIDEINFO) {
                           
                         uint16_t t_offset=sizeof(uint16_t)*2; //skip the first 4 bytes, reserved for size and vec_type
-                        uint16_t vector_ceiling=(((mRawFrame->width * mRawFrame->height)/256)*(double)20)/100;  //FIXMEC, the size of hardware buffer is smaller than software buffer so can save memory by requesting smaller buffer size
+                        uint16_t vector_ceiling=(((encoder->output[0]->format->es->video.width * encoder->output[0]->format->es->video.height)/256)*(double)20)/100;  //FIXMEC, the size of hardware buffer is smaller than software buffer so can save memory by requesting smaller buffer size
                         vector_ceiling--;
                         uint16_t vec_count=0;  
                         
@@ -384,8 +389,8 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                             if ((abs(mvs.x_vector) + abs(mvs.y_vector)) < 1)
                                continue;
                           
-                            mvt.xcoord = (i*16) % (mVideoCodecContext->width + 16);
-                            mvt.ycoord = ((i*16)/(mVideoCodecContext->width+16))*16;
+                            mvt.xcoord = (i*16) % (encoder->output[0]->format->es->video.width + 16);
+                            mvt.ycoord = ((i*16)/(encoder->output[0]->format->es->video.height +16))*16;
                             
                             //Future expansion, save the magnitude of vectors
                             //mvt.x_vector = mv->x_vector;
