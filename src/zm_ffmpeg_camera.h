@@ -98,8 +98,9 @@ class FfmpegCamera : public Camera {
     MMAL_POOL_T *pool_in, *pool_out;
 
     /** Context for our application */
-    static struct CONTEXT_T {
-      MMAL_QUEUE_T *queue;
+    
+    struct CONTEXT_T {
+    MMAL_QUEUE_T *queue;
     } context,contextr,contexts;
 
     MMAL_COMPONENT_T *resizer;
@@ -119,7 +120,6 @@ class FfmpegCamera : public Camera {
     MMAL_POOL_T *input_pool=NULL;
 
     bool resize_needed;
-    uint16_t width,height;
 
     struct mmal_motion_vector {
      char x_vector;
