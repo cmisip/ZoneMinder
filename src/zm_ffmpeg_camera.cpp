@@ -65,7 +65,11 @@ FfmpegCamera::FfmpegCamera( int p_id, const std::string &p_path, const std::stri
   mReopenThread = 0;
   videoStore = NULL;
   video_last_pts = 0;
-
+  
+#ifdef __arm__
+  resize_needed = false;
+#endif
+  
 #if HAVE_LIBSWSCALE  
   mConvertContext = NULL;
 #endif
@@ -277,9 +281,9 @@ if (!ctype) { //motion vectors from software h264 decoding
                        }
                         
                         if (vec_count > vector_ceiling) {  
-                            //memset(mvect_buffer,0,image.mv_size);
-                            char * temp_ptr = (char *)mvect_buffer;
-                            memset(temp_ptr,0,image.mv_size);
+                            memset(mvect_buffer,0,image.mv_size);
+                           // char * temp_ptr = (char *)mvect_buffer;
+                           //memset(temp_ptr,0,image.mv_size);
                             vec_count=0;
                             break;
                         }     
@@ -316,7 +320,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                   
            
                   if (mmal_port_send_buffer(input_port, buffer) != MMAL_SUCCESS) {
-                       Warning("failed to send YUV420 buffer to encoder for frame %d\n", frameCount);
+                       Warning("failed to send YUV420 buffer to start of pipeline for frame %d\n", frameCount);
                        goto end;
                   }
                 } 
@@ -710,9 +714,17 @@ int FfmpegCamera::OpenMmalSplitter(uint16_t i_width, uint16_t i_height){
    //Splitter output 0 format goes to directbuffer
    MMAL_ES_FORMAT_T *format_out = splitter->output[0]->format;
    
-   //FIXME set output encoding to either RGBA, RGB24 or GRAY8
-   format_out->encoding = MMAL_ENCODING_RGB24;
-   format_out->encoding_variant = MMAL_ENCODING_RGB24;
+   if ( colours == ZM_COLOUR_RGB32 ) {
+       format_out->encoding = MMAL_ENCODING_RGBA;
+       format_out->encoding_variant = MMAL_ENCODING_RGBA;
+   } else if ( colours == ZM_COLOUR_RGB24 ) {
+    
+       format_out->encoding = MMAL_ENCODING_RGB24;
+       format_out->encoding_variant = MMAL_ENCODING_RGB24;
+   } else if(colours == ZM_COLOUR_GRAY8) { //FIXME
+       format_out->encoding = MMAL_ENCODING_I420;
+       format_out->encoding_variant = MMAL_ENCODING_I420;
+}
    
    format_out->es->video.width = i_width;
    format_out->es->video.height = i_height;
@@ -1060,6 +1072,7 @@ int FfmpegCamera::OpenFfmpeg() {
 
   mCanCapture = true;
 #ifdef __arm__
+  
   if (ctype) { 
     if ((width != mVideoCodecContext->width ) || (height != mVideoCodecContext->height )) {
        resize_needed=true;
