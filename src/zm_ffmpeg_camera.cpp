@@ -297,26 +297,11 @@ if (!ctype) { //motion vectors from software h264 decoding
 
 #ifdef __arm__        
 if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels and there are a fixed number covering the entire frame.
-                MMAL_BUFFER_HEADER_T *buffer, *rbuffer;
+                MMAL_BUFFER_HEADER_T *buffer;
                 
-                //send free buffer to encoder
-                if ((buffer = mmal_queue_get(pool_out->queue)) != NULL) {
-                   if (mmal_port_send_buffer(encoder->output[0], buffer) != MMAL_SUCCESS) {
-                      Warning("failed to send buffer to encoder for frame %d\n", frameCount);
-                      goto end;
-                   }
-                } 
-                
-                //send free buffer to resizer
-                if ((rbuffer = mmal_queue_get(pool_outr->queue)) != NULL) {
-                   if (mmal_port_send_buffer(resizer->output[0], rbuffer) != MMAL_SUCCESS) {
-                      Warning("failed to send buffer to resizer for frame %d\n", frameCount);
-                      goto end;
-                   }
-                } 
-                
-                //send buffer with yuv420 data to encoder
-                if ((buffer = mmal_queue_get(pool_in->queue)) != NULL)  {
+              
+                //send buffer with yuv420 data to pipeline input
+                if ((buffer = mmal_queue_get(input_pool->queue)) != NULL)  {
                     
                   int bufsize=av_image_get_buffer_size(AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 1);  
                     
@@ -330,34 +315,12 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                   mmal_buffer_header_mem_unlock(buffer);
                   
            
-                  if (mmal_port_send_buffer(encoder->input[0], buffer) != MMAL_SUCCESS) {
+                  if (mmal_port_send_buffer(input_port, buffer) != MMAL_SUCCESS) {
                        Warning("failed to send YUV420 buffer to encoder for frame %d\n", frameCount);
                        goto end;
                   }
                 } 
-                
-                //send buffer with yuv420 data to resizer
-                if ((rbuffer = mmal_queue_get(pool_inr->queue)) != NULL)  {
-                    
-                  int bufsize=av_image_get_buffer_size(AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 1);  
-                    
-                  mmal_buffer_header_mem_lock(rbuffer);
-                   
-                  av_image_copy_to_buffer(rbuffer->data, bufsize, (const uint8_t **)mRawFrame->data, mRawFrame->linesize,
-                                 AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 1);
-                  rbuffer->length=bufsize;
-                  //buffer->pts = buffer->dts = frameCount;  //could be used to check if buffer and frame synchronized
-                                                                                        //if we supply a time stamp to pts, the first buffer returned with the same time stamp is the matching data for the frame sent
-                  mmal_buffer_header_mem_unlock(rbuffer);
-                  
-           
-                  if (mmal_port_send_buffer(resizer->input[0], rbuffer) != MMAL_SUCCESS) {
-                       Warning("failed to send YUV420 buffer to resizer for frame %d\n", frameCount);
-                       goto end;
-                  }
-                } 
-                
-                
+              
                 while ((buffer = mmal_queue_get(context.queue)) != NULL) {
                         
                       if(buffer->flags & MMAL_BUFFER_HEADER_FLAG_CODECSIDEINFO) {
@@ -418,36 +381,40 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                     mmal_buffer_header_release(buffer);
                     
                   
-                    if ((buffer = mmal_queue_get(pool_out->queue)) != NULL) {
-                           if (mmal_port_send_buffer(encoder->output[0], buffer) != MMAL_SUCCESS) {
-                              goto end;
-                           } 
-                    }         
+                    
                     
                 }
                 
-                while ((rbuffer = mmal_queue_get(contextr.queue)) != NULL) {
+                while ((buffer = mmal_queue_get(contexts.queue)) != NULL) {
                        
-                    mmal_buffer_header_mem_lock(rbuffer);
+                    mmal_buffer_header_mem_lock(buffer);
                         
                     //copy buffer->data to directbuffer
                     if (colours == ZM_COLOUR_GRAY8)
-                        memcpy(directbuffer,rbuffer->data,encoder->output[0]->format->es->video.width * encoder->output[0]->format->es->video.height);
+                        memcpy(directbuffer,buffer->data,splitter->output[0]->format->es->video.width * splitter->output[0]->format->es->video.height);
                     else
-                        memcpy(directbuffer,rbuffer->data,rbuffer->length);
+                        memcpy(directbuffer,buffer->data,buffer->length);
                     
-                    mmal_buffer_header_mem_unlock(rbuffer);   
+                    mmal_buffer_header_mem_unlock(buffer);   
                     
-                    mmal_buffer_header_release(rbuffer);
+                    mmal_buffer_header_release(buffer);
                     
                   
-                    if ((rbuffer = mmal_queue_get(pool_outr->queue)) != NULL) {
-                           if (mmal_port_send_buffer(resizer->output[0], rbuffer) != MMAL_SUCCESS) {
-                              goto end;
-                           } 
-                    }         
+                    
                     
                 }
+                
+                //FREE BUFFERS allocated at end of PIPELINE 1
+                while ((buffer = mmal_queue_get(pool_outs->queue)) != NULL) {
+                   if (mmal_port_send_buffer(splitter->output[0], buffer) != MMAL_SUCCESS)
+                   Warning("failed to send free buffer to splitter output for frame %d\n", frameCount);
+                } 
+
+                //FREE BUFFERS allocated at end of PIPELINE 2
+                while ((buffer = mmal_queue_get(pool_out->queue)) != NULL) {
+                   if (mmal_port_send_buffer(encoder->output[0], buffer) != MMAL_SUCCESS)
+                   Warning("failed to send free buffer to encoder output for frame %d\n", frameCount);
+                 } 
                 
 } //if ctype
         
