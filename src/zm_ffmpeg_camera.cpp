@@ -519,17 +519,25 @@ void FfmpegCamera::output_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buff
 }
 
 
-void FfmpegCamera::input_callbackr(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer) {
-   //CONTEXT_T *ctx = (struct CONTEXT_T *)port->userdata;
-   mmal_buffer_header_release(buffer);
+
+
+MMAL_STATUS_T FfmpegCamera::connect_ports(MMAL_PORT_T *output_port, MMAL_PORT_T *input_port, MMAL_CONNECTION_T **connection)
+{
+   MMAL_STATUS_T status;
+
+   status =  mmal_connection_create(connection, output_port, input_port, MMAL_CONNECTION_FLAG_TUNNELLING | MMAL_CONNECTION_FLAG_ALLOCATION_ON_OUTPUT);
+
+   if (status == MMAL_SUCCESS)
+   {
+      status =  mmal_connection_enable(*connection);
+      if (status != MMAL_SUCCESS)
+         mmal_connection_destroy(*connection);
+   }
+
+   return status;
 }
 
-void FfmpegCamera::output_callbackr(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer) {
-   CONTEXT_T *ctx = (struct CONTEXT_T *)port->userdata;
-   mmal_queue_put(ctx->queue, buffer);
-}
-
-int FfmpegCamera::OpenMmal(AVCodecContext *mVideoCodecContext){  
+int FfmpegCamera::OpenMmalEncoder(uint16_t i_width, uint16_t i_height){  
    
 
    // Create the encoder component.
@@ -540,15 +548,17 @@ int FfmpegCamera::OpenMmal(AVCodecContext *mVideoCodecContext){
    /* Set format of video encoder input port */
    MMAL_ES_FORMAT_T *format_in = encoder->input[0]->format;
    format_in->type = MMAL_ES_TYPE_VIDEO;
-   format_in->encoding = MMAL_ENCODING_I420;
-   format_in->es->video.width = mVideoCodecContext->width;
-   format_in->es->video.height = mVideoCodecContext->height;
+   //format_in->encoding = MMAL_ENCODING_I420;
+   format_in->encoding = MMAL_ENCODING_I420;     
+   format_in->encoding_variant = MMAL_ENCODING_I420;
+   format_in->es->video.width = i_width;
+   format_in->es->video.height = i_height;
    format_in->es->video.frame_rate.num = 30;
    format_in->es->video.frame_rate.den = 1;
    format_in->es->video.par.num = 1;
    format_in->es->video.par.den = 1;
-   format_in->es->video.crop.width = mVideoCodecContext->width;
-   format_in->es->video.crop.height = mVideoCodecContext->height;
+   format_in->es->video.crop.width = i_width;
+   format_in->es->video.crop.height = i_height;
  
 
    
@@ -559,8 +569,8 @@ int FfmpegCamera::OpenMmal(AVCodecContext *mVideoCodecContext){
    MMAL_ES_FORMAT_T *format_out = encoder->output[0]->format;
    format_out->type = MMAL_ES_TYPE_VIDEO;
    format_out->encoding = MMAL_ENCODING_H264;
-   format_out->es->video.width = mVideoCodecContext->width;
-   format_out->es->video.height = mVideoCodecContext->height;
+   format_out->es->video.width = i_width;
+   format_out->es->video.height = i_height;
    format_out->es->video.frame_rate.num = 30;
    format_out->es->video.frame_rate.den = 1;
    format_out->es->video.par.num = 0; 
@@ -599,35 +609,6 @@ int FfmpegCamera::OpenMmal(AVCodecContext *mVideoCodecContext){
            format_out->es->video.crop.x, format_out->es->video.crop.y,
            format_out->es->video.crop.width, format_out->es->video.crop.height);
 
-
-   /* The format of both ports is now set so we can get their buffer requirements and create
-    * our buffer headers. We use the buffer pool API to create these. */
-   //encoder->input[0]->buffer_num = encoder->input[0]->buffer_num_min;
-   //encoder->input[0]->buffer_size = encoder->input[0]->buffer_size_min;
-   //encoder->output[0]->buffer_num = encoder->output[0]->buffer_num_min;
-   //encoder->output[0]->buffer_size = encoder->output[0]->buffer_size_min;
-   pool_in = mmal_pool_create(encoder->input[0]->buffer_num,
-                              encoder->input[0]->buffer_size);
-   pool_out = mmal_pool_create(encoder->output[0]->buffer_num,
-                               encoder->output[0]->buffer_size);
-
-   /* Create a queue to store our decoded video frames. The callback we will get when
-    * a frame has been decoded will put the frame into this queue. */
-   context.queue = mmal_queue_create();
-
-   /* Store a reference to our context in each port (will be used during callbacks) */
-   encoder->input[0]->userdata = (MMAL_PORT_USERDATA_T *)&context;
-   encoder->output[0]->userdata = (MMAL_PORT_USERDATA_T *)&context;
-   
-   // Enable all the input port and the output port.
-   if ( mmal_port_enable(encoder->input[0], input_callback) != MMAL_SUCCESS ) {
-     Fatal("failed to enable mmal input port");
-   }  
-   
-   if ( mmal_port_enable(encoder->output[0], output_callback) != MMAL_SUCCESS ) {
-     Fatal("failed to enable mmal output port");
-   }
-   
    /* Component won't start processing data until it is enabled. */
    if ( mmal_component_enable(encoder) != MMAL_SUCCESS ) {
      Fatal("failed to enable mmal encoder component");
@@ -637,12 +618,11 @@ int FfmpegCamera::OpenMmal(AVCodecContext *mVideoCodecContext){
 
 }
 
-int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){  
+int FfmpegCamera::OpenMmalResizer(AVCodecContext *mVideoCodecContext , uint16_t i_width, uint16_t i_height ){  
    
 
    // Create the encoder component.
-  // if ( mmal_component_create("vc.ril.resize", &resizer)  != MMAL_SUCCESS) {
-   if ( mmal_component_create("vc.ril.video_splitter", &resizer)  != MMAL_SUCCESS) { 
+   if ( mmal_component_create("vc.ril.resize", &resizer)  != MMAL_SUCCESS) {
       Fatal("failed to create mmal resizer");
    }   
 
@@ -651,50 +631,41 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
    format_in->type = MMAL_ES_TYPE_VIDEO;
    format_in->encoding = MMAL_ENCODING_I420;
    format_in->encoding_variant = MMAL_ENCODING_I420;
-   format_in->es->video.width = width;
-   format_in->es->video.height = height;
+   format_in->es->video.width = mVideoCodecContext->width;
+   format_in->es->video.height = mVideoCodecContext->height;
    format_in->es->video.frame_rate.num = 30;
    format_in->es->video.frame_rate.den = 1;
    format_in->es->video.par.num = 1;
    format_in->es->video.par.den = 1;
-   format_in->es->video.crop.width = mVideoCodecContext->width;;
-   format_in->es->video.crop.height = mVideoCodecContext->height;;
+   format_in->es->video.crop.width = mVideoCodecContext->width;
+   format_in->es->video.crop.height = mVideoCodecContext->height;
    
-   
- 
-
    
    if ( mmal_port_format_commit(resizer->input[0]) != MMAL_SUCCESS ) {
       Fatal("failed to commit mmal resizer input format");
    }   
-
-   
    
    MMAL_ES_FORMAT_T *format_out = resizer->output[0]->format;
    
-   mmal_format_copy(format_out,format_in);
-   
-  
-   
-   if ( colours == ZM_COLOUR_RGB32 ) {
-       format_out->encoding = MMAL_ENCODING_RGBA;
-       format_out->encoding_variant = MMAL_ENCODING_RGBA;
-   } else if ( colours == ZM_COLOUR_RGB24 ) {
+   //format_out->encoding = MMAL_ENCODING_RGBA;
+   format_out->encoding = MMAL_ENCODING_I420;
+   format_out->encoding_variant = MMAL_ENCODING_I420;
     
-       format_out->encoding = MMAL_ENCODING_RGB24;
-       format_out->encoding_variant = MMAL_ENCODING_RGB24;
-   } else if(colours == ZM_COLOUR_GRAY8) { //FIXME
-       format_out->encoding = MMAL_ENCODING_I420;
-       format_out->encoding_variant = MMAL_ENCODING_I420;
-   }
+   //format_out->encoding = MMAL_ENCODING_RGB24;
+   //format_out->encoding_variant = MMAL_ENCODING_RGB24;
+
+   //format_out->encoding = MMAL_ENCODING_I420;
+   //format_out->encoding_variant = MMAL_ENCODING_I420;
    
    
-   format_out->es->video.width = width;
-   format_out->es->video.height = height;
+   format_out->es->video.width = i_width;
+   format_out->es->video.height = i_height;
+   format_out->es->video.crop.width = i_width;;
+   format_out->es->video.crop.height = i_height;;
    
    
    if ( mmal_port_format_commit(resizer->output[0]) != MMAL_SUCCESS ) {
-     Fatal("failed to commit mmal resizer output format");
+     Fatal("failed to commit mmal resizer output format\n");
    }
    
 
@@ -723,44 +694,124 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
            format_out->es->video.crop.width, format_out->es->video.crop.height);
 
 
-   /* The format of both ports is now set so we can get their buffer requirements and create
-    * our buffer headers. We use the buffer pool API to create these. */
-   //resizer->input[0]->buffer_num = resizer->input[0]->buffer_num_min;
-   //resizer->input[0]->buffer_size = resizer->input[0]->buffer_size_min;
-   //resizer->output[0]->buffer_num = resizer->output[0]->buffer_num_min;
-   //resizer->output[0]->buffer_size = resizer->output[0]->buffer_size_min;
-   pool_inr = mmal_pool_create(resizer->input[0]->buffer_num,
-                              resizer->input[0]->buffer_size);
-   pool_outr = mmal_pool_create(resizer->output[0]->buffer_num,
-                               resizer->output[0]->buffer_size);
+   return 0;
 
-   /* Create a queue to store our decoded video frames. The callback we will get when
-    * a frame has been decoded will put the frame into this queue. */
-   contextr.queue = mmal_queue_create();
+}
 
-   /* Store a reference to our context in each port (will be used during callbacks) */
-   resizer->input[0]->userdata = (MMAL_PORT_USERDATA_T *)&contextr;
-   resizer->output[0]->userdata = (MMAL_PORT_USERDATA_T *)&contextr;
+
+
+int FfmpegCamera::OpenMmalSplitter(uint16_t i_width, uint16_t i_height){  
    
-   // Enable all the input port and the output port.
-   if ( mmal_port_enable(resizer->input[0], input_callbackr) != MMAL_SUCCESS ) {
-     Fatal("failed to enable mmal resizer input port");
-   }  
+
+   // Create the encoder component.
+   if ( mmal_component_create("vc.ril.video_splitter", &splitter)  != MMAL_SUCCESS) { 
+      Fatal("failed to create mmal splitter");
+   }   
+
+   /* Set format of video resizer input port */
+   MMAL_ES_FORMAT_T *format_in = splitter->input[0]->format;
+   format_in->type = MMAL_ES_TYPE_VIDEO;
+   format_in->encoding = MMAL_ENCODING_I420;
+   format_in->encoding_variant = MMAL_ENCODING_I420;
+   format_in->es->video.width = i_width;
+   format_in->es->video.height = i_height;
+   format_in->es->video.frame_rate.num = 30;
+   format_in->es->video.frame_rate.den = 1;
+   format_in->es->video.par.num = 1;
+   format_in->es->video.par.den = 1;
+   format_in->es->video.crop.width = i_width;;
+   format_in->es->video.crop.height = i_height;;
    
-   if ( mmal_port_enable(resizer->output[0], output_callbackr) != MMAL_SUCCESS ) {
-     Fatal("failed to enable mmal resizer output port");
+
+   if ( mmal_port_format_commit(splitter->input[0]) != MMAL_SUCCESS ) {
+      Fatal("failed to commit mmal splitter 0 input format");
+   }   
+
+   /* Display the input port format */
+   Info("splitter INPUT FORMAT \n");
+   Info("%s\n", splitter->input[0]->name);
+   Info(" type: %i, fourcc: %4.4s\n", format_in->type, (char *)&format_in->encoding);
+   Info(" bitrate: %i, framed: %i\n", format_in->bitrate,
+           !!(format_in->flags & MMAL_ES_FORMAT_FLAG_FRAMED));
+   Info(" extra data: %i, %p\n", format_in->extradata_size, format_in->extradata);
+   Info(" width: %i, height: %i, (%i,%i,%i,%i)\n",
+           format_in->es->video.width, format_in->es->video.height,
+           format_in->es->video.crop.x, format_in->es->video.crop.y,
+           format_in->es->video.crop.width, format_in->es->video.crop.height);
+   
+
+   //Splitter output 0 format goes to directbuffer
+   MMAL_ES_FORMAT_T *format_out = splitter->output[0]->format;
+   
+   //FIXME set output encoding to either RGBA, RGB24 or GRAY8
+   format_out->encoding = MMAL_ENCODING_RGB24;
+   format_out->encoding_variant = MMAL_ENCODING_RGB24;
+   
+   format_out->es->video.width = i_width;
+   format_out->es->video.height = i_height;
+
+   /* Display the output 0 port format */
+   Info("splitter 0 OUTPUT FORMAT \n");
+   Info("%s\n", splitter->output[0]->name);
+   Info(" type: %i, fourcc: %4.4s\n", format_out->type, (char *)&format_out->encoding);
+   Info(" bitrate: %i, framed: %i\n", format_out->bitrate,
+           !!(format_out->flags & MMAL_ES_FORMAT_FLAG_FRAMED));
+   Info(" extra data: %i, %p\n", format_out->extradata_size, format_out->extradata);
+   Info(" width: %i, height: %i, (%i,%i,%i,%i)\n",
+           format_out->es->video.width, format_out->es->video.height,
+           format_out->es->video.crop.x, format_out->es->video.crop.y,
+           format_out->es->video.crop.width, format_out->es->video.crop.height);
+
+    if ( mmal_port_format_commit(splitter->output[0]) != MMAL_SUCCESS ) {
+     Fatal("failed to commit mmal splitter 0 output format");
    }
+
+   //Splitter output 1 format goes into encoder
+   MMAL_ES_FORMAT_T *format_out2 = splitter->output[1]->format;
    
-   /* Component won't start processing data until it is enabled. */
-   if ( mmal_component_enable(resizer) != MMAL_SUCCESS ) {
-     Fatal("failed to enable mmal resizer component");
-   }  
+   format_out2->encoding = MMAL_ENCODING_I420;
+   format_out2->encoding_variant = MMAL_ENCODING_I420;
+   
+   format_out2->es->video.width = i_width;
+   format_out2->es->video.height = i_height;
+   
+   
+   if ( mmal_port_format_commit(splitter->output[1]) != MMAL_SUCCESS ) {
+     Fatal("failed to commit mmal splitter 1 output format");
+   }
+
+   /* Display the output 1 port format */
+   Info("splitter 1 OUTPUT FORMAT \n");
+   Info("%s\n", splitter->output[1]->name);
+   Info(" type: %i, fourcc: %4.4s\n", format_out2->type, (char *)&format_out2->encoding);
+   Info(" bitrate: %i, framed: %i\n", format_out2->bitrate,
+           !!(format_out2->flags & MMAL_ES_FORMAT_FLAG_FRAMED));
+   Info(" extra data: %i, %p\n", format_out2->extradata_size, format_out2->extradata);
+   Info(" width: %i, height: %i, (%i,%i,%i,%i)\n",
+           format_out2->es->video.width, format_out2->es->video.height,
+           format_out2->es->video.crop.x, format_out2->es->video.crop.y,
+           format_out2->es->video.crop.width, format_out2->es->video.crop.height);
+
 
    return 0;
 
 }
 
+
+
+
 int FfmpegCamera::CloseMmal(){ 
+    
+   if (resizer_splitter) {
+      //mmal_connection_disable(resizer_splitter);
+      mmal_connection_destroy(resizer_splitter);
+   }   
+   
+   if (splitter_encoder) {
+      //mmal_connection_disable(splitter_encoder); 
+      mmal_connection_destroy(splitter_encoder); 
+   }   
+   
    if (encoder)
       mmal_component_destroy(encoder);
    if (pool_in)
@@ -777,6 +828,15 @@ int FfmpegCamera::CloseMmal(){
    if (pool_outr)
       mmal_pool_destroy(pool_outr);
    if (contextr.queue)
+   mmal_queue_destroy(contextr.queue);
+   
+   if (splitter)
+      mmal_component_destroy(splitter);
+   if (pool_ins)
+      mmal_pool_destroy(pool_ins);
+   if (pool_outs)
+      mmal_pool_destroy(pool_outs);
+   if (contexts.queue)
    mmal_queue_destroy(contextr.queue);
    
    return 0;
@@ -1034,8 +1094,91 @@ int FfmpegCamera::OpenFfmpeg() {
   mCanCapture = true;
 #ifdef __arm__
   if (ctype) { 
-    OpenMmal(mVideoCodecContext);
-    OpenMmalSWS(mVideoCodecContext);
+    if ((width != mVideoCodecContext->width ) || (height != mVideoCodecContext->height )) {
+       resize_needed=true;
+       Info("User supplied width or  height does not match video source width and height.  Resize necessary");
+    }
+
+    if ( ((width % 16) != 0) || ((height % 16) != 0) ) {
+       resize_needed=true;
+       Info("User supplied width or height not a multiple of 16.  Resize necessary ");
+       while ((width %16 ) != 0)
+           width++;
+       while ((height %16) != 0 )
+           height++;
+    }  
+     
+    OpenMmalEncoder(width, height);
+    
+    OpenMmalSplitter(width, height);
+
+
+    if (resize_needed) {
+      Info("Activating resizer");
+      OpenMmalResizer(mVideoCodecContext, width, height);
+      input_port = resizer->input[0];
+      
+      
+      connect_ports(resizer->output[0],splitter->input[0],&resizer_splitter);
+      resizer->input[0]->userdata = (struct MMAL_PORT_USERDATA_T *)&contextr;
+      if ( mmal_port_enable(resizer->input[0], input_callback) != MMAL_SUCCESS ) {
+        Fatal("failed to enable mmal resizer input port");
+      }
+      
+      //PIPELINE ENTRY POINT
+      //BUFFER POOL for resizer input
+      pool_inr = mmal_pool_create(input_port->buffer_num,
+                              input_port->buffer_size);
+
+      input_pool = pool_inr;
+    } else {
+      input_port = splitter->input[0];
+      
+      
+      splitter->input[0]->userdata = (struct MMAL_PORT_USERDATA_T *)&contexts;
+      if ( mmal_port_enable(splitter->input[0], input_callback) != MMAL_SUCCESS ) {
+        Fatal("failed to enable mmal splitter input port");
+      }
+
+      //PIPELINE ENTRY POINT
+      //BUFFER POOL for splitter input
+      pool_ins = mmal_pool_create(input_port->buffer_num,
+                              input_port->buffer_size);
+      input_pool = pool_ins;
+    }
+
+
+
+    //PIPELINE EXIT POINT 1
+    //BUFFER POOL for splitter output 0 
+    pool_outs = mmal_pool_create(splitter->output[0]->buffer_num,
+                               splitter->output[0]->buffer_size);
+
+    //PIPELINE EXIT POINT 2
+    //BUFFER POOL for encoder output
+    pool_out = mmal_pool_create(encoder->output[0]->buffer_num,
+                               encoder->output[0]->buffer_size);
+
+    connect_ports(splitter->output[1],encoder->input[0],&splitter_encoder);
+
+    //Splitter output 0 context output queue    
+    contexts.queue = mmal_queue_create();
+    //Encoder output context output queue
+    context.queue = mmal_queue_create();
+
+    /* Store a reference to our context in each port (will be used during callbacks) */
+    splitter->output[0]->userdata = (struct MMAL_PORT_USERDATA_T *)&contexts;
+    encoder->output[0]->userdata = (struct MMAL_PORT_USERDATA_T *)&context; 
+
+
+    if ( mmal_port_enable(splitter->output[0], output_callback) != MMAL_SUCCESS ) {
+      Fatal("failed to enable mmal splitter output port");
+    }
+
+    if ( mmal_port_enable(encoder->output[0], output_callback) != MMAL_SUCCESS ) {
+      Fatal("failed to enable mmal output port");
+    }
+    
   }
 #endif  
 

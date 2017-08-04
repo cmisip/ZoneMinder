@@ -15,7 +15,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-#define __arm__
 #ifndef ZM_FFMPEG_CAMERA_H
 #define ZM_FFMPEG_CAMERA_H
 
@@ -31,6 +30,7 @@ extern "C" {
 #include "interface/mmal/mmal.h"
 #include "interface/mmal/util/mmal_default_components.h"
 #include "interface/mmal/util/mmal_util_params.h"
+#include "interface/mmal/util/mmal_connection.h"    
 }
 #endif
 
@@ -93,17 +93,33 @@ class FfmpegCamera : public Camera {
   public:
       
 #ifdef __arm__
+
     MMAL_COMPONENT_T *encoder;
     MMAL_POOL_T *pool_in, *pool_out;
 
-    struct CONTEXT_T {
-    MMAL_QUEUE_T *queue;
-    } context,contextr;
-    
+    /** Context for our application */
+    static struct CONTEXT_T {
+      MMAL_QUEUE_T *queue;
+    } context,contextr,contexts;
+
     MMAL_COMPONENT_T *resizer;
     MMAL_POOL_T *pool_inr, *pool_outr;
 
+    MMAL_COMPONENT_T *splitter;
+    MMAL_POOL_T *pool_ins, *pool_outs;
+
+    //resizer -> splitter -> encoder -> mvect_buffer
+    //              |
+    //              -> output (RGBA/RGB24/I420) -> directbuffer
     
+    MMAL_CONNECTION_T *resizer_splitter;
+    MMAL_CONNECTION_T *splitter_encoder;
+
+    MMAL_PORT_T *input_port=NULL;
+    MMAL_POOL_T *input_pool=NULL;
+
+    bool resize_needed;
+    uint16_t width,height;
 
     struct mmal_motion_vector {
      char x_vector;
@@ -144,10 +160,10 @@ class FfmpegCamera : public Camera {
 #ifdef __arm__
     static void input_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
     static void output_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
-    static void input_callbackr(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
-    static void output_callbackr(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
-    int OpenMmal(AVCodecContext *mVideoCodecContext);
-    int OpenMmalSWS(AVCodecContext *mVideoCodecContext);
+    static MMAL_STATUS_T connect_ports(MMAL_PORT_T *output_port, MMAL_PORT_T *input_port, MMAL_CONNECTION_T **connection);
+    int OpenMmalEncoder(uint16_t width, uint16_t height);
+    int OpenMmalResizer(AVCodecContext *mVideoCodecContext, uint16_t width, uint16_t height);
+    int OpenMmalSplitter(uint16_t width, uint16_t height);
     int CloseMmal();
 #endif
 };
