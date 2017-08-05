@@ -213,7 +213,7 @@ int FfmpegCamera::Capture( Image &image ) {
         /* Request a writeable buffer of the target image */
         directbuffer = image.WriteBuffer(width, height, colours, subpixelorder);
         if(directbuffer == NULL) {
-          Error("Failed requesting writeable buffer for the captured image.");
+          Error("Failed requesting writeable buffer for the captured image with dimensions %d,%d.", width, height);
           return (-1);
         }
         
