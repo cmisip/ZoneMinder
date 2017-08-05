@@ -449,7 +449,8 @@ uint8_t* Image::WriteBuffer(const unsigned int p_width, const unsigned int p_hei
           //DumpImgBuffer(); // Done in AllocImgBuffer too
           AllocImgBuffer(newsize);
         }
-      }
+      } else
+          AllocImgBuffer(newsize);
     }
 
     width = p_width;

@@ -521,7 +521,7 @@ int FfmpegCamera::OpenMmalEncoder(unsigned int i_width, unsigned int i_height){
    format_in->type = MMAL_ES_TYPE_VIDEO;
    //format_in->encoding = MMAL_ENCODING_I420;
    format_in->encoding = MMAL_ENCODING_I420;     
-   format_in->encoding_variant = MMAL_ENCODING_I420;
+   format_in->encoding_variant = 0;
    format_in->es->video.width = VCOS_ALIGN_UP(i_width, 32);
    format_in->es->video.height = VCOS_ALIGN_UP(i_height, 16);
    format_in->es->video.frame_rate.num = 30;
@@ -601,7 +601,7 @@ int FfmpegCamera::OpenMmalResizer(AVCodecContext *mVideoCodecContext , unsigned 
    MMAL_ES_FORMAT_T *format_in = resizer->input[0]->format;
    format_in->type = MMAL_ES_TYPE_VIDEO;
    format_in->encoding = MMAL_ENCODING_I420;
-   format_in->encoding_variant = MMAL_ENCODING_I420;
+   format_in->encoding_variant = 0;
    format_in->es->video.width = VCOS_ALIGN_UP(mVideoCodecContext->width,32);
    format_in->es->video.height = VCOS_ALIGN_UP(mVideoCodecContext->height,16);
    format_in->es->video.frame_rate.num = 30;
@@ -619,7 +619,7 @@ int FfmpegCamera::OpenMmalResizer(AVCodecContext *mVideoCodecContext , unsigned 
    MMAL_ES_FORMAT_T *format_out = resizer->output[0]->format;
    
    format_out->encoding = MMAL_ENCODING_I420;
-   format_out->encoding_variant = MMAL_ENCODING_I420;
+   format_out->encoding_variant = 0;
    
    
    format_out->es->video.width = VCOS_ALIGN_UP(i_width, 32);
@@ -676,7 +676,7 @@ int FfmpegCamera::OpenMmalSplitter(unsigned int i_width, unsigned int i_height){
    MMAL_ES_FORMAT_T *format_in = splitter->input[0]->format;
    format_in->type = MMAL_ES_TYPE_VIDEO;
    format_in->encoding = MMAL_ENCODING_I420;
-   format_in->encoding_variant = MMAL_ENCODING_I420;
+   format_in->encoding_variant = 0;
    format_in->es->video.width = VCOS_ALIGN_UP(i_width, 32);
    format_in->es->video.height = VCOS_ALIGN_UP(i_height, 16);
    format_in->es->video.frame_rate.num = 30;
@@ -741,7 +741,7 @@ int FfmpegCamera::OpenMmalSplitter(unsigned int i_width, unsigned int i_height){
    MMAL_ES_FORMAT_T *format_out2 = splitter->output[1]->format;
    
    format_out2->encoding = MMAL_ENCODING_I420;
-   format_out2->encoding_variant = MMAL_ENCODING_I420;
+   format_out2->encoding_variant = 0;
    
    format_out2->es->video.width = VCOS_ALIGN_UP(i_width, 32);
    format_out2->es->video.height = VCOS_ALIGN_UP(i_height, 16);
@@ -1075,9 +1075,9 @@ int FfmpegCamera::OpenFfmpeg() {
        resize_needed=true;
        Info("User supplied width or height not a multiple of 16.  Resize necessary ");
        while ((width %16 ) != 0)
-           width--;  //reduce the size so will fit in buffer
+           width++;  //increase the size so buffer is reallocated
        while ((height %16) != 0 )
-           height--; //reduce the size so will fit in buffer
+           height++; //reduce the size so buffer is reallocated
     }  
      
     OpenMmalEncoder(width, height);
