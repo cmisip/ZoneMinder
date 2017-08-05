@@ -211,7 +211,7 @@ int FfmpegCamera::Capture( Image &image ) {
             directbuffer = image.WriteBuffer(width, height, colours, subpixelorder);
         
         if (ctype)
-            directbuffer = image.WriteBuffer(encoder->output[0]->format->es->video.width, encoder->output[0]->format->es->video.height, colours, subpixelorder);
+            directbuffer = image.WriteBuffer(resizer->output[0]->format->es->video.width, resizer->output[0]->format->es->video.height, colours, subpixelorder);
         
         if(directbuffer == NULL) {
           Error("Failed requesting writeable buffer for the captured image.");
@@ -437,7 +437,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                         
                     //copy buffer->data to directbuffer
                     if (colours == ZM_COLOUR_GRAY8)
-                        memcpy(directbuffer,rbuffer->data,encoder->output[0]->format->es->video.width * encoder->output[0]->format->es->video.height);
+                        memcpy(directbuffer,rbuffer->data,resizer->output[0]->format->es->video.width * resizer->output[0]->format->es->video.height);
                     else
                         memcpy(directbuffer,rbuffer->data,rbuffer->length);
                     
@@ -656,14 +656,14 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
    format_in->type = MMAL_ES_TYPE_VIDEO;
    format_in->encoding = MMAL_ENCODING_I420;
    format_in->encoding_variant = MMAL_ENCODING_I420;
-   format_in->es->video.width = width;
-   format_in->es->video.height = height;
+   format_in->es->video.width = mVideoCodecContext->width;
+   format_in->es->video.height = mVideoCodecContext->height;
    format_in->es->video.frame_rate.num = 30;
    format_in->es->video.frame_rate.den = 1;
    format_in->es->video.par.num = 1;
    format_in->es->video.par.den = 1;
-   format_in->es->video.crop.width = mVideoCodecContext->width;;
-   format_in->es->video.crop.height = mVideoCodecContext->height;;
+   format_in->es->video.crop.width = mVideoCodecContext->width;
+   format_in->es->video.crop.height = mVideoCodecContext->height;
    
    
  
@@ -685,10 +685,9 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
        format_out->encoding = MMAL_ENCODING_RGBA;
        format_out->encoding_variant = MMAL_ENCODING_RGBA;
    } else if ( colours == ZM_COLOUR_RGB24 ) {
-    
        format_out->encoding = MMAL_ENCODING_RGB24;
        format_out->encoding_variant = MMAL_ENCODING_RGB24;
-   } else if(colours == ZM_COLOUR_GRAY8) { //FIXME
+   } else if(colours == ZM_COLOUR_GRAY8) { 
        format_out->encoding = MMAL_ENCODING_I420;
        format_out->encoding_variant = MMAL_ENCODING_I420;
    }
