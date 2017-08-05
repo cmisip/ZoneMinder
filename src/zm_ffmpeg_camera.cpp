@@ -1075,9 +1075,9 @@ int FfmpegCamera::OpenFfmpeg() {
        resize_needed=true;
        Info("User supplied width or height not a multiple of 16.  Resize necessary ");
        while ((width %16 ) != 0)
-           width++;  //increase the size so buffer is reallocated
+           width--;  //reduce the size so buffer is reallocated
        while ((height %16) != 0 )
-           height++; //reduce the size so buffer is reallocated
+           height--; //reduce the size so buffer is reallocated
     }  
      
     OpenMmalEncoder(width, height);
