@@ -647,7 +647,7 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
 
    // Create the encoder component.
   // if ( mmal_component_create("vc.ril.resize", &resizer)  != MMAL_SUCCESS) {
-   if ( mmal_component_create("vc.ril.video_splitter", &resizer)  != MMAL_SUCCESS) { 
+   if ( mmal_component_create("vc.ril.isp", &resizer)  != MMAL_SUCCESS) { 
       Fatal("failed to create mmal resizer");
    }   
 
