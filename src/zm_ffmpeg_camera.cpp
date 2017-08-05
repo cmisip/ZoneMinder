@@ -677,8 +677,9 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
    
    MMAL_ES_FORMAT_T *format_out = resizer->output[0]->format;
    
-   mmal_format_copy(format_out,format_in);
-   
+   //mmal_format_copy(format_out,format_in);
+   format_in->es->video.crop.width = width;
+   format_in->es->video.crop.height = height;
   
    
    if ( colours == ZM_COLOUR_RGB32 ) {
