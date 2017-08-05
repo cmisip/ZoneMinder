@@ -307,7 +307,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                 //send buffer with yuv420 data to pipeline input
                 if ((buffer = mmal_queue_get(input_pool->queue)) != NULL)  {
                     
-                  int bufsize=av_image_get_buffer_size(AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 1);  
+                  int bufsize=av_image_get_buffer_size(AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 32);  
                     
                   mmal_buffer_header_mem_lock(buffer);
                    
@@ -522,14 +522,14 @@ int FfmpegCamera::OpenMmalEncoder(unsigned int i_width, unsigned int i_height){
    //format_in->encoding = MMAL_ENCODING_I420;
    format_in->encoding = MMAL_ENCODING_I420;     
    format_in->encoding_variant = MMAL_ENCODING_I420;
-   format_in->es->video.width = i_width;
-   format_in->es->video.height = i_height;
+   format_in->es->video.width = VCOS_ALIGN_UP(i_width, 32);
+   format_in->es->video.height = VCOS_ALIGN_UP(i_height, 16);
    format_in->es->video.frame_rate.num = 30;
    format_in->es->video.frame_rate.den = 1;
    format_in->es->video.par.num = 1;
    format_in->es->video.par.den = 1;
-   format_in->es->video.crop.width = i_width;
-   format_in->es->video.crop.height = i_height;
+   format_in->es->video.crop.width = VCOS_ALIGN_UP(i_width, 32);
+   format_in->es->video.crop.height = VCOS_ALIGN_UP(i_height, 16);
  
 
    
@@ -540,8 +540,8 @@ int FfmpegCamera::OpenMmalEncoder(unsigned int i_width, unsigned int i_height){
    MMAL_ES_FORMAT_T *format_out = encoder->output[0]->format;
    format_out->type = MMAL_ES_TYPE_VIDEO;
    format_out->encoding = MMAL_ENCODING_H264;
-   format_out->es->video.width = i_width;
-   format_out->es->video.height = i_height;
+   format_out->es->video.width = VCOS_ALIGN_UP(i_width, 32);
+   format_out->es->video.height = VCOS_ALIGN_UP(i_height, 16);
    format_out->es->video.frame_rate.num = 30;
    format_out->es->video.frame_rate.den = 1;
    format_out->es->video.par.num = 0; 
@@ -602,14 +602,14 @@ int FfmpegCamera::OpenMmalResizer(AVCodecContext *mVideoCodecContext , unsigned 
    format_in->type = MMAL_ES_TYPE_VIDEO;
    format_in->encoding = MMAL_ENCODING_I420;
    format_in->encoding_variant = MMAL_ENCODING_I420;
-   format_in->es->video.width = mVideoCodecContext->width;
-   format_in->es->video.height = mVideoCodecContext->height;
+   format_in->es->video.width = VCOS_ALIGN_UP(mVideoCodecContext->width,32);
+   format_in->es->video.height = VCOS_ALIGN_UP(mVideoCodecContext->height,16);
    format_in->es->video.frame_rate.num = 30;
    format_in->es->video.frame_rate.den = 1;
    format_in->es->video.par.num = 1;
    format_in->es->video.par.den = 1;
-   format_in->es->video.crop.width = mVideoCodecContext->width;
-   format_in->es->video.crop.height = mVideoCodecContext->height;
+   format_in->es->video.crop.width = VCOS_ALIGN_UP(mVideoCodecContext->width,32);
+   format_in->es->video.crop.height = VCOS_ALIGN_UP(mVideoCodecContext->height,16);
    
    
    if ( mmal_port_format_commit(resizer->input[0]) != MMAL_SUCCESS ) {
@@ -618,21 +618,14 @@ int FfmpegCamera::OpenMmalResizer(AVCodecContext *mVideoCodecContext , unsigned 
    
    MMAL_ES_FORMAT_T *format_out = resizer->output[0]->format;
    
-   //format_out->encoding = MMAL_ENCODING_RGBA;
    format_out->encoding = MMAL_ENCODING_I420;
    format_out->encoding_variant = MMAL_ENCODING_I420;
-    
-   //format_out->encoding = MMAL_ENCODING_RGB24;
-   //format_out->encoding_variant = MMAL_ENCODING_RGB24;
-
-   //format_out->encoding = MMAL_ENCODING_I420;
-   //format_out->encoding_variant = MMAL_ENCODING_I420;
    
    
-   format_out->es->video.width = i_width;
-   format_out->es->video.height = i_height;
-   format_out->es->video.crop.width = i_width;;
-   format_out->es->video.crop.height = i_height;;
+   format_out->es->video.width = VCOS_ALIGN_UP(i_width, 32);
+   format_out->es->video.height = VCOS_ALIGN_UP(i_height, 16);
+   format_out->es->video.crop.width = VCOS_ALIGN_UP(i_width, 32);
+   format_out->es->video.crop.height = VCOS_ALIGN_UP(i_height, 16);
    
    
    if ( mmal_port_format_commit(resizer->output[0]) != MMAL_SUCCESS ) {
@@ -684,14 +677,14 @@ int FfmpegCamera::OpenMmalSplitter(unsigned int i_width, unsigned int i_height){
    format_in->type = MMAL_ES_TYPE_VIDEO;
    format_in->encoding = MMAL_ENCODING_I420;
    format_in->encoding_variant = MMAL_ENCODING_I420;
-   format_in->es->video.width = i_width;
-   format_in->es->video.height = i_height;
+   format_in->es->video.width = VCOS_ALIGN_UP(i_width, 32);
+   format_in->es->video.height = VCOS_ALIGN_UP(i_height, 16);
    format_in->es->video.frame_rate.num = 30;
    format_in->es->video.frame_rate.den = 1;
    format_in->es->video.par.num = 1;
    format_in->es->video.par.den = 1;
-   format_in->es->video.crop.width = i_width;;
-   format_in->es->video.crop.height = i_height;;
+   format_in->es->video.crop.width = VCOS_ALIGN_UP(i_width, 32);
+   format_in->es->video.crop.height = VCOS_ALIGN_UP(i_height, 16);
    
 
    if ( mmal_port_format_commit(splitter->input[0]) != MMAL_SUCCESS ) {
@@ -718,7 +711,6 @@ int FfmpegCamera::OpenMmalSplitter(unsigned int i_width, unsigned int i_height){
        format_out->encoding = MMAL_ENCODING_RGBA;
        format_out->encoding_variant = MMAL_ENCODING_RGBA;
    } else if ( colours == ZM_COLOUR_RGB24 ) {
-    
        format_out->encoding = MMAL_ENCODING_RGB24;
        format_out->encoding_variant = MMAL_ENCODING_RGB24;
    } else if(colours == ZM_COLOUR_GRAY8) { //FIXME
@@ -726,8 +718,8 @@ int FfmpegCamera::OpenMmalSplitter(unsigned int i_width, unsigned int i_height){
        format_out->encoding_variant = MMAL_ENCODING_I420;
 }
    
-   format_out->es->video.width = i_width;
-   format_out->es->video.height = i_height;
+   format_out->es->video.width = VCOS_ALIGN_UP(i_width, 32);
+   format_out->es->video.height = VCOS_ALIGN_UP(i_height, 16);   
 
    /* Display the output 0 port format */
    Info("splitter 0 OUTPUT FORMAT \n");
@@ -751,8 +743,8 @@ int FfmpegCamera::OpenMmalSplitter(unsigned int i_width, unsigned int i_height){
    format_out2->encoding = MMAL_ENCODING_I420;
    format_out2->encoding_variant = MMAL_ENCODING_I420;
    
-   format_out2->es->video.width = i_width;
-   format_out2->es->video.height = i_height;
+   format_out2->es->video.width = VCOS_ALIGN_UP(i_width, 32);
+   format_out2->es->video.height = VCOS_ALIGN_UP(i_height, 16);
    
    
    if ( mmal_port_format_commit(splitter->output[1]) != MMAL_SUCCESS ) {
