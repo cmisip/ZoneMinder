@@ -508,7 +508,7 @@ MMAL_STATUS_T FfmpegCamera::connect_ports(MMAL_PORT_T *output_port, MMAL_PORT_T 
    return status;
 }
 
-int FfmpegCamera::OpenMmalEncoder(uint16_t i_width, uint16_t i_height){  
+int FfmpegCamera::OpenMmalEncoder(unsigned int i_width, unsigned int i_height){  
    
 
    // Create the encoder component.
@@ -589,7 +589,7 @@ int FfmpegCamera::OpenMmalEncoder(uint16_t i_width, uint16_t i_height){
 
 }
 
-int FfmpegCamera::OpenMmalResizer(AVCodecContext *mVideoCodecContext , uint16_t i_width, uint16_t i_height ){  
+int FfmpegCamera::OpenMmalResizer(AVCodecContext *mVideoCodecContext , unsigned int i_width, unsigned int i_height ){  
    
 
    // Create the encoder component.
@@ -671,7 +671,7 @@ int FfmpegCamera::OpenMmalResizer(AVCodecContext *mVideoCodecContext , uint16_t 
 
 
 
-int FfmpegCamera::OpenMmalSplitter(uint16_t i_width, uint16_t i_height){  
+int FfmpegCamera::OpenMmalSplitter(unsigned int i_width, unsigned int i_height){  
    
 
    // Create the encoder component.

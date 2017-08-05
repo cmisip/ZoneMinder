@@ -161,9 +161,9 @@ class FfmpegCamera : public Camera {
     static void input_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
     static void output_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
     static MMAL_STATUS_T connect_ports(MMAL_PORT_T *output_port, MMAL_PORT_T *input_port, MMAL_CONNECTION_T **connection);
-    int OpenMmalEncoder(uint16_t width, uint16_t height);
-    int OpenMmalResizer(AVCodecContext *mVideoCodecContext, uint16_t width, uint16_t height);
-    int OpenMmalSplitter(uint16_t width, uint16_t height);
+    int OpenMmalEncoder(unsigned int width, unsigned int height);
+    int OpenMmalResizer(AVCodecContext *mVideoCodecContext, unsigned int width, unsigned int height);
+    int OpenMmalSplitter(unsigned int width, unsigned int height);
     int CloseMmal();
 #endif
 };
