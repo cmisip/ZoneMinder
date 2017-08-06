@@ -207,12 +207,7 @@ int FfmpegCamera::Capture( Image &image ) {
         uint8_t* directbuffer;
 
         /* Request a writeable buffer of the target image */
-        if (!ctype)
-            directbuffer = image.WriteBuffer(width, height, colours, subpixelorder);
-        
-        if (ctype)
-            directbuffer = image.WriteBuffer(resizer->output[0]->format->es->video.width, resizer->output[0]->format->es->video.height, colours, subpixelorder);
-        
+        directbuffer = image.WriteBuffer(width, height, colours, subpixelorder);
         if(directbuffer == NULL) {
           Error("Failed requesting writeable buffer for the captured image.");
           return (-1);
@@ -677,9 +672,10 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
    
    MMAL_ES_FORMAT_T *format_out = resizer->output[0]->format;
    
-   //mmal_format_copy(format_out,format_in);
-   format_in->es->video.crop.width = width;
-   format_in->es->video.crop.height = height;
+   format_out->es->video.crop.width = width;
+   format_out->es->video.crop.height = height;
+   format_out->es->video.width = width;
+   format_out->es->video.height = height;
   
    
    if ( colours == ZM_COLOUR_RGB32 ) {
@@ -694,8 +690,7 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
    }
    
    
-   format_out->es->video.width = width;
-   format_out->es->video.height = height;
+   
    
    
    if ( mmal_port_format_commit(resizer->output[0]) != MMAL_SUCCESS ) {
