@@ -3262,7 +3262,7 @@ unsigned int Monitor::DetectMotion( const Image &comp_image, Event::StringSet &z
     Debug( 3, "Checking preclusive zone %s - old score: %d, state: %s", zone->Label(),old_zone_score, zone->Alarmed()?"alarmed":"quiet" );
 
     if (function == MVDECT ) {
-        check_result = zone->CheckAlarms( mvect_buffer );
+        check_result = zone->CheckAlarms( mvect_buffer, comp_image.width, comp_image.height );
     }    else 
         check_result = zone->CheckAlarms( &delta_image);
     

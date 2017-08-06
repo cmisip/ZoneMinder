@@ -189,7 +189,7 @@ bool Zone::CheckExtendAlarmCount() {
 } // end bool Zone::CheckExtendAlarmCount
 
 
-bool Zone::CheckAlarms( uint8_t *& mvect_buffer) { 
+bool Zone::CheckAlarms( uint8_t *& mvect_buffer , unsigned int image_width, unsigned int image_height) { 
     ResetStats();  
     alarm_centre=Coord(0,0);
    
@@ -211,10 +211,10 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
     uint16_t vec_count=0;
     uint16_t x_sum=0;
     uint16_t y_sum=0;
-    uint16_t size;
-    uint16_t vec_type;
-    uint16_t dscale_x_res;
-    uint16_t dscale_y_res;
+    uint16_t size=0;
+    uint16_t vec_type=0;
+    unsigned int dscale_x_res=0;
+    unsigned int dscale_y_res=0;
     
     
     
@@ -228,6 +228,9 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
         
         
       switch (vec_type) {
+        case 1: dscale_x_res = image_width;
+                dscale_y_res = image_height;
+                break;
         case 2: dscale_x_res = 320;
                 dscale_y_res = 240;   
                 break;
@@ -239,15 +242,22 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
                 break;             
       }        
       
-      //Rescale the zone polygons here
-      uint16_t x_rfactor = image->width/dscale_x_res;
-      uint16_t y_rfactor = image->height/dscale_y_res;
-      
-      for (int p = 0; p< polygon.n_coords; p++) {
+      Info("vec type : %d, x_res %d, y_res %d\n ", vec_type, dscale_x_res, dscale_y_res);
+      Info("Image width %d, height %d\n ", image_width, image_height);
+      //Rescale the zone polygons here if hardware decode was used
+      /*if ((vec_type>0) && (size > 0)) {
+        uint16_t x_rfactor = image->width/dscale_x_res;
+        uint16_t y_rfactor = image->height/dscale_y_res;
+        Info("X_factor %d, Y_factor %d\n" ,x_rfactor, y_rfactor);
+      */
+        /*for (int p = 0; p< polygon.n_coords; p++) {
           polygon.coords[p].X()*=x_rfactor;
-          polygon.coords[p].Y()*=x_rfactor;
-      }
+          polygon.coords[p].Y()*=y_rfactor;
+          Info("Coord %d, with value of %d, %d \n", polygon.coords[p].X() , polygon.coords[p].Y());
+
+        }
         
+      }*/
         
         uint16_t offset=4;
         for (int i = 0; i < size; i++) {
@@ -262,7 +272,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
                     uint16_t x;
                     uint16_t y;
                         
-                if (vec_type > 0 )  //hardware macroblock with size of 16x16, there are 16 4x4 blocks in each one
+                if (vec_type>0)  //hardware macroblock with size of 16x16, there are 16 4x4 blocks in each one
                   for (uint16_t i=0 ; i< 4; i++) {
                            for (uint16_t j=0 ; j< 4; j++) {
                                 x=mv.xcoord+i*4;
