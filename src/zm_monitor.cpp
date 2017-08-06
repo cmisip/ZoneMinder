@@ -2860,8 +2860,11 @@ Monitor *Monitor::Load( unsigned int p_id, bool load_zones, Purpose purpose ) {
   } else if ( type == "Ffmpeghw" ) {
 #if HAVE_LIBAVFORMAT      
       
+#ifdef __arm__      
     width=VCOS_ALIGN_UP(width,32);
     height=VCOS_ALIGN_UP(height,16);
+#endif
+//FIXMEC  the zone polygons need to be adjusted here to reflect the new width and height
     
     camera = new FfmpegCamera(
       id,

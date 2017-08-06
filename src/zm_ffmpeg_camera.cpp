@@ -217,13 +217,13 @@ int FfmpegCamera::Capture( Image &image ) {
         
  
       uint8_t* mvect_buffer=NULL;     
-if (!( cfunction == Monitor::MVDECT )) {     
+  if (!( cfunction == Monitor::MVDECT )) {     
     //Info("Camera Function is not MVDECT.. Will not capture motion vectors.");
     goto end;
-}
+  }
 
         
-{   
+  {   
         mvect_buffer=image.VectBuffer();   
         if (mvect_buffer ==  NULL ){
                 Error("Failed requesting vector buffer for the captured image.");
@@ -231,14 +231,11 @@ if (!( cfunction == Monitor::MVDECT )) {
         } else
                 memset(mvect_buffer,0,image.mv_size);
         
-        
-        
-}
+  }
 
      
         
-if (!ctype) { //motion vectors from software h264 decoding
-            
+  if (!ctype) { //motion vectors from software h264 decoding
          
             AVFrameSideData *sd=NULL;
 
@@ -246,11 +243,9 @@ if (!ctype) { //motion vectors from software h264 decoding
             uint16_t vector_ceiling=((((mRawFrame->width * mRawFrame->height)/16)*(double)20)/100);  //FIXMEC, just 20% of the maximum number of 4x4 blocks that will fit
         
             if (sd) {
-
                    
                    uint8_t offset=sizeof(uint16_t)*2;
                    const AVMotionVector *mvs = (const AVMotionVector *)sd->data;
-                   //uint16_t size=sd->size / sizeof(AVMotionVector);
                    uint16_t vec_count=0;
                    
                    for (unsigned int i = 0; i < sd->size / sizeof(*mvs); i++) {
@@ -277,9 +272,7 @@ if (!ctype) { //motion vectors from software h264 decoding
                        }
                         
                         if (vec_count > vector_ceiling) {  
-                            //memset(mvect_buffer,0,image.mv_size);
-                            char * temp_ptr = (char *)mvect_buffer;
-                            memset(temp_ptr,0,image.mv_size);
+                            memset(mvect_buffer,0,image.mv_size);
                             vec_count=0;
                             break;
                         }     
@@ -315,7 +308,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                    }
                 } 
                 
-                //send buffer with yuv420 data to encoder
+                //ENTRYPOINT 1 : send buffer with yuv420 data to encoder
                 if ((buffer = mmal_queue_get(pool_in->queue)) != NULL)  {
                     
                   int bufsize=av_image_get_buffer_size(AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 1);  
@@ -325,10 +318,9 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                   av_image_copy_to_buffer(buffer->data, bufsize, (const uint8_t **)mRawFrame->data, mRawFrame->linesize,
                                  AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 1);
                   buffer->length=bufsize;
-                  //buffer->offset = 0; buffer->pts = buffer->dts = MMAL_TIME_UNKNOWN;  //could be used to check if buffer and frame synchronized
-                                                                                        //if we supply a time stamp to pts, the first buffer returned with the same time stamp is the matching data for the frame sent
+                  //buffer->offset = 0; buffer->pts = buffer->dts = frameCount;  //could be used to check if buffer and frame synchronized
+                                                                                //if we supply a time stamp to pts, the first buffer returned with the same time stamp is the matching data for the frame sent
                   mmal_buffer_header_mem_unlock(buffer);
-                  
            
                   if (mmal_port_send_buffer(encoder->input[0], buffer) != MMAL_SUCCESS) {
                        Warning("failed to send YUV420 buffer to encoder for frame %d\n", frameCount);
@@ -336,7 +328,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                   }
                 } 
                 
-                //send buffer with yuv420 data to resizer
+                //ENTRYPOINT 2: send buffer with yuv420 data to resizer
                 if ((rbuffer = mmal_queue_get(pool_inr->queue)) != NULL)  {
                     
                   int bufsize=av_image_get_buffer_size(AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 1);  
@@ -346,8 +338,8 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                   av_image_copy_to_buffer(rbuffer->data, bufsize, (const uint8_t **)mRawFrame->data, mRawFrame->linesize,
                                  AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 1);
                   rbuffer->length=bufsize;
-                  //buffer->pts = buffer->dts = frameCount;  //could be used to check if buffer and frame synchronized
-                                                                                        //if we supply a time stamp to pts, the first buffer returned with the same time stamp is the matching data for the frame sent
+                  buffer->pts = buffer->dts = frameCount;  //could be used to check if buffer and frame synchronized
+                                                           //if we supply a time stamp to pts, the first buffer returned with the same time stamp is the matching data for the frame sent
                   mmal_buffer_header_mem_unlock(rbuffer);
                   
            
@@ -357,7 +349,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                   }
                 } 
                 
-                
+                //EXIT POINT 1: h264 encoder output buffers, only save the sideinfo.
                 while ((buffer = mmal_queue_get(context.queue)) != NULL) {
                         
                       if(buffer->flags & MMAL_BUFFER_HEADER_FLAG_CODECSIDEINFO) {
@@ -371,7 +363,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                         uint16_t size=buffer->length/sizeof(mmal_motion_vector);
                         struct mmal_motion_vector mvarray[size];
                         
-                        //copy buffer->data to temporary
+                        //copy buffer->data to temporary mvarray
                         memcpy(mvarray,buffer->data,buffer->length);
                         memset(mvect_buffer,buffer->length,sizeof(buffer->length));
                         mmal_buffer_header_mem_unlock(buffer);   
@@ -387,7 +379,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                             mvt.xcoord = (i*16) % (encoder->output[0]->format->es->video.width + 16);
                             mvt.ycoord = ((i*16)/(encoder->output[0]->format->es->video.height +16))*16;
                             
-                            //Future expansion, save the magnitude of vectors
+                            //Future expansion, save the magnitude of vectors, requires corresponding adjustment of motion_vector struct as well as any hardcoded pointer arithmetic on mvect_buffer
                             //mvt.x_vector = mv->x_vector;
                             //mvt.y_vector = mv->y_vector;
                             vec_count++;
@@ -426,12 +418,13 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                     
                 }
                 
+                //EXIT POINT 2 : vc.ril.isp resizer/format conversion output buffers
                 while ((rbuffer = mmal_queue_get(contextr.queue)) != NULL) {
                        
                     mmal_buffer_header_mem_lock(rbuffer);
                         
                     //copy buffer->data to directbuffer
-                    if (colours == ZM_COLOUR_GRAY8)
+                    if (colours == ZM_COLOUR_GRAY8)  //buffer is YUV, just get the luma
                         memcpy(directbuffer,rbuffer->data,resizer->output[0]->format->es->video.width * resizer->output[0]->format->es->video.height);
                     else
                         memcpy(directbuffer,rbuffer->data,rbuffer->length);
@@ -459,7 +452,7 @@ end:
 
         
 
-if (!ctype) {        
+   if (!ctype) {        //software h264 decoder is the only mode that uses swscale now
 #if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
         av_image_fill_arrays(mFrame->data, mFrame->linesize,
             directbuffer, imagePixFormat, width, height, 1);
@@ -486,7 +479,7 @@ if (!ctype) {
         Fatal( "You must compile ffmpeg with the --enable-swscale option to use ffmpeg cameras" );
 #endif // HAVE_LIBSWSCALE
 
-}
+   }
 
 
         frameCount++;
@@ -519,30 +512,33 @@ void FfmpegCamera::output_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buff
 }
 
 
-void FfmpegCamera::input_callbackr(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer) {
-   //CONTEXT_T *ctx = (struct CONTEXT_T *)port->userdata;
-   mmal_buffer_header_release(buffer);
-}
-
-void FfmpegCamera::output_callbackr(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer) {
-   CONTEXT_T *ctx = (struct CONTEXT_T *)port->userdata;
-   mmal_queue_put(ctx->queue, buffer);
-}
-
-int FfmpegCamera::OpenMmal(AVCodecContext *mVideoCodecContext){  
-   
+int FfmpegCamera::OpenMmalH264Encoder(AVCodecContext *mVideoCodecContext){  
 
    // Create the encoder component.
    if ( mmal_component_create(MMAL_COMPONENT_DEFAULT_VIDEO_ENCODER, &encoder)  != MMAL_SUCCESS) {
       Fatal("failed to create mmal encoder");
    }   
 
+   //Input port and output port configuration is necessary except when this port will participate in a mmal connnection, in which case a mmal_format_copy
+   //is simply needed to copy the output format settings to the input format settings of the input port to be connected. 
+   //Additionally, some port connections will allow setting format to MMAL_ENCODING_OPAQUE which means full data buffer copies are not done across connected components,
+   //instead references are exchanged and the data transfer is small. This allows the transfer of data to happen across components in the the GPU at higher efficiency.
+   //When MMAL_ENCODING_OPAQUE is used, the format->encoding_variant needs to be set to the actual type of buffer that is referenced.  If the port connection does not
+   //support MMAL_ENCODING_OPAQUE, the buffer data needs to be retrieved from ARM memory space and copied into the GPU memory which entails a performance hit due to 
+   //having to access dynamic memory for the data and the copying of a large data buffer. 
+   
+   //There is a mmal function VCOS_ALIGN_UP that creates a data buffer that is a multiple of 16 on the y and a multiple of 32 on the x.  This creates a buffer that is larger
+   //than the user defined width and height for the frame.  This is necessary as the mmal engine is designed to work on resolutions that are a multiple of 16.  For example, 
+   //the h264 encoder macroblocks are 16x16 pixels in size.  If vcos_align_up is not used, the mmal engine does it internally anyway and saves the actual frame coordinates in
+   //format->es->video.crop.x, format_in->es->video.crop.y, format->es->video.crop.width, format->es->video.crop.height.  Thus the resulting buffer could be larger than expected
+   //and there might be unfortunate side effects if the programmer assumes that it did not change from the user specified values. 
+   
    /* Set format of video encoder input port */
    MMAL_ES_FORMAT_T *format_in = encoder->input[0]->format;
    format_in->type = MMAL_ES_TYPE_VIDEO;
    format_in->encoding = MMAL_ENCODING_I420;
-   format_in->es->video.width = mVideoCodecContext->width;
-   format_in->es->video.height = mVideoCodecContext->height;
+   format_in->es->video.width = mVideoCodecContext->width;  //FIXMEC, the encoder in this arrangement is parallel to the resizer and so it must use the decoder context values which could be offset by up to 8 pixels
+   format_in->es->video.height = mVideoCodecContext->height; //this results in a mismatch of frame sizes.  The coordinates of the vectors will be shifted by that much.
    format_in->es->video.frame_rate.num = 30;
    format_in->es->video.frame_rate.den = 1;
    format_in->es->video.par.num = 1;
@@ -550,27 +546,28 @@ int FfmpegCamera::OpenMmal(AVCodecContext *mVideoCodecContext){
    format_in->es->video.crop.width = mVideoCodecContext->width;
    format_in->es->video.crop.height = mVideoCodecContext->height;
  
-
-   
+   //Commit input port format changes
    if ( mmal_port_format_commit(encoder->input[0]) != MMAL_SUCCESS ) {
       Fatal("failed to commit mmal encoder input format");
-   }   
-
+   } 
+   
+   //Set format of video encoder output port
    MMAL_ES_FORMAT_T *format_out = encoder->output[0]->format;
    format_out->type = MMAL_ES_TYPE_VIDEO;
    format_out->encoding = MMAL_ENCODING_H264;
-   format_out->es->video.width = mVideoCodecContext->width;
+   format_out->es->video.width = mVideoCodecContext->width;  //the encoder in this arrangement must have the same values for input and output format width and height
    format_out->es->video.height = mVideoCodecContext->height;
    format_out->es->video.frame_rate.num = 30;
    format_out->es->video.frame_rate.den = 1;
    format_out->es->video.par.num = 0; 
    format_out->es->video.par.den = 1;
    
-   
+   //Commit output port format changes
    if ( mmal_port_format_commit(encoder->output[0]) != MMAL_SUCCESS ) {
      Fatal("failed to commit output format");
    }
    
+   //Activate inline vectors
    if (mmal_port_parameter_set_boolean(encoder->output[0], MMAL_PARAMETER_VIDEO_ENCODE_INLINE_VECTORS, 1) != MMAL_SUCCESS) {
       Fatal("failed to request inline motion vectors from mmal encoder");
    }   
@@ -599,27 +596,29 @@ int FfmpegCamera::OpenMmal(AVCodecContext *mVideoCodecContext){
            format_out->es->video.crop.x, format_out->es->video.crop.y,
            format_out->es->video.crop.width, format_out->es->video.crop.height);
 
-
-   /* The format of both ports is now set so we can get their buffer requirements and create
-    * our buffer headers. We use the buffer pool API to create these. */
-   //encoder->input[0]->buffer_num = encoder->input[0]->buffer_num_min;
-   //encoder->input[0]->buffer_size = encoder->input[0]->buffer_size_min;
-   //encoder->output[0]->buffer_num = encoder->output[0]->buffer_num_min;
-   //encoder->output[0]->buffer_size = encoder->output[0]->buffer_size_min;
+   //Create the buffer pool for encoder input and output
+   //The creation of the port buffer pool is  not necessary if the port is participating in a mmal_connection_create as those pools that handle transfer of buffer data 
+   //across the connection are automatically created.  An input buffer pool is necessary if we are passing avcodec buffers to the input port.
+   //An output port buffer pool is necessary if we are expecting to receive buffers for processing from this component. 
    pool_in = mmal_pool_create(encoder->input[0]->buffer_num,
                               encoder->input[0]->buffer_size);
    pool_out = mmal_pool_create(encoder->output[0]->buffer_num,
                                encoder->output[0]->buffer_size);
 
+   
+   //THE NEXT STEPS, are not necessary if this port will participate in a mmal_connection_create
    /* Create a queue to store our decoded video frames. The callback we will get when
     * a frame has been decoded will put the frame into this queue. */
+   //If this component is participating in a mmal_connection_create, there is no need for a context queue here as outport port passes the buffer along to the connected input port automatically.
+   //If this component is an endpoint from which we will receive buffers for processing, then create the context. 
    context.queue = mmal_queue_create();
 
    /* Store a reference to our context in each port (will be used during callbacks) */
    encoder->input[0]->userdata = (MMAL_PORT_USERDATA_T *)&context;
    encoder->output[0]->userdata = (MMAL_PORT_USERDATA_T *)&context;
    
-   // Enable all the input port and the output port.
+   
+   // Enable all the input port and the output port. 
    if ( mmal_port_enable(encoder->input[0], input_callback) != MMAL_SUCCESS ) {
      Fatal("failed to enable mmal input port");
    }  
@@ -641,27 +640,23 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
    
 
    // Create the encoder component.
-  // if ( mmal_component_create("vc.ril.resize", &resizer)  != MMAL_SUCCESS) {
-   if ( mmal_component_create("vc.ril.isp", &resizer)  != MMAL_SUCCESS) { 
+   if ( mmal_component_create("vc.ril.isp", &resizer)  != MMAL_SUCCESS) { //the vc.ril.isp is better than vc.ril.resize as it can do format conversion in addition to scaling
       Fatal("failed to create mmal resizer");
    }   
 
    /* Set format of video resizer input port */
    MMAL_ES_FORMAT_T *format_in = resizer->input[0]->format;
    format_in->type = MMAL_ES_TYPE_VIDEO;
-   format_in->encoding = MMAL_ENCODING_I420;
+   format_in->encoding = MMAL_ENCODING_I420;  //I420 is the YUV format in mmal 
    format_in->encoding_variant = MMAL_ENCODING_I420;
-   format_in->es->video.width = mVideoCodecContext->width;
+   format_in->es->video.width = mVideoCodecContext->width;  //input resolution from the the decode codec context
    format_in->es->video.height = mVideoCodecContext->height;
    format_in->es->video.frame_rate.num = 30;
    format_in->es->video.frame_rate.den = 1;
    format_in->es->video.par.num = 1;
    format_in->es->video.par.den = 1;
-   format_in->es->video.crop.width = mVideoCodecContext->width;
+   format_in->es->video.crop.width = mVideoCodecContext->width; //sets the buffer size
    format_in->es->video.crop.height = mVideoCodecContext->height;
-   
-   
- 
 
    
    if ( mmal_port_format_commit(resizer->input[0]) != MMAL_SUCCESS ) {
@@ -672,25 +667,22 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
    
    MMAL_ES_FORMAT_T *format_out = resizer->output[0]->format;
    
-   format_out->es->video.crop.width = width;
-   format_out->es->video.crop.height = height;
-   format_out->es->video.width = width;
-   format_out->es->video.height = height;
+   format_out->es->video.crop.width = width;   //this is the vcos_align_up adjusted width
+   format_out->es->video.crop.height = height; //this is the vcos_align_up adjusted height
+   format_out->es->video.width = width;  //sets the buffer size
+   format_out->es->video.height = height; //sets the buffer size
   
-   
+   //vc.ril.isp supports all the formats we use
    if ( colours == ZM_COLOUR_RGB32 ) {
        format_out->encoding = MMAL_ENCODING_RGBA;
-       format_out->encoding_variant = MMAL_ENCODING_RGBA;
+       format_out->encoding_variant = MMAL_ENCODING_RGBA;  //FIXMEC variant may not be necessary since encoding format is not opaque.
    } else if ( colours == ZM_COLOUR_RGB24 ) {
        format_out->encoding = MMAL_ENCODING_RGB24;
-       format_out->encoding_variant = MMAL_ENCODING_RGB24;
+       format_out->encoding_variant = MMAL_ENCODING_RGB24; //FIXMEC variant may not be necessary since encoding format is not opaque.
    } else if(colours == ZM_COLOUR_GRAY8) { 
-       format_out->encoding = MMAL_ENCODING_I420;
-       format_out->encoding_variant = MMAL_ENCODING_I420;
+       format_out->encoding = MMAL_ENCODING_I420;  //gray8 is simply copying the luma of a YUV
+       format_out->encoding_variant = MMAL_ENCODING_I420;  //FIXMEC variant may not be necessary since encoding format is not opaque.
    }
-   
-   
-   
    
    
    if ( mmal_port_format_commit(resizer->output[0]) != MMAL_SUCCESS ) {
@@ -722,13 +714,7 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
            format_out->es->video.crop.x, format_out->es->video.crop.y,
            format_out->es->video.crop.width, format_out->es->video.crop.height);
 
-
-   /* The format of both ports is now set so we can get their buffer requirements and create
-    * our buffer headers. We use the buffer pool API to create these. */
-   //resizer->input[0]->buffer_num = resizer->input[0]->buffer_num_min;
-   //resizer->input[0]->buffer_size = resizer->input[0]->buffer_size_min;
-   //resizer->output[0]->buffer_num = resizer->output[0]->buffer_num_min;
-   //resizer->output[0]->buffer_size = resizer->output[0]->buffer_size_min;
+   //Create the buffer pools
    pool_inr = mmal_pool_create(resizer->input[0]->buffer_num,
                               resizer->input[0]->buffer_size);
    pool_outr = mmal_pool_create(resizer->output[0]->buffer_num,
@@ -743,11 +729,11 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
    resizer->output[0]->userdata = (MMAL_PORT_USERDATA_T *)&contextr;
    
    // Enable all the input port and the output port.
-   if ( mmal_port_enable(resizer->input[0], input_callbackr) != MMAL_SUCCESS ) {
+   if ( mmal_port_enable(resizer->input[0], input_callback) != MMAL_SUCCESS ) {
      Fatal("failed to enable mmal resizer input port");
    }  
    
-   if ( mmal_port_enable(resizer->output[0], output_callbackr) != MMAL_SUCCESS ) {
+   if ( mmal_port_enable(resizer->output[0], output_callback) != MMAL_SUCCESS ) {
      Fatal("failed to enable mmal resizer output port");
    }
    
@@ -1034,7 +1020,7 @@ int FfmpegCamera::OpenFfmpeg() {
   mCanCapture = true;
 #ifdef __arm__
   if (ctype) { 
-    OpenMmal(mVideoCodecContext);
+    OpenMmalH264Encoder(mVideoCodecContext);
     OpenMmalSWS(mVideoCodecContext);
   }
 #endif  

@@ -146,7 +146,7 @@ class FfmpegCamera : public Camera {
     static void output_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
     static void input_callbackr(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
     static void output_callbackr(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
-    int OpenMmal(AVCodecContext *mVideoCodecContext);
+    int OpenMmalH264Encoder(AVCodecContext *mVideoCodecContext);
     int OpenMmalSWS(AVCodecContext *mVideoCodecContext);
     int CloseMmal();
 #endif
