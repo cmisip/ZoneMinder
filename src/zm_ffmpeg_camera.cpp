@@ -338,7 +338,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                   av_image_copy_to_buffer(rbuffer->data, bufsize, (const uint8_t **)mRawFrame->data, mRawFrame->linesize,
                                  AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 1);
                   rbuffer->length=bufsize;
-                  buffer->pts = buffer->dts = frameCount;  //could be used to check if buffer and frame synchronized
+                  rbuffer->pts = rbuffer->dts = frameCount;  //could be used to check if buffer and frame synchronized
                                                            //if we supply a time stamp to pts, the first buffer returned with the same time stamp is the matching data for the frame sent
                   mmal_buffer_header_mem_unlock(rbuffer);
                   
