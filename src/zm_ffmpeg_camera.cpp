@@ -66,6 +66,10 @@ FfmpegCamera::FfmpegCamera( int p_id, const std::string &p_path, const std::stri
   videoStore = NULL;
   video_last_pts = 0;
   
+  //FIXMEC these should be config options
+  dscale_before_encode=true;
+  dscale_x_res=width; //no downscaling since equal to width
+  dscale_y_res=height; //no downscaling since equal to height
 
   
 #if HAVE_LIBSWSCALE  
@@ -226,7 +230,7 @@ if (!( cfunction == Monitor::MVDECT )) {
 
         
 {   
-        mvect_buffer=image.VectBuffer();   
+        mvect_buffer=image.VectBuffer();   //FIXMEC, we need to pass dscale_x_res and dscale_y_res to image to downsize the mvect_buffer and save memory if dscale_before_encode is true
         if (mvect_buffer ==  NULL ){
                 Error("Failed requesting vector buffer for the captured image.");
                 return (-1); 
@@ -1116,7 +1120,7 @@ int FfmpegCamera::OpenFfmpeg() {
 
     //perhaps there needs to be a config option in the web ui to enable pre encoder downscaling and with what resolution
     //for now will set the resolution to 320x240 to reduce the number of motion vectors that need to be processed in zmc and zma
-    OpenMmalResizerE(mVideoCodecContext, 320, 240);
+    OpenMmalResizerE(mVideoCodecContext, dscale_x_res, dscale_y_res);
 
     OpenMmalEncoder(width, height);
 
