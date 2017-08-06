@@ -15,6 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+#define __arm__ 
 #ifndef ZM_FFMPEG_CAMERA_H
 #define ZM_FFMPEG_CAMERA_H
 
@@ -93,33 +94,34 @@ class FfmpegCamera : public Camera {
   public:
       
 #ifdef __arm__
-
+      
+    
     MMAL_COMPONENT_T *encoder;
-    MMAL_POOL_T *pool_in, *pool_out;
+    MMAL_POOL_T  *pool_oute;
 
     /** Context for our application */
-    
-    struct CONTEXT_T {
-    MMAL_QUEUE_T *queue;
-    } context,contextr,contexts;
+    static struct CONTEXT_T {
+      MMAL_QUEUE_T *queue;
+    } contexts,contexte,contextd;
 
-    MMAL_COMPONENT_T *resizer;
-    MMAL_POOL_T *pool_inr, *pool_outr;
+    MMAL_COMPONENT_T *resizere;
+
+    MMAL_COMPONENT_T *resizerd;
+    MMAL_POOL_T  *pool_outd;
 
     MMAL_COMPONENT_T *splitter;
-    MMAL_POOL_T *pool_ins, *pool_outs;
+    MMAL_POOL_T *pool_ins;
 
-    //resizer -> splitter -> encoder -> mvect_buffer
-    //              |
-    //              -> output (RGBA/RGB24/I420) -> directbuffer
-    
-    MMAL_CONNECTION_T *resizer_splitter;
-    MMAL_CONNECTION_T *splitter_encoder;
+    //splitter -> resizere -> h264 encoder -> mvect_buffer
+    //   |
+    //   -------> resizerd -> directbuffer
+
+    MMAL_CONNECTION_T *splitter_resizere;
+    MMAL_CONNECTION_T *splitter_resizerd;
+    MMAL_CONNECTION_T *resizere_h264encoder;
 
     MMAL_PORT_T *input_port=NULL;
-    MMAL_POOL_T *input_pool=NULL;
-
-    bool resize_needed;
+    MMAL_POOL_T *input_pool=NULL;  
 
     struct mmal_motion_vector {
      char x_vector;
@@ -162,8 +164,9 @@ class FfmpegCamera : public Camera {
     static void output_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
     static MMAL_STATUS_T connect_ports(MMAL_PORT_T *output_port, MMAL_PORT_T *input_port, MMAL_CONNECTION_T **connection);
     int OpenMmalEncoder(unsigned int width, unsigned int height);
-    int OpenMmalResizer(AVCodecContext *mVideoCodecContext, unsigned int width, unsigned int height);
-    int OpenMmalSplitter(unsigned int width, unsigned int height);
+    int OpenMmalResizerE(AVCodecContext *mVideoCodecContext , unsigned int i_width, unsigned int i_height );
+    int OpenMmalResizerD(AVCodecContext *mVideoCodecContext , unsigned int i_width, unsigned int i_height );
+    int OpenMmalSplitter(AVCodecContext *mVideoCodecContext);
     int CloseMmal();
 #endif
 };
