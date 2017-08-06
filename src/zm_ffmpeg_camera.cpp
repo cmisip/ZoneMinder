@@ -68,9 +68,11 @@ FfmpegCamera::FfmpegCamera( int p_id, const std::string &p_path, const std::stri
   
   //FIXMEC these should be config options
   dscale_before_encode=true;
-  dscale_x_res=width; //no downscaling since equal to width
-  dscale_y_res=height; //no downscaling since equal to height
+  //dscale_x_res=width; //no downscaling since equal to width
+  //dscale_y_res=height; //no downscaling since equal to height
 
+  dscale_x_res=320;
+  dscale_y_res=240;
   
 #if HAVE_LIBSWSCALE  
   mConvertContext = NULL;
@@ -335,7 +337,8 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                       if(buffer->flags & MMAL_BUFFER_HEADER_FLAG_CODECSIDEINFO) {
                           
                         uint16_t t_offset=sizeof(uint16_t)*2; //skip the first 4 bytes, reserved for size and vec_type
-                        uint16_t vector_ceiling=(((mRawFrame->width * mRawFrame->height)/256)*(double)20)/100;  //FIXMEC, the size of hardware buffer is smaller than software buffer so can save memory by requesting smaller buffer size
+                        //uint16_t vector_ceiling=(((mRawFrame->width * mRawFrame->height)/256)*(double)20)/100;  //FIXMEC, the size of hardware buffer is smaller than software buffer so can save memory by requesting smaller buffer size
+                        uint16_t vector_ceiling=(((dscale_x_res * dscale_y_res)/256)*(double)20)/100;
                         vector_ceiling--;
                         uint16_t vec_count=0;  
                         
@@ -356,8 +359,8 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                             if ((abs(mvs.x_vector) + abs(mvs.y_vector)) < 1)
                                continue;
                           
-                            mvt.xcoord = (i*16) % (mVideoCodecContext->width + 16);
-                            mvt.ycoord = ((i*16)/(mVideoCodecContext->width+16))*16;
+                            mvt.xcoord = (i*16) % (dscale_x_res + 16);
+                            mvt.ycoord = ((i*16)/(dscale_x_res+16))*16;
                             
                             //Future expansion, save the magnitude of vectors
                             //mvt.x_vector = mv->x_vector;
@@ -378,6 +381,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                         } 
                          memcpy(mvect_buffer,&vec_count, sizeof(vec_count));  //size at first byte
                          uint16_t vec_type = 0;
+                         
                          
                          memcpy(mvect_buffer+sizeof(vec_count),&vec_type, sizeof(vec_type));   //type of vector at 3rd byte
                          
@@ -402,7 +406,8 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                         
                     //copy buffer->data to directbuffer
                     if (colours == ZM_COLOUR_GRAY8)
-                        memcpy(directbuffer,buffer->data,splitter->output[0]->format->es->video.width * splitter->output[0]->format->es->video.height);
+                        //memcpy(directbuffer,buffer->data,splitter->output[0]->format->es->video.width * splitter->output[0]->format->es->video.height);
+                        memcpy(directbuffer,buffer->data,width * height); //width and height adjusted by vcos_align_up
                     else
                         memcpy(directbuffer,buffer->data,buffer->length);
                     
