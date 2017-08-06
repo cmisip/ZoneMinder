@@ -3306,7 +3306,6 @@ unsigned int Monitor::DetectMotion( const Image &comp_image, Event::StringSet &z
       Debug( 3, "Checking active zone %s", zone->Label() );
 
       if (function == MVDECT ) {
-        //check_result = zone->CheckAlarms( mvect_buffer );
         check_result = zone->CheckAlarms( mvect_buffer, comp_image.width, comp_image.height );
       } else 
         check_result = zone->CheckAlarms( &delta_image);
@@ -3335,7 +3334,6 @@ unsigned int Monitor::DetectMotion( const Image &comp_image, Event::StringSet &z
         Debug( 3, "Checking inclusive zone %s", zone->Label() );
 
         if (function == MVDECT ) {
-          //check_result = zone->CheckAlarms( mvect_buffer );
           check_result = zone->CheckAlarms( mvect_buffer, comp_image.width, comp_image.height );
         } else 
           check_result = zone->CheckAlarms( &delta_image);
@@ -3365,7 +3363,6 @@ unsigned int Monitor::DetectMotion( const Image &comp_image, Event::StringSet &z
         Debug( 3, "Checking exclusive zone %s", zone->Label() );
 
         if (function == MVDECT ) {
-          //check_result = zone->CheckAlarms( mvect_buffer );
           check_result = zone->CheckAlarms( mvect_buffer, comp_image.width, comp_image.height );
         } else 
           check_result = zone->CheckAlarms( &delta_image);

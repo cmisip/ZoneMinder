@@ -204,7 +204,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer , unsigned int image_width, unsi
     
     //CONFIG section
     //USE the AlarmedPixels Method and Percent Units to set the Min/Max Alarmed Area
-    //uint16_t minimum_vector_threshold=(double)min_alarm_pixels/20;  //20 is 4 pixels per macroblock multiplied by the skew value of 5
+    
     uint16_t minimum_vector_coverage=((double)min_alarm_pixels/polygon.Area())*100; //best case assumed, all vectors are within polygon resulting in minimum score
     uint16_t maximum_vector_coverage=((double)max_alarm_pixels/polygon.Area())*100; //worst case assumed, all vectors could be thrown out
     
@@ -227,7 +227,17 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer , unsigned int image_width, unsi
         //sizeof would be safer in the long run if we decide to make changes to these types
         
         
-      switch (vec_type) {
+      
+      
+      //Info("vec type : %d, x_res %d, y_res %d\n ", vec_type, dscale_x_res, dscale_y_res);
+      //Info("Image width %d, height %d\n ", image_width, image_height);
+
+      //Rescale the zone polygons here if hardware decode was used
+      if ((vec_type>0) && (size > 0)) {
+          
+        //uint16_t minimum_vector_threshold=(double)min_alarm_pixels/20;  //20 is 4 pixels per macroblock multiplied by the skew value of 5  
+          
+        switch (vec_type) {
         case 1: dscale_x_res = image_width;
                 dscale_y_res = image_height;
                 break;
@@ -240,24 +250,24 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer , unsigned int image_width, unsi
         case 4: dscale_x_res = 960;
                 dscale_y_res = 720;
                 break;             
-      }        
-      
-      //Info("vec type : %d, x_res %d, y_res %d\n ", vec_type, dscale_x_res, dscale_y_res);
-      //Info("Image width %d, height %d\n ", image_width, image_height);
-      //Rescale the zone polygons here if hardware decode was used
-      if ((vec_type>0) && (size > 0)) {
-        uint16_t x_rfactor = image->width/dscale_x_res;
-        uint16_t y_rfactor = image->height/dscale_y_res;
+      }          
+          
+        
+        int x_rfactor = image_width/dscale_x_res;
+        int y_rfactor = image_height/dscale_y_res;
         Info("X_factor %d, Y_factor %d\n" ,x_rfactor, y_rfactor);
       
-        for (int p = 0; p< polygon.n_coords; p++) {
-          polygon.coords[p].X()*=x_rfactor;
-          polygon.coords[p].Y()*=y_rfactor;
-          Info("Coord %d, with value of %d, %d \n", polygon.coords[p].X() , polygon.coords[p].Y());
+        Polygon cpolygon = polygon;
+        for (int p = 0; p< cpolygon.n_coords; p++) {
+          Info("Coord before %d, with value of %d, %d \n", p, cpolygon.coords[p].X() , cpolygon.coords[p].Y());  
+          cpolygon.coords[p].X()*=x_rfactor;
+          cpolygon.coords[p].Y()*=y_rfactor;
+          Info("Coord after %d, with value of %d, %d \n", p, cpolygon.coords[p].X() , cpolygon.coords[p].Y());
 
         }
         
-      }
+      
+      
         
         uint16_t offset=4;
         for (int i = 0; i < size; i++) {
@@ -266,7 +276,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer , unsigned int image_width, unsi
                 offset+=sizeof(motion_vector);
 
                 //Are the vectors inside the zone polygon?
-                if (!polygon.isInside(Coord(mv.xcoord,mv.ycoord)))      
+                if (!cpolygon.isInside(Coord(mv.xcoord,mv.ycoord)))      
                     continue;
                 
                     uint16_t x;
@@ -288,6 +298,8 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer , unsigned int image_width, unsi
                      
                        
         }
+        
+      }  
         
         memset(mvect_buffer,0,4);
     }   
