@@ -144,6 +144,9 @@ public:
         //int16_t y_vector;
         };
         
+        unsigned int width;
+	unsigned int height;
+        
 protected:
 	static bool initialised;
 	static unsigned char *abs_table;
@@ -156,8 +159,7 @@ protected:
 	static jpeg_decompress_struct *decodejpg_dcinfo;
 	static struct zm_error_mgr jpg_err;
 
-	unsigned int width;
-	unsigned int height;
+	
 	unsigned int pixels;
 	unsigned int colours;
 	unsigned int size;

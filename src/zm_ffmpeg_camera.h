@@ -132,6 +132,17 @@ class FfmpegCamera : public Camera {
     uint16_t dscale_x_res,dscale_y_res;
     bool dscale_before_encode;
     
+    enum mvect_modes {
+        software_default,
+        hardware_default,  //no downscale
+        //the following resolutions are already aligned 16 and 32 so no need to vcos_align_up
+        low_resolution,  //320x240    //downscale from any video source larger than this
+        medium_resolution, //640x480  //downscale from 704x480
+        high_resolution //960x720     //downscale from 1920x1080
+    };
+    
+    mvect_modes mvect_mode;
+    
 #endif
     enum h264_codec {
         software,

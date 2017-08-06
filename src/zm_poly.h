@@ -74,8 +74,7 @@ protected:
   };
 
 protected:
-  int n_coords;
-  Coord *coords;
+  
   Box extent;
   int area;
   Coord centre;
@@ -88,6 +87,8 @@ protected:
   void calcCentre();
 
 public:
+  int n_coords;
+  Coord *coords;  
   inline Polygon() : n_coords( 0 ), coords( 0 ), area( 0 )
   {
   }

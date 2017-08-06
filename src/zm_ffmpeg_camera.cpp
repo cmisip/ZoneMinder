@@ -66,14 +66,32 @@ FfmpegCamera::FfmpegCamera( int p_id, const std::string &p_path, const std::stri
   videoStore = NULL;
   video_last_pts = 0;
   
-  //FIXMEC these should be config options
-  dscale_before_encode=true;
-  //dscale_x_res=width; //no downscaling since equal to width
-  //dscale_y_res=height; //no downscaling since equal to height
-
-  dscale_x_res=320;
-  dscale_y_res=240;
+  if (!ctype) {
+      mvect_mode=software_default;
+  }
   
+  //FIXMEC these should be config options in the web UI
+  //START CONFIG OPTION
+  dscale_before_encode=true;
+  mvect_mode=low_resolution;
+  //END CONFIG OPTION
+  
+  if (ctype) {
+      switch (mvect_mode) {
+        case 1: dscale_x_res = width;
+                dscale_y_res = height;
+                break;
+        case 2: dscale_x_res = 320;
+                dscale_y_res = 240;   
+                break;
+        case 3: dscale_x_res = 640;
+                dscale_y_res = 480;
+                break;
+        case 4: dscale_x_res = 960;
+                dscale_y_res = 720;
+                break;             
+   }        
+}  
 #if HAVE_LIBSWSCALE  
   mConvertContext = NULL;
 #endif
@@ -295,7 +313,7 @@ if (!ctype) { //motion vectors from software h264 decoding
                   
                     }
                        memcpy(mvect_buffer,&vec_count, 2); //size on first byte
-                       uint16_t vec_type = 1;
+                       uint16_t vec_type = software_default;
                          
                        memcpy(mvect_buffer+2,&vec_type, 2);   //type of vector at 3rd byte
                     //Info("FFMPEG SW VEC_COUNT %d, ceiling %d", vec_count, vector_ceiling);
@@ -380,8 +398,10 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                             
                         } 
                          memcpy(mvect_buffer,&vec_count, sizeof(vec_count));  //size at first byte
-                         uint16_t vec_type = 0;
                          
+                         //FIXMEC One solution to downscaled frame for encoding to send the information to zma to rescale the zone polygons
+                         //is to use the vector type 
+                         uint16_t vec_type = mvect_mode;
                          
                          memcpy(mvect_buffer+sizeof(vec_count),&vec_type, sizeof(vec_type));   //type of vector at 3rd byte
                          

@@ -213,6 +213,8 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
     uint16_t y_sum=0;
     uint16_t size;
     uint16_t vec_type;
+    uint16_t dscale_x_res;
+    uint16_t dscale_y_res;
     
     
     
@@ -223,6 +225,28 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
         //second 16 bit value is source type of macroblock : 0 hardware, 1 software.  //FIXME, could be 8 bit value but probably better to keep things even
         memcpy(&vec_type,mvect_buffer+sizeof(size),sizeof(vec_type));    
         //sizeof would be safer in the long run if we decide to make changes to these types
+        
+        
+      switch (vec_type) {
+        case 2: dscale_x_res = 320;
+                dscale_y_res = 240;   
+                break;
+        case 3: dscale_x_res = 640;
+                dscale_y_res = 480;
+                break;
+        case 4: dscale_x_res = 960;
+                dscale_y_res = 720;
+                break;             
+      }        
+      
+      //Rescale the zone polygons here
+      uint16_t x_rfactor = image->width/dscale_x_res;
+      uint16_t y_rfactor = image->height/dscale_y_res;
+      
+      for (int p = 0; p< polygon.n_coords; p++) {
+          polygon.coords[p].X()*=x_rfactor;
+          polygon.coords[p].Y()*=x_rfactor;
+      }
         
         
         uint16_t offset=4;
@@ -238,7 +262,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
                     uint16_t x;
                     uint16_t y;
                         
-                if (vec_type == 0 )  //hardware macroblock with size of 16x16, there are 16 4x4 blocks in each one
+                if (vec_type > 0 )  //hardware macroblock with size of 16x16, there are 16 4x4 blocks in each one
                   for (uint16_t i=0 ; i< 4; i++) {
                            for (uint16_t j=0 ; j< 4; j++) {
                                 x=mv.xcoord+i*4;
