@@ -200,7 +200,6 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer , unsigned int image_width, unsi
     return( false );
   }
     
-    //uint16_t maximum_vector_threshold=(polygon.Area()/16); //16 is the size of a 4x4 macroblock
     
     //CONFIG section
     //USE the AlarmedPixels Method and Percent Units to set the Min/Max Alarmed Area
@@ -213,8 +212,8 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer , unsigned int image_width, unsi
     uint16_t y_sum=0;
     uint16_t size=0;
     uint16_t vec_type=0;
-    unsigned int dscale_x_res=0;
-    unsigned int dscale_y_res=0;
+    unsigned int dscale_x_res=image_width;
+    unsigned int dscale_y_res=image_height;
     
     
     
@@ -232,15 +231,21 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer , unsigned int image_width, unsi
       //Info("vec type : %d, x_res %d, y_res %d\n ", vec_type, dscale_x_res, dscale_y_res);
       //Info("Image width %d, height %d\n ", image_width, image_height);
 
-      //Rescale the zone polygons here if hardware decode was used
-      if ((vec_type>0) && (size > 0)) {
+      if (size > 0) {
+     
           
-        //uint16_t minimum_vector_threshold=(double)min_alarm_pixels/20;  //20 is 4 pixels per macroblock multiplied by the skew value of 5  
+        //Minimum number of 4x4 vectors to satisfy the minimum score  
+        //If we get at least 20% of min_alarm_pixels, that is equivalent to 100%
+        //Divide 20% with number of 4x4 vectors that will fit  
+        uint16_t minimum_vector_threshold=(double)min_alarm_pixels * .20 / 16 ;
+        //Each hardware macroblock is 16x16 which dissolves into 16 4x4 blocks
+        uint16_t available_vectors=(double)size * 16 ; 
+        
+       if (available_vectors > minimum_vector_threshold) {
+        Polygon cpolygon = polygon;
+         if (vec_type>0) { //hardware decoding   
           
         switch (vec_type) {
-        case 1: dscale_x_res = image_width;
-                dscale_y_res = image_height;
-                break;
         case 2: dscale_x_res = 320;
                 dscale_y_res = 240;   
                 break;
@@ -251,23 +256,25 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer , unsigned int image_width, unsi
                 dscale_y_res = 720;
                 break;             
       }          
-          
-        
+      //Rescale the zone polygons here if hardware decode was used and we downscaled 
+      
+      
+      if (vec_type > 1) {  
         int x_rfactor = image_width/dscale_x_res;
         int y_rfactor = image_height/dscale_y_res;
         Info("X_factor %d, Y_factor %d\n" ,x_rfactor, y_rfactor);
       
-        Polygon cpolygon = polygon;
+        
         for (int p = 0; p< cpolygon.n_coords; p++) {
           Info("Coord before %d, with value of %d, %d \n", p, cpolygon.coords[p].X() , cpolygon.coords[p].Y());  
-          cpolygon.coords[p].X()*=x_rfactor;
-          cpolygon.coords[p].Y()*=y_rfactor;
+          cpolygon.coords[p].X()/=x_rfactor;
+          cpolygon.coords[p].Y()/=y_rfactor;
           Info("Coord after %d, with value of %d, %d \n", p, cpolygon.coords[p].X() , cpolygon.coords[p].Y());
 
         }
-        
-      
-      
+      } 
+       
+       } 
         
         uint16_t offset=4;
         for (int i = 0; i < size; i++) {
@@ -300,7 +307,8 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer , unsigned int image_width, unsi
         }
         
       }  
-        
+     
+      }
         memset(mvect_buffer,0,4);
     }   
     
@@ -310,18 +318,18 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer , unsigned int image_width, unsi
     }
   
    
-    alarm_pixels = vec_count*20 ; //4 pixels per 4x4 macroblock multiplied by the skew value
+    alarm_pixels = vec_count*80 ; //16 pixels per 16x16 macroblock multiplied by the skew value of 5
     score = ((double) alarm_pixels/(polygon.Area()))*100;  //score adjusted to faux pixel values for users who insist on using pixels for setting min_alarm_pixels and max_alarm_pixels instead of percentages, value is in the stat UI of the event score. 
     //possible values 0 to 500 where 100 is equal to .2 
     //0-100 values mean 0.0 to 0.2,  anything higher probably won't happen since there are not very many vectors but this can be adjusted in the code in the future if testing can show a more practical range of values
     //User expects value of percent min_alarm_pixels and max_alarm_pixels to be 0-100, I think 0.0 - 0.2 is practical (corresponding to percentages 0-100)
     
     
-    //bool result=score > minimum_vector_coverage && score < maximum_vector_coverage;
+    bool result=score > minimum_vector_coverage && score < maximum_vector_coverage;
     
-    //if (result) {
-    //   Info("ALARM | SCORE ==> %d | VECS ==> %d | SCORE RANGE ==> %d  <>  %d", score, vec_count,   minimum_vector_coverage, maximum_vector_coverage);
-    //} //else
+    if (result) {
+       Info("ALARM | SCORE ==> %d | VECS ==> %d | SCORE RANGE ==> %d  <>  %d", score, vec_count,   minimum_vector_coverage, maximum_vector_coverage);
+    } //else
       // Info("IDLE  | SCORE ==> %d | VECS ==> %d | SCORE RANGE ==> %d  <>  %d", score, vec_count,   minimum_vector_coverage, maximum_vector_coverage);
  
     
