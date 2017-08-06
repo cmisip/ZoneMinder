@@ -502,7 +502,6 @@ int FfmpegCamera::PostCapture() {
 
 #ifdef __arm__
 void FfmpegCamera::input_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer) {
-   //CONTEXT_T *ctx = (struct CONTEXT_T *)port->userdata;
    mmal_buffer_header_release(buffer);
 }
 
@@ -675,13 +674,10 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
    //vc.ril.isp supports all the formats we use
    if ( colours == ZM_COLOUR_RGB32 ) {
        format_out->encoding = MMAL_ENCODING_RGBA;
-       format_out->encoding_variant = MMAL_ENCODING_RGBA;  //FIXMEC variant may not be necessary since encoding format is not opaque.
    } else if ( colours == ZM_COLOUR_RGB24 ) {
        format_out->encoding = MMAL_ENCODING_RGB24;
-       format_out->encoding_variant = MMAL_ENCODING_RGB24; //FIXMEC variant may not be necessary since encoding format is not opaque.
    } else if(colours == ZM_COLOUR_GRAY8) { 
        format_out->encoding = MMAL_ENCODING_I420;  //gray8 is simply copying the luma of a YUV
-       format_out->encoding_variant = MMAL_ENCODING_I420;  //FIXMEC variant may not be necessary since encoding format is not opaque.
    }
    
    
