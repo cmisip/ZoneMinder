@@ -2892,6 +2892,27 @@ Monitor *Monitor::Load( unsigned int p_id, bool load_zones, Purpose purpose ) {
       FfmpegCamera::hardware,
       (Monitor::Function)function
      );
+    
+    uint16_t vec_type=camera->Get_Mode();
+    Info("Mode in Monitor Load ffmpeg Hw is %d", vec_type);
+    /*
+    unsigned int dscale_x_res=width;
+    unsigned int dscale_y_res=height;
+    
+    switch (vec_type) {
+                      case 2: dscale_x_res = 320;
+                              dscale_y_res = 240;   
+                              break;
+                      case 3: dscale_x_res = 640;
+                              dscale_y_res = 480;
+                              break;
+                      case 4: dscale_x_res = 960;
+                              dscale_y_res = 720;
+                              break;             
+    } */
+    
+    
+    
 #else // HAVE_LIBAVFORMAT
     Fatal( "You must have ffmpeg libraries installed to use ffmpeg cameras for monitor %d", id );
 #endif // HAVE_LIBAVFORMAT

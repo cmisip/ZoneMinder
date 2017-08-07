@@ -172,6 +172,7 @@ class FfmpegCamera : public Camera {
     int PreCapture();
     int Capture( Image &image );
     int CaptureAndRecord( Image &image, timeval recording, char* event_directory );
+    int Get_Mode(){ return mvect_mode;}
     int PostCapture();
     
 #ifdef __arm__
