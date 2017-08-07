@@ -130,7 +130,6 @@ class FfmpegCamera : public Camera {
     };
     
     uint16_t dscale_x_res,dscale_y_res;
-    bool dscale_before_encode;
     
     enum mvect_modes {
         software_default,

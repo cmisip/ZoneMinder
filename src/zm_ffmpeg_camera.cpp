@@ -40,7 +40,7 @@ FfmpegCamera::FfmpegCamera( int p_id, const std::string &p_path, const std::stri
   Camera( p_id, FFMPEG_SRC, p_width, p_height, p_colours, ZM_SUBPIX_ORDER_DEFAULT_FOR_COLOUR(p_colours), p_brightness, p_contrast, p_hue, p_colour, p_capture, p_record_audio ),
   mPath( p_path ),
   mMethod( p_method ),
-  mOptions( p_options ),
+  mOptions( p_options ),  //Not being used, use it for mvect_mode
   ctype( ictype),
   cfunction(icfunction)
 {
@@ -72,8 +72,18 @@ FfmpegCamera::FfmpegCamera( int p_id, const std::string &p_path, const std::stri
   
   //FIXMEC these should be config options in the web UI
   //START CONFIG OPTION
-  dscale_before_encode=true;
-  mvect_mode=low_resolution;
+  if (ctype) {
+  if ( mOptions == "low")
+      mvect_mode=low_resolution;
+  else if ( mOptions == "medium" )
+      mvect_mode = medium_resolution;
+  else if ( mOptions == "high")
+      mvect_mode = high_resolution;
+  else 
+      mvect_mode = hardware_default;
+  } else
+      mvect_mode = software_default;
+  
   //END CONFIG OPTION
   
   if (ctype) {
