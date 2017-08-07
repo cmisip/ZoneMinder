@@ -2893,24 +2893,6 @@ Monitor *Monitor::Load( unsigned int p_id, bool load_zones, Purpose purpose ) {
       (Monitor::Function)function
      );
     
-    uint16_t vec_type=camera->Get_Mode();
-    Info("Mode in Monitor Load ffmpeg Hw is %d", vec_type);
-    /*
-    unsigned int dscale_x_res=width;
-    unsigned int dscale_y_res=height;
-    
-    switch (vec_type) {
-                      case 2: dscale_x_res = 320;
-                              dscale_y_res = 240;   
-                              break;
-                      case 3: dscale_x_res = 640;
-                              dscale_y_res = 480;
-                              break;
-                      case 4: dscale_x_res = 960;
-                              dscale_y_res = 720;
-                              break;             
-    } */
-    
     
     
 #else // HAVE_LIBAVFORMAT
@@ -3011,6 +2993,43 @@ Monitor *Monitor::Load( unsigned int p_id, bool load_zones, Purpose purpose ) {
     monitor->AddPrivacyBitmask( zones );
   }
   Debug( 1, "Loaded monitor %d(%s), %d zones", id, name.c_str(), n_zones );
+  
+    uint16_t vec_type=camera->Get_Mode();
+    Info("Mode in Monitor Load ffmpeg Hw is %d", vec_type);
+    
+    unsigned int dscale_x_res=width;
+    unsigned int dscale_y_res=height;
+    
+    switch (vec_type) {
+                      case 2: dscale_x_res = 320;
+                              dscale_y_res = 240;   
+                              break;
+                      case 3: dscale_x_res = 640;
+                              dscale_y_res = 480;
+                              break;
+                      case 4: dscale_x_res = 960;
+                              dscale_y_res = 720;
+                              break;             
+    } 
+    
+    if (vec_type > 1) {  
+                        int x_rfactor = width/dscale_x_res;
+                        int y_rfactor = height/dscale_y_res;
+                       // Info("X_factor %d, Y_factor %d\n" ,x_rfactor, y_rfactor);
+      
+                        for (int o = 0; o < n_zones ; o++) {
+                        for (int p = 0; p< monitor->zones[o]->polygon.n_coords; p++) {
+                         //    Info("Coord before %d, with value of %d, %d \n", p, cpolygon.coords[p].X() , cpolygon.coords[p].Y());  
+                             monitor->zones[o]->polygon.coords[p].X()/=x_rfactor;
+                             monitor->zones[o]->polygon.coords[p].Y()/=y_rfactor;
+                          //   Info("Coord after %d, with value of %d, %d \n", p, cpolygon.coords[p].X() , cpolygon.coords[p].Y());
+
+                        }
+                        }
+    }       
+    
+    
+  
   return( monitor );
 }
 

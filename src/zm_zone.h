@@ -48,8 +48,7 @@ public:
 
   
   typedef Image::motion_vector motion_vector;
-  
-
+  Polygon      polygon;
 protected:
   // Inputs
   Monitor      *monitor;
@@ -57,7 +56,7 @@ protected:
   int        id;
   char      *label;
   ZoneType    type;
-  Polygon      polygon;
+  //Polygon      polygon;
   Rgb        alarm_rgb;
   CheckMethod    check_method;
 

@@ -245,7 +245,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer , unsigned int image_width, unsi
         
         if (available_vectors > minimum_vector_threshold) { 
             
-          if (vec_type>0) { //hardware decoding, the overhead of all the computation in this block needs to be weighed against benefit of downscaling in zmc 
+        /*  if (vec_type>0) { //hardware decoding, the overhead of all the computation in this block needs to be weighed against benefit of downscaling in zmc 
                             //FIXMEC, zma needs to know at initialization of this is necessary so its not done with every loop
           
                    switch (vec_type) {
@@ -277,7 +277,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer , unsigned int image_width, unsi
                   }             
        
         
-       }  
+       }  */
         
           uint16_t offset=4;
           for (int i = 0; i < size; i++) {
