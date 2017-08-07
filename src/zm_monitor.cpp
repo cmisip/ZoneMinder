@@ -3099,7 +3099,7 @@ int Monitor::Capture() {
   }
   
   if ( captureResult == 1 ) {
-    
+    gettimeofday( image_buffer[index].timestamp, NULL );
     /* Deinterlacing */
     if ( deinterlacing_value == 1 ) {
       capture_image->Deinterlace_Discard();
@@ -3157,7 +3157,7 @@ int Monitor::Capture() {
       capture_image->MaskPrivacy( privacy_bitmask );
 
     //gettimeofday( image_buffer[index].timestamp, NULL );
-    memcpy(image_buffer[index].timestamp,&capture_image->timestamp, sizeof(timeval));
+    //memcpy(image_buffer[index].timestamp,&capture_image->timestamp, sizeof(timeval));
     if ( config.timestamp_on_capture ) {
       TimestampImage( capture_image, image_buffer[index].timestamp );
     }

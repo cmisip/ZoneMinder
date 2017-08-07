@@ -66,9 +66,7 @@ FfmpegCamera::FfmpegCamera( int p_id, const std::string &p_path, const std::stri
   videoStore = NULL;
   video_last_pts = 0;
   
-  if (!ctype) {
-      mvect_mode=software_default;
-  }
+  
   
   //FIXMEC these should be config options in the web UI, for now use the options field
   //START CONFIG OPTION
@@ -441,7 +439,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                        else
                           memcpy(directbuffer,buffer->data,buffer->length);
                     
-                       gettimeofday( &image.timestamp, NULL );
+                       //gettimeofday( &image.timestamp, NULL );
                     } else 
                         return -1;
                     
