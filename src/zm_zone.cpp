@@ -212,8 +212,8 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer , unsigned int image_width, unsi
     uint16_t y_sum=0;
     uint16_t size=0;
     uint16_t vec_type=0;
-    unsigned int dscale_x_res=image_width;
-    unsigned int dscale_y_res=image_height;
+    //unsigned int dscale_x_res=image_width;
+    //unsigned int dscale_y_res=image_height;
     
     uint16_t minimum_vector_threshold;
     uint16_t available_vectors=0;
@@ -241,7 +241,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer , unsigned int image_width, unsi
         //Each hardware macroblock is 16x16 which dissolves into 16 4x4 blocks, just make the same assumption for software decoding
         available_vectors=(double)size * 16 ;    
         
-        Polygon cpolygon = polygon;
+        //Polygon cpolygon = polygon;
         
         if (available_vectors > minimum_vector_threshold) { 
             
@@ -282,11 +282,14 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer , unsigned int image_width, unsi
           uint16_t offset=4;
           for (int i = 0; i < size; i++) {
                 motion_vector mv;
+                
+                
+
                 memcpy(&mv,mvect_buffer+offset,sizeof(motion_vector));
                 offset+=sizeof(motion_vector);
 
                 //Are the vectors inside the zone polygon?
-                if (!cpolygon.isInside(Coord(mv.xcoord,mv.ycoord)))      
+                if (!polygon.isInside(Coord(mv.xcoord,mv.ycoord)))      
                     continue;
                 
                     uint16_t x;
