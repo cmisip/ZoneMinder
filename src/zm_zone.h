@@ -156,7 +156,7 @@ public:
   }
   void RecordStats( const Event *event );
   bool CheckAlarms( const Image *delta_image );
-  bool CheckAlarms( uint8_t *& mvect_buffer, unsigned int width, unsigned int height);
+  bool CheckAlarms( uint8_t *& mvect_buffer );
   bool DumpSettings( char *output, bool verbose );
 
   static bool ParsePolygonString( const char *polygon_string, Polygon &polygon );

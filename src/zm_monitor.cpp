@@ -2868,12 +2868,12 @@ Monitor *Monitor::Load( unsigned int p_id, bool load_zones, Purpose purpose ) {
 #if HAVE_LIBAVFORMAT  
       
     
-#ifdef __arm__      
+#ifdef __arm__    
+   // int oldwidth = width;
+   // int oldheight = height;
     width=VCOS_ALIGN_UP(width,32);
     height=VCOS_ALIGN_UP(height,16);
 #endif
-//FIXMEC  the zone polygons need to be adjusted here to reflect the new width and height
-    
   
     camera = new FfmpegCamera(
       id,
@@ -2994,13 +2994,17 @@ Monitor *Monitor::Load( unsigned int p_id, bool load_zones, Purpose purpose ) {
   }
   Debug( 1, "Loaded monitor %d(%s), %d zones", id, name.c_str(), n_zones );
   
-    uint16_t vec_type=camera->Get_Mode();
-    Info("Mode in Monitor Load ffmpeg Hw is %d", vec_type);
+  
+  //Adust the zone polygons
+  uint16_t vec_type=camera->Get_Mode();
     
-    unsigned int dscale_x_res=width;
-    unsigned int dscale_y_res=height;
+  unsigned int dscale_x_res=width;
+  unsigned int dscale_y_res=height;
     
-    switch (vec_type) {
+  switch (vec_type) {
+                      //case 1: dscale_x_res = 320;
+                      //        dscale_y_res = 240;   
+                      //        break; 
                       case 2: dscale_x_res = 320;
                               dscale_y_res = 240;   
                               break;
@@ -3010,23 +3014,20 @@ Monitor *Monitor::Load( unsigned int p_id, bool load_zones, Purpose purpose ) {
                       case 4: dscale_x_res = 960;
                               dscale_y_res = 720;
                               break;             
-    } 
+  } 
     
-    if (vec_type > 1) {  
+  if (vec_type > 1) {  
                         int x_rfactor = width/dscale_x_res;
                         int y_rfactor = height/dscale_y_res;
-                       // Info("X_factor %d, Y_factor %d\n" ,x_rfactor, y_rfactor);
       
                         for (int o = 0; o < n_zones ; o++) {
-                        for (int p = 0; p< monitor->zones[o]->polygon.n_coords; p++) {
-                         //    Info("Coord before %d, with value of %d, %d \n", p, cpolygon.coords[p].X() , cpolygon.coords[p].Y());  
-                             monitor->zones[o]->polygon.coords[p].X()/=x_rfactor;
-                             monitor->zones[o]->polygon.coords[p].Y()/=y_rfactor;
-                          //   Info("Coord after %d, with value of %d, %d \n", p, cpolygon.coords[p].X() , cpolygon.coords[p].Y());
+                            for (int p = 0; p< monitor->zones[o]->polygon.n_coords; p++) {
+                               monitor->zones[o]->polygon.coords[p].X()/=x_rfactor;
+                               monitor->zones[o]->polygon.coords[p].Y()/=y_rfactor;
 
+                            }
                         }
-                        }
-    }       
+   }       
     
     
   
@@ -3302,7 +3303,7 @@ unsigned int Monitor::DetectMotion( const Image &comp_image, Event::StringSet &z
     Debug( 3, "Checking preclusive zone %s - old score: %d, state: %s", zone->Label(),old_zone_score, zone->Alarmed()?"alarmed":"quiet" );
 
     if (function == MVDECT ) {
-        check_result = zone->CheckAlarms( mvect_buffer, comp_image.width, comp_image.height );
+        check_result = zone->CheckAlarms( mvect_buffer);
     }    else 
         check_result = zone->CheckAlarms( &delta_image);
     
@@ -3346,7 +3347,7 @@ unsigned int Monitor::DetectMotion( const Image &comp_image, Event::StringSet &z
       Debug( 3, "Checking active zone %s", zone->Label() );
 
       if (function == MVDECT ) {
-        check_result = zone->CheckAlarms( mvect_buffer, comp_image.width, comp_image.height );
+        check_result = zone->CheckAlarms( mvect_buffer );
       } else 
         check_result = zone->CheckAlarms( &delta_image);
     
@@ -3374,7 +3375,7 @@ unsigned int Monitor::DetectMotion( const Image &comp_image, Event::StringSet &z
         Debug( 3, "Checking inclusive zone %s", zone->Label() );
 
         if (function == MVDECT ) {
-          check_result = zone->CheckAlarms( mvect_buffer, comp_image.width, comp_image.height );
+          check_result = zone->CheckAlarms( mvect_buffer );
         } else 
           check_result = zone->CheckAlarms( &delta_image);
     
@@ -3403,7 +3404,7 @@ unsigned int Monitor::DetectMotion( const Image &comp_image, Event::StringSet &z
         Debug( 3, "Checking exclusive zone %s", zone->Label() );
 
         if (function == MVDECT ) {
-          check_result = zone->CheckAlarms( mvect_buffer, comp_image.width, comp_image.height );
+          check_result = zone->CheckAlarms( mvect_buffer );
         } else 
           check_result = zone->CheckAlarms( &delta_image);
     

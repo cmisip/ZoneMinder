@@ -189,7 +189,7 @@ bool Zone::CheckExtendAlarmCount() {
 } // end bool Zone::CheckExtendAlarmCount
 
 
-bool Zone::CheckAlarms( uint8_t *& mvect_buffer , unsigned int image_width, unsigned int image_height) { 
+bool Zone::CheckAlarms( uint8_t *& mvect_buffer ) { 
     ResetStats();  
     alarm_centre=Coord(0,0);
    
@@ -212,8 +212,6 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer , unsigned int image_width, unsi
     uint16_t y_sum=0;
     uint16_t size=0;
     uint16_t vec_type=0;
-    //unsigned int dscale_x_res=image_width;
-    //unsigned int dscale_y_res=image_height;
     
     uint16_t minimum_vector_threshold;
     uint16_t available_vectors=0;
@@ -241,44 +239,8 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer , unsigned int image_width, unsi
         //Each hardware macroblock is 16x16 which dissolves into 16 4x4 blocks, just make the same assumption for software decoding
         available_vectors=(double)size * 16 ;    
         
-        //Polygon cpolygon = polygon;
-        
         if (available_vectors > minimum_vector_threshold) { 
             
-        /*  if (vec_type>0) { //hardware decoding, the overhead of all the computation in this block needs to be weighed against benefit of downscaling in zmc 
-                            //FIXMEC, zma needs to know at initialization of this is necessary so its not done with every loop
-          
-                   switch (vec_type) {
-                      case 2: dscale_x_res = 320;
-                              dscale_y_res = 240;   
-                              break;
-                      case 3: dscale_x_res = 640;
-                              dscale_y_res = 480;
-                              break;
-                      case 4: dscale_x_res = 960;
-                              dscale_y_res = 720;
-                              break;             
-                   }          
-      
-                  //Rescale the zone polygons here if hardware decode was used and we downscaled 
-                  if (vec_type > 1) {  
-                        int x_rfactor = image_width/dscale_x_res;
-                        int y_rfactor = image_height/dscale_y_res;
-                       // Info("X_factor %d, Y_factor %d\n" ,x_rfactor, y_rfactor);
-      
-        
-                        for (int p = 0; p< cpolygon.n_coords; p++) {
-                         //    Info("Coord before %d, with value of %d, %d \n", p, cpolygon.coords[p].X() , cpolygon.coords[p].Y());  
-                             cpolygon.coords[p].X()/=x_rfactor;
-                             cpolygon.coords[p].Y()/=y_rfactor;
-                          //   Info("Coord after %d, with value of %d, %d \n", p, cpolygon.coords[p].X() , cpolygon.coords[p].Y());
-
-                        }
-                  }             
-       
-        
-       }  */
-        
           uint16_t offset=4;
           for (int i = 0; i < size; i++) {
                 motion_vector mv;
