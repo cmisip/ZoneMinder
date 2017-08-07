@@ -442,7 +442,8 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                           memcpy(directbuffer,buffer->data,buffer->length);
                     
                        gettimeofday( &image.timestamp, NULL );
-                    }
+                    } else 
+                        return -1;
                     
                     mmal_buffer_header_mem_unlock(buffer);   
                     
