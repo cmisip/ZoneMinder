@@ -3156,7 +3156,8 @@ int Monitor::Capture() {
     if ( privacy_bitmask )
       capture_image->MaskPrivacy( privacy_bitmask );
 
-    gettimeofday( image_buffer[index].timestamp, NULL );
+    //gettimeofday( image_buffer[index].timestamp, NULL );
+    memcpy(image_buffer[index].timestamp,capture_image->timestamp, sizeof(timeval));
     if ( config.timestamp_on_capture ) {
       TimestampImage( capture_image, image_buffer[index].timestamp );
     }

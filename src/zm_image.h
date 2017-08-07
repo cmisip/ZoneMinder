@@ -147,6 +147,8 @@ public:
         unsigned int width;
 	unsigned int height;
         
+        struct timeval  *timestamp;
+        
 protected:
 	static bool initialised;
 	static unsigned char *abs_table;

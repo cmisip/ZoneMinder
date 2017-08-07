@@ -431,6 +431,8 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                     else
                         memcpy(directbuffer,buffer->data,buffer->length);
                     
+                    gettimeofday( image.timestamp, NULL );
+                    
                     mmal_buffer_header_mem_unlock(buffer);   
                     
                     mmal_buffer_header_release(buffer);
@@ -488,7 +490,7 @@ if (!ctype) {
 #else // HAVE_LIBSWSCALE
         Fatal( "You must compile ffmpeg with the --enable-swscale option to use ffmpeg cameras" );
 #endif // HAVE_LIBSWSCALE
-
+        gettimeofday( image.timestamp, NULL );
 }
 
 
