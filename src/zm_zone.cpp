@@ -193,12 +193,12 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer ) {
     ResetStats();  
     alarm_centre=Coord(0,0);
    
-    if ( overload_count ) {
+   /* if ( overload_count ) {
     Info( "In overload mode, %d frames of %d remaining", overload_count, overload_frames );
     Debug( 4, "In overload mode, %d frames of %d remaining", overload_count, overload_frames );
     overload_count--;
     return( false );
-  }
+  }*/
     
     
     //CONFIG section

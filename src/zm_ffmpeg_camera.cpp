@@ -500,7 +500,7 @@ if (!ctype) {
 #else // HAVE_LIBSWSCALE
         Fatal( "You must compile ffmpeg with the --enable-swscale option to use ffmpeg cameras" );
 #endif // HAVE_LIBSWSCALE
-        gettimeofday( &image.timestamp, NULL );
+        //gettimeofday( &image.timestamp, NULL );
 }
 
 
