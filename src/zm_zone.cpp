@@ -235,7 +235,13 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
                 if (!polygon.isInside(Coord(mv.xcoord,mv.ycoord)))      
                     continue;
                 
-                    uint16_t x;
+                if (vec_type > 0) {
+                  vec_count * 16;
+                  x_sum=x_sum+(16*mv.xcoord);
+                  y_sum=y_sum+(16*mv.ycoord);
+
+                
+                /*    uint16_t x;
                     uint16_t y;
                         
                 if (vec_type == 0 )  //hardware macroblock with size of 16x16, there are 16 4x4 blocks in each one
@@ -247,11 +253,13 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
                                 y_sum+=y;   
                                 vec_count++;
                            }
-                  }
-                else //software macroblock with size of 4x4
+                  }*/
+                
+                } else {//software macroblock with size of 4x4
                   vec_count++;  
-             
-                     
+                  x_sum+=mv.xcoord;
+                  y_sum+=mv.ycoord;
+                }     
                        
         }
         
