@@ -66,14 +66,23 @@ FfmpegCamera::FfmpegCamera( int p_id, const std::string &p_path, const std::stri
   videoStore = NULL;
   video_last_pts = 0;
   
-  if (!ctype) {
-      mvect_mode=software_default;
-  }
   
-  //FIXMEC these should be config options in the web UI
+  
+  
+  //FIXMEC these should be config options in the web UI, for now use the options field
   //START CONFIG OPTION
-  dscale_before_encode=true;
-  mvect_mode=low_resolution;
+  if (ctype) {
+  if ( mOptions == "low")
+      mvect_mode=low_resolution;
+  else if ( mOptions == "medium" )
+      mvect_mode = medium_resolution;
+  else if ( mOptions == "high")
+      mvect_mode = high_resolution;
+  else 
+      mvect_mode = hardware_default;
+  } else
+      mvect_mode = software_default;
+  
   //END CONFIG OPTION
   
   if (ctype) {
