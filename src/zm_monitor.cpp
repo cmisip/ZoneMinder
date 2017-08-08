@@ -574,7 +574,7 @@ bool Monitor::connect() {
     image_buffer[i].timestamp = &(shared_timestamps[i]);
     image_buffer[i].image = new Image( width, height, camera->Colours(), camera->SubpixelOrder(), &(shared_images[i*camera->ImageSize()]) );
     image_buffer[i].image->VectBuffer() = &(shared_mbuff[ i*mv_buffer_size ]) ; //FIXMEC maybe needs to be a parameter to constructor in line above
-    image_buffer[i].image->HoldBuffer(false); /* Don't release the internal buffer or replace it with another */
+    image_buffer[i].image->HoldBuffer(true); /* Don't release the internal buffer or replace it with another */
   }
   if ( (deinterlacing & 0xff) == 4) {
     /* Four field motion adaptive deinterlacing in use */
