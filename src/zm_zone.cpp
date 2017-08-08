@@ -258,7 +258,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer ) {
                     //uint16_t y;
                         
                 if (vec_type>0) {  //hardware macroblock with size of 16x16, there are 16 4x4 blocks in each one
-                  vec_count * 16;
+                  vec_count=vec_count + 16;
                   x_sum=x_sum+(16*mv.xcoord);
                   y_sum=y_sum+(16*mv.ycoord);
                     
@@ -300,10 +300,10 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer ) {
     
     
    /* bool result=score > minimum_vector_coverage && score < maximum_vector_coverage;
-    
-    if (result) {
+   */ 
+   // if (result) {
        Info("ALARM | SCORE ==> %d | VECS_TESTED ==> %d |  VECS PASSED==> %d | SCORE RANGE ==> %d  <>  %d", score, available_vectors, vec_count,   minimum_vector_coverage, maximum_vector_coverage);
-    }*/ 
+   // } 
     
     
     if( score ) {

@@ -83,6 +83,7 @@ FfmpegCamera::FfmpegCamera( int p_id, const std::string &p_path, const std::stri
   } else
       mvect_mode = software_default;
   
+  Info("**************Mode is %d", mvect_mode);
   //END CONFIG OPTION
   
   if (ctype) {
@@ -434,12 +435,12 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                     mmal_buffer_header_mem_lock(buffer);
                         
                     //copy buffer->data to directbuffer
-                    if (colours == ZM_COLOUR_GRAY8)
+                    /*if (colours == ZM_COLOUR_GRAY8)
                         //memcpy(directbuffer,buffer->data,splitter->output[0]->format->es->video.width * splitter->output[0]->format->es->video.height);
                         memcpy(directbuffer,buffer->data,width * height); //width and height adjusted by vcos_align_up
                     else
                         memcpy(directbuffer,buffer->data,buffer->length);
-                    
+                    */
                     mmal_buffer_header_mem_unlock(buffer);   
                     
                     mmal_buffer_header_release(buffer);
@@ -471,7 +472,7 @@ end:
 
         
 
-if (!ctype) {        
+//if (!ctype) {        
 #if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
         av_image_fill_arrays(mFrame->data, mFrame->linesize,
             directbuffer, imagePixFormat, width, height, 1);
@@ -498,7 +499,7 @@ if (!ctype) {
         Fatal( "You must compile ffmpeg with the --enable-swscale option to use ffmpeg cameras" );
 #endif // HAVE_LIBSWSCALE
 
-}
+//}
 
 
         frameCount++;

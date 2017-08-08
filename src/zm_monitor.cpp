@@ -3001,6 +3001,7 @@ Monitor *Monitor::Load( unsigned int p_id, bool load_zones, Purpose purpose ) {
   unsigned int dscale_x_res=width;
   unsigned int dscale_y_res=height;
     
+  Info("************Mode is %d**********************", vec_type);
   switch (vec_type) {
                       //case 1: dscale_x_res = 320;
                       //        dscale_y_res = 240;   
