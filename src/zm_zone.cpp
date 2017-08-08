@@ -234,12 +234,12 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer ) {
         //Minimum number of 4x4 vectors to satisfy the minimum score  
         //If we get at least 20% of min_alarm_pixels, that is equivalent to 100%
         //Divide 20% with number of 4x4 vectors that will fit  
-       // minimum_vector_threshold=(double)min_alarm_pixels * .20 / 16 ; 
+        minimum_vector_threshold=(double)min_alarm_pixels * .20 / 16 ; 
         
         //Each hardware macroblock is 16x16 which dissolves into 16 4x4 blocks, just make the same assumption for software decoding
-       // available_vectors=(double)size * 16 ;    
+        available_vectors=(double)size * 16 ;    
         
-        //if (available_vectors > minimum_vector_threshold) { 
+        if (available_vectors > minimum_vector_threshold) { 
             
           uint16_t offset=4;
           for (int i = 0; i < size; i++) {
@@ -279,7 +279,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer ) {
                 }     
                        
           }
-       // } 
+        } 
       }  
      
       
@@ -299,11 +299,11 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer ) {
     //User expects value of percent min_alarm_pixels and max_alarm_pixels to be 0-100, I think 0.0 - 0.2 is practical (corresponding to percentages 0-100)
     
     
-    bool result=score > minimum_vector_coverage && score < maximum_vector_coverage;
+   /* bool result=score > minimum_vector_coverage && score < maximum_vector_coverage;
     
     if (result) {
        Info("ALARM | SCORE ==> %d | VECS_TESTED ==> %d |  VECS PASSED==> %d | SCORE RANGE ==> %d  <>  %d", score, available_vectors, vec_count,   minimum_vector_coverage, maximum_vector_coverage);
-    } 
+    }*/ 
     
     
     if( score ) {
