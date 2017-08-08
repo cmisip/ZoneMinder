@@ -299,11 +299,11 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer ) {
     //User expects value of percent min_alarm_pixels and max_alarm_pixels to be 0-100, I think 0.0 - 0.2 is practical (corresponding to percentages 0-100)
     
     
-   /* bool result=score > minimum_vector_coverage && score < maximum_vector_coverage;
-   */ 
-   // if (result) {
+    bool result=score > minimum_vector_coverage && score < maximum_vector_coverage;
+    
+    if (result) {
        Info("ALARM | SCORE ==> %d | VECS_TESTED ==> %d |  VECS PASSED==> %d | SCORE RANGE ==> %d  <>  %d", score, available_vectors, vec_count,   minimum_vector_coverage, maximum_vector_coverage);
-   // } 
+    } 
     
     
     if( score ) {
