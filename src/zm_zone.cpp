@@ -257,8 +257,12 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer ) {
                     uint16_t x;
                     uint16_t y;
                         
-                if (vec_type>0)  //hardware macroblock with size of 16x16, there are 16 4x4 blocks in each one
-                  for (uint16_t i=0 ; i< 4; i++) {
+                if (vec_type>0) {  //hardware macroblock with size of 16x16, there are 16 4x4 blocks in each one
+                  vec_count * 16;
+                  x_sum=x_sum+(16*mv.xcoord);
+                  y_sum=y_sum+(16*mv.ycoord);
+                    
+                  /*for (uint16_t i=0 ; i< 4; i++) {
                            for (uint16_t j=0 ; j< 4; j++) {
                                 x=mv.xcoord+i*4;
                                 y=mv.ycoord+j*4;
@@ -266,11 +270,13 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer ) {
                                 y_sum+=y;   
                                 vec_count++;
                            }
-                  }
-                else //software macroblock with size of 4x4
-                  vec_count++;  
+                  }*/
+                } else {//software macroblock with size of 4x4
+                  vec_count++; 
+                  x_sum+=mv.xcoord;
+                  y_sum+=mv.ycoord;
              
-                     
+                }     
                        
           }
        // } 
