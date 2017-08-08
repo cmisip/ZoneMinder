@@ -574,7 +574,7 @@ bool Monitor::connect() {
     image_buffer[i].timestamp = &(shared_timestamps[i]);
     image_buffer[i].image = new Image( width, height, camera->Colours(), camera->SubpixelOrder(), &(shared_images[i*camera->ImageSize()]) );
     image_buffer[i].image->VectBuffer() = &(shared_mbuff[ i*mv_buffer_size ]) ; //FIXMEC maybe needs to be a parameter to constructor in line above
-    image_buffer[i].image->HoldBuffer(false); /* Release the internal buffer*/
+    image_buffer[i].image->HoldBuffer(true); /* Dont Release the internal buffer*/
   }
   if ( (deinterlacing & 0xff) == 4) {
     /* Four field motion adaptive deinterlacing in use */
@@ -3001,7 +3001,7 @@ Monitor *Monitor::Load( unsigned int p_id, bool load_zones, Purpose purpose ) {
   unsigned int dscale_x_res=width;
   unsigned int dscale_y_res=height;
     
-  Info("************Hardsare Downscale Mode is %d**********************", vec_type);
+  Info("************Hardware Downscale Mode is %d**********************", vec_type);
   
   switch (vec_type) {
                       //case 1: dscale_x_res = 320;
