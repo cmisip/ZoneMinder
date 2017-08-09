@@ -435,12 +435,12 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                         
                     //copy buffer->data to directbuffer
                     //FIXMEC -->DISABLED FOR NOW 
-                    /*if (colours == ZM_COLOUR_GRAY8)
+                    if (colours == ZM_COLOUR_GRAY8)
                         //memcpy(directbuffer,buffer->data,splitter->output[0]->format->es->video.width * splitter->output[0]->format->es->video.height);
                         memcpy(directbuffer,buffer->data,width * height); //width and height adjusted by vcos_align_up
                     else
                         memcpy(directbuffer,buffer->data,buffer->length);
-                    */
+                    
                     mmal_buffer_header_mem_unlock(buffer);   
                     
                     mmal_buffer_header_release(buffer);
@@ -472,7 +472,7 @@ end:
 
         
 
-//if (!ctype) {        //restore use of swscale for both hardware and software decode
+if (!ctype) {        //restore use of swscale for both hardware and software decode
 #if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
         av_image_fill_arrays(mFrame->data, mFrame->linesize,
             directbuffer, imagePixFormat, width, height, 1);
@@ -499,7 +499,7 @@ end:
         Fatal( "You must compile ffmpeg with the --enable-swscale option to use ffmpeg cameras" );
 #endif // HAVE_LIBSWSCALE
 
-//}
+}
 
 
         frameCount++;
