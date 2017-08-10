@@ -344,7 +344,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                   mmal_buffer_header_mem_lock(buffer);
                    
                   av_image_copy_to_buffer(buffer->data, bufsize, (const uint8_t **)mRawFrame->data, mRawFrame->linesize,
-                                 AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 1);
+                                 AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 32);
                   buffer->length=bufsize;
                   //buffer->offset = 0; buffer->pts = buffer->dts = MMAL_TIME_UNKNOWN;  //could be used to check if buffer and frame synchronized
                                                                                         //if we supply a time stamp to pts, the first buffer returned with the same time stamp is the matching data for the frame sent
@@ -477,19 +477,19 @@ end:
 //if (!ctype) {        //restore use of swscale for both hardware and software decode
 #if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
         av_image_fill_arrays(mFrame->data, mFrame->linesize,
-            directbuffer, imagePixFormat, width, height, 1);
+            directbuffer, imagePixFormat, width, height, 32);
         av_image_fill_arrays(mIFrame->data, mIFrame->linesize,
-            iframe, imagePixFormat, width, height, 1);
+            iframe, imagePixFormat, width, height, 32);
 #else
         avpicture_fill( (AVPicture *)mFrame, directbuffer,
             imagePixFormat, width, height);
-        avpicture_fill( (AVPicture *)mIrame, iframe,
+        avpicture_fill( (AVPicture *)mIFrame, iframe,
             imagePixFormat, width, height);
         
 #endif
 
 #if HAVE_LIBSWSCALE
-        if(colours == ZM_COLOUR_RGB32) {
+  if(colours == ZM_COLOUR_RGB32) {
     subpixelorder = ZM_SUBPIX_ORDER_RGBA;
     imagePixFormat = AV_PIX_FMT_RGBA;
   } else if(colours == ZM_COLOUR_RGB24) {
@@ -501,6 +501,8 @@ end:
   } else {
     Panic("Unexpected colours: %d",colours);
   }
+        
+
         
         if(mConvertContext == NULL) {
           mConvertContext = sws_getContext(width,
@@ -1125,7 +1127,7 @@ int FfmpegCamera::OpenFfmpeg() {
   Debug ( 1, "Allocated frames" );
 
 #if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
-  int pSize = av_image_get_buffer_size( imagePixFormat, width, height,1 );
+  int pSize = av_image_get_buffer_size( imagePixFormat, width, height,32 );
 #else
   int pSize = avpicture_get_size( imagePixFormat, width, height );
 #endif
@@ -1568,7 +1570,7 @@ else if ( packet.pts && video_last_pts > packet.pts ) {
           return (-1);
         }
 #if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
-        av_image_fill_arrays(mFrame->data, mFrame->linesize, directbuffer, imagePixFormat, width, height, 1);
+        av_image_fill_arrays(mFrame->data, mFrame->linesize, directbuffer, imagePixFormat, width, height, 32);
 #else
         avpicture_fill( (AVPicture *)mFrame, directbuffer, imagePixFormat, width, height);
 #endif
