@@ -312,9 +312,9 @@ if (!ctype) { //motion vectors from software h264 decoding
                        }
                         
                         if (vec_count > vector_ceiling) {  
-                            memset(mvect_buffer,0,image.mv_size);
-                           // char * temp_ptr = (char *)mvect_buffer;
-                           //memset(temp_ptr,0,image.mv_size);
+                            //memset(mvect_buffer,0,image.mv_size);
+                            char * temp_ptr = (char *)mvect_buffer;
+                            memset(temp_ptr,0,image.mv_size);
                             vec_count=0;
                             break;
                         }     
@@ -398,7 +398,9 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                             t_offset+=sizeof(motion_vector);
                             
                             if (vec_count > vector_ceiling) {  
-                              memset(mvect_buffer,0,image.mv_size);
+                              //memset(mvect_buffer,0,image.mv_size);
+                                 char * temp_ptr = (char *)mvect_buffer;
+                                  memset(temp_ptr,0,image.mv_size);
                               vec_count=0;
                               
                               break;
@@ -507,7 +509,7 @@ end:
         if(mConvertContext == NULL) {
           mConvertContext = sws_getContext(width,
                                            height,
-                                           imagePixFormat,
+                                           AV_PIX_FMT_YUV420P,
                                            width-1, height, imagePixFormat,
                                            SWS_BICUBIC, NULL, NULL, NULL);
 
@@ -727,14 +729,14 @@ int FfmpegCamera::OpenMmalResizerD(AVCodecContext *mVideoCodecContext , unsigned
    
    MMAL_ES_FORMAT_T *format_out = resizerd->output[0]->format;
    
-   if ( colours == ZM_COLOUR_RGB32 ) {
+   /*if ( colours == ZM_COLOUR_RGB32 ) {
        format_out->encoding = MMAL_ENCODING_RGBA;
    } else if ( colours == ZM_COLOUR_RGB24 ) {
        format_out->encoding = MMAL_ENCODING_RGB24;
    } else if(colours == ZM_COLOUR_GRAY8) { 
        format_out->encoding = MMAL_ENCODING_I420;
-   }
-
+   }*/
+format_out->encoding = MMAL_ENCODING_I420;
    
    format_out->es->video.width = i_width;
    format_out->es->video.height = i_height;
