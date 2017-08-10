@@ -437,9 +437,11 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                     //FIXMEC -->DISABLED FOR NOW 
                     if (colours == ZM_COLOUR_GRAY8)
                         //memcpy(directbuffer,buffer->data,splitter->output[0]->format->es->video.width * splitter->output[0]->format->es->video.height);
-                        memcpy(directbuffer,buffer->data,width * height); //width and height adjusted by vcos_align_up
+                        //memcpy(directbuffer,buffer->data,width * height); //width and height adjusted by vcos_align_up
+                        memcpy(iframe,buffer->data,width * height);
                     else
-                        memcpy(directbuffer,buffer->data,buffer->length);
+                        //memcpy(directbuffer,buffer->data,buffer->length);
+                        memcpy(iframe,buffer->data,buffer->length);
                     
                     mmal_buffer_header_mem_unlock(buffer);   
                     
@@ -472,20 +474,38 @@ end:
 
         
 
-if (!ctype) {        //restore use of swscale for both hardware and software decode
+//if (!ctype) {        //restore use of swscale for both hardware and software decode
 #if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
         av_image_fill_arrays(mFrame->data, mFrame->linesize,
             directbuffer, imagePixFormat, width, height, 1);
+        av_image_fill_arrays(mIFrame->data, mIFrame->linesize,
+            iframe, imagePixFormat, width, height, 1);
 #else
         avpicture_fill( (AVPicture *)mFrame, directbuffer,
             imagePixFormat, width, height);
+        avpicture_fill( (AVPicture *)mIrame, iframe,
+            imagePixFormat, width, height);
+        
 #endif
 
 #if HAVE_LIBSWSCALE
+        if(colours == ZM_COLOUR_RGB32) {
+    subpixelorder = ZM_SUBPIX_ORDER_RGBA;
+    imagePixFormat = AV_PIX_FMT_RGBA;
+  } else if(colours == ZM_COLOUR_RGB24) {
+    subpixelorder = ZM_SUBPIX_ORDER_RGB;
+    imagePixFormat = AV_PIX_FMT_RGB24;
+  } else if(colours == ZM_COLOUR_GRAY8) {
+    subpixelorder = ZM_SUBPIX_ORDER_NONE;
+    imagePixFormat = AV_PIX_FMT_GRAY8;
+  } else {
+    Panic("Unexpected colours: %d",colours);
+  }
+        
         if(mConvertContext == NULL) {
-          mConvertContext = sws_getContext(mVideoCodecContext->width,
-                                           mVideoCodecContext->height,
-                                           mVideoCodecContext->pix_fmt,
+          mConvertContext = sws_getContext(width,
+                                           height,
+                                           imagePixFormat,
                                            width-1, height, imagePixFormat,
                                            SWS_BICUBIC, NULL, NULL, NULL);
 
@@ -493,13 +513,13 @@ if (!ctype) {        //restore use of swscale for both hardware and software dec
             Fatal( "Unable to create conversion context for %s", mPath.c_str() );
         }
 
-        if (sws_scale(mConvertContext, mRawFrame->data, mRawFrame->linesize, 0, mVideoCodecContext->height, mFrame->data, mFrame->linesize) < 0)
-          Fatal("Unable to convert raw format %u to target format %u at frame %d", mVideoCodecContext->pix_fmt, imagePixFormat, frameCount);
+        if (sws_scale(mConvertContext, mIFrame->data, mIFrame->linesize, 0, height, mFrame->data, mFrame->linesize) < 0)
+          Fatal("Unable to convert raw format %u to target format %u at frame %d", imagePixFormat, imagePixFormat, frameCount);
 #else // HAVE_LIBSWSCALE
         Fatal( "You must compile ffmpeg with the --enable-swscale option to use ffmpeg cameras" );
 #endif // HAVE_LIBSWSCALE
 
-}
+//}
 
 
         frameCount++;
@@ -1094,6 +1114,7 @@ int FfmpegCamera::OpenFfmpeg() {
 
   // Allocate space for the native video frame
   mRawFrame = zm_av_frame_alloc();
+  mIFrame = zm_av_frame_alloc();
 
   // Allocate space for the converted video frame
   mFrame = zm_av_frame_alloc();
@@ -1114,6 +1135,8 @@ int FfmpegCamera::OpenFfmpeg() {
   }
 
   Debug ( 1, "Validated imagesize" );
+  
+  iframe =  (uint8_t *) malloc(pSize);
 
 #if HAVE_LIBSWSCALE
   Debug ( 1, "Calling sws_isSupportedInput" );
@@ -1244,6 +1267,8 @@ int FfmpegCamera::CloseFfmpeg(){
 
   av_frame_free( &mFrame );
   av_frame_free( &mRawFrame );
+  av_frame_free( &mIFrame );
+  free(iframe);
 
 #if HAVE_LIBSWSCALE
   if ( mConvertContext ) {

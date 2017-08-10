@@ -57,6 +57,8 @@ class FfmpegCamera : public Camera {
     AVCodec             *mVideoCodec;
     AVCodec             *mAudioCodec;
     AVFrame             *mRawFrame; 
+    AVFrame             *mIFrame;
+    uint8_t             *iframe;            
     AVFrame             *mFrame;
     _AVPIXELFORMAT      imagePixFormat;
 
