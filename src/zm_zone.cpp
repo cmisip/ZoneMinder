@@ -236,8 +236,8 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer ) {
         //Divide 20% with number of 4x4 vectors that will fit  
         minimum_vector_threshold=(double)min_alarm_pixels * .20 / 16 ; 
         
-        //Each hardware macroblock is 16x16 which dissolves into 16 4x4 blocks, just make the same assumption for software decoding
-        available_vectors=(double)size * 16 ;    
+        //Each hardware macroblock is 16x16 which dissolves into 4 4x4 blocks, just make the same assumption for software decoding
+        available_vectors=(double)size * 4 ;    
         
         if (available_vectors > minimum_vector_threshold) { 
             
@@ -257,11 +257,16 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer ) {
                     //uint16_t x;
                     //uint16_t y;
                         
-                if (vec_type>0) {  //hardware macroblock with size of 16x16, there are 16 4x4 blocks in each one
-                  vec_count=vec_count + 16;
-                  x_sum=x_sum+(16*mv.xcoord);
-                  y_sum=y_sum+(16*mv.ycoord);
+                if (vec_type>0) {  //hardware macroblock with size of 16x16, there are 4 4x4 blocks in each one
+                  vec_count=vec_count + 4;
+                  //this is an attempt to equally weight a 16x16 hardware macroblock with a 4x4 software macroblock, that is a 16x16 macroblock is equivalent to 4 4x4 software macroblocks
+                  
+                  
+                  //The next two lines would run faster ....
+                  x_sum=x_sum+(4*mv.xcoord);  
+                  y_sum=y_sum+(4*mv.ycoord);
                     
+                  //...than the next loop  
                   /*for (uint16_t i=0 ; i< 4; i++) {
                            for (uint16_t j=0 ; j< 4; j++) {
                                 x=mv.xcoord+i*4;
@@ -288,11 +293,13 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer ) {
     
     
     if (vec_count) {
+		  //alarm centre is just the average of all the xcoord and ycoord values of motion vectors. 
           alarm_centre=Coord((uint16_t)(x_sum/vec_count),(uint16_t)(y_sum/vec_count));
     }
   
     //vec_count is now count of 4x4 macroblocks
-    alarm_pixels = vec_count*80 ; //16 pixels per 4x4 macroblock multiplied by the skew value of 5
+    alarm_pixels = vec_count*80 ; //16 pixels per 4x4 macroblock multiplied by the skew value of 5; that is 4x4x5, that is, each 4x4 motion vector is weighted as x5 such that if the frame in question generates a certain number of 4x4 macroblocks and they cover 20% of the screen, then we consider that 100% covered.
+    
     score = ((double) alarm_pixels/(polygon.Area()))*100;  //score adjusted to faux pixel values for users who insist on using pixels for setting min_alarm_pixels and max_alarm_pixels instead of percentages, value is in the stat UI of the event score. 
     //possible values 0 to 500 where 100 is equal to .2 
     //0-100 values mean 0.0 to 0.2,  anything higher probably won't happen since there are not very many vectors but this can be adjusted in the code in the future if testing can show a more practical range of values

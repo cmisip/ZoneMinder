@@ -87,6 +87,9 @@ FfmpegCamera::FfmpegCamera( int p_id, const std::string &p_path, const std::stri
   
   if (ctype) {
       switch (mvect_mode) {
+		dscale_x_mult = width/dscale_x_res;
+		dscale_y_mult = height/dscale_y_res;
+		
         case 1: dscale_x_res = width;
                 dscale_y_res = height;
                 break;
@@ -300,14 +303,14 @@ if (!ctype) { //motion vectors from software h264 decoding
                         if ((abs(x_disp) + abs(y_disp)) < 1)
                             continue;
                         
-                        for (uint16_t i=0 ; i< mv->w/4; i++) {
+                        for (uint16_t i=0 ; i< mv->w/4; i++) {  //Count each macroblock as equivalent number of 4x4 blocks so a 16x16 macroblock is counted as 4 4x4 blocks
                            for (uint16_t j=0 ; j< mv->h/4; j++) {
                                 mvt.xcoord=mv->dst_x+i*4;
                                 mvt.ycoord=mv->dst_y+j*4;
                                 
                                 memcpy(mvect_buffer+offset,&mvt,sizeof(motion_vector));
                                 offset+=sizeof(motion_vector);
-                                vec_count++;
+                                vec_count++;  //this is a count of 4x4 blocks
                            }
                        }
                         
@@ -358,14 +361,16 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                 } 
                 
                 
-              
+                bool got_eframe=false;
+                bool got_dframe=false;
                 while ((buffer = mmal_queue_get(contexte.queue)) != NULL) {
-                        
+                      got_eframe=true;
                       if(buffer->flags & MMAL_BUFFER_HEADER_FLAG_CODECSIDEINFO) {
                           
                         uint16_t t_offset=sizeof(uint16_t)*2; //skip the first 4 bytes, reserved for size and vec_type
                         //uint16_t vector_ceiling=(((mRawFrame->width * mRawFrame->height)/256)*(double)20)/100;  //FIXMEC, the size of hardware buffer is smaller than software buffer so can save memory by requesting smaller buffer size
-                        uint16_t vector_ceiling=(((dscale_x_res * dscale_y_res)/256)*(double)20)/100;
+ 
+                        uint16_t vector_ceiling=(((dscale_x_res * dscale_y_res)/256)*(double)20)/100; //vector ceiling will be based on downscaled resolution.  For each frame, there will be dscale_x/16 * dscale_y/16 macroblocks covering the entire frame.  
                         vector_ceiling--;
                         uint16_t vec_count=0;  
                         
@@ -385,14 +390,24 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                             
                             if ((abs(mvs.x_vector) + abs(mvs.y_vector)) < 1)
                                continue;
+                               
+                            //adjust the coords so that they represent the non downscaled resolution
+                            //FIXMEC this adds a performance hit that might negate the benefit of downscaling before motion vector extraction
+                            
+                            if (( dscale_x_mult > 1 ) || ( dscale_y_mult > 1 ))  {
+							  mvt.xcoord = mvt.xcoord * dscale_x_mult ;
+							  mvt.ycoord = mvt.ycoord * dscale_y_mult ;	
+							
+						    }	  
+                                
                           
-                            mvt.xcoord = (i*16) % (dscale_x_res + 16);
+                            mvt.xcoord = (i*16) % (dscale_x_res + 16);  //these blocks are tiled to cover the entire frame and are 16x16 size
                             mvt.ycoord = ((i*16)/(dscale_x_res+16))*16;
                             
                             //Future expansion, save the magnitude of vectors
                             //mvt.x_vector = mv->x_vector;
                             //mvt.y_vector = mv->y_vector;
-                            vec_count++;
+                            vec_count++;  //this is a count of 16x16 blocks
                             
                             memcpy(mvect_buffer+t_offset,&mvt,sizeof(motion_vector));
                             t_offset+=sizeof(motion_vector);
@@ -408,8 +423,8 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                         } 
                          memcpy(mvect_buffer,&vec_count, sizeof(vec_count));  //size at first byte
                          
-                         //FIXMEC One solution to downscaled frame for encoding to send the information to zma to rescale the zone polygons
-                         //is to use the vector type 
+                         //FIXMEC One solution to downscaled frame for encoding is to send the information to zm_zone.cpp to rescale the zone polygons there based on the vector type we pass here.
+                         //OR the coords of the motion vectors are adjusted to actual width and height here so no polygon rescaling is necessary in zm_zone.cpp
                          uint16_t vec_type = mvect_mode;
                          
                          memcpy(mvect_buffer+sizeof(vec_count),&vec_type, sizeof(vec_type));   //type of vector at 3rd byte
@@ -430,17 +445,17 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
       
                 
                 while ((buffer = mmal_queue_get(contextd.queue)) != NULL) {
-                       
+                    got_dframe=true;  
                     mmal_buffer_header_mem_lock(buffer);
                         
                     //copy buffer->data to directbuffer
-                    //FIXMEC -->DISABLED FOR NOW 
-                    /*if (colours == ZM_COLOUR_GRAY8)
+                    
+                    if (colours == ZM_COLOUR_GRAY8)
                         //memcpy(directbuffer,buffer->data,splitter->output[0]->format->es->video.width * splitter->output[0]->format->es->video.height);
                         memcpy(directbuffer,buffer->data,width * height); //width and height adjusted by vcos_align_up
                     else
                         memcpy(directbuffer,buffer->data,buffer->length);
-                    */
+                    
                     mmal_buffer_header_mem_unlock(buffer);   
                     
                     mmal_buffer_header_release(buffer);
@@ -461,6 +476,9 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                    if (mmal_port_send_buffer(encoder->output[0], buffer) != MMAL_SUCCESS)
                    Warning("failed to send free buffer to encoder output for frame %d\n", frameCount);
                  } 
+                 
+                if ( !got_dframe ) 
+                  return (-1);
                 
 } //if ctype
         

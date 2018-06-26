@@ -128,7 +128,7 @@ class FfmpegCamera : public Camera {
      short sad;
     };
     
-    uint16_t dscale_x_res,dscale_y_res;
+    uint16_t dscale_x_res,dscale_y_res,dscale_x_mult,dscale_y_mult;
     
     enum mvect_modes {
         software_default,
