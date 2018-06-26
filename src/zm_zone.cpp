@@ -257,8 +257,17 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer ) {
                     //uint16_t x;
                     //uint16_t y;
                         
-                if (vec_type>0) {  //hardware macroblock with size of 16x16, there are 4 4x4 blocks in each one
-                  vec_count=vec_count + 4;
+                if (vec_type==0) {  
+					//software macroblock with size of 4x4
+                    vec_count++; 
+                    x_sum+=mv.xcoord;
+                    y_sum+=mv.ycoord;
+					
+				} else  {	
+					
+			      //hardware macroblock with size of 16x16, there are 4 4x4 blocks in each one
+			      //if vec_type > 1, then the vectors are derived from downscaled frame and must be weighted up
+                  vec_count=vec_count + 4 * vec_type;
                   //this is an attempt to equally weight a 16x16 hardware macroblock with a 4x4 software macroblock, that is a 16x16 macroblock is equivalent to 4 4x4 software macroblocks
                   
                   
@@ -276,12 +285,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer ) {
                                 vec_count++;
                            }
                   }*/
-                } else {//software macroblock with size of 4x4
-                  vec_count++; 
-                  x_sum+=mv.xcoord;
-                  y_sum+=mv.ycoord;
-             
-                }     
+                } 
                        
           }
         } 

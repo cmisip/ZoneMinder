@@ -74,8 +74,6 @@ FfmpegCamera::FfmpegCamera( int p_id, const std::string &p_path, const std::stri
   if (ctype) {
   if ( mOptions == "low")
       mvect_mode=low_resolution;
-  else if ( mOptions == "medium" )
-      mvect_mode = medium_resolution;
   else if ( mOptions == "high")
       mvect_mode = high_resolution;
   else 
@@ -87,21 +85,21 @@ FfmpegCamera::FfmpegCamera( int p_id, const std::string &p_path, const std::stri
   
   if (ctype) {
       switch (mvect_mode) {
-		dscale_x_mult = width/dscale_x_res;
-		dscale_y_mult = height/dscale_y_res;
 		
-        case 1: dscale_x_res = width;
-                dscale_y_res = height;
+		
+        case 1: dscale_x_res = VCOS_ALIGN_UP(width, 32); //no downscale
+                dscale_y_res = VCOS_ALIGN_UP(height, 16);
+                
                 break;
-        case 2: dscale_x_res = 320;
-                dscale_y_res = 240;   
+        case 2: dscale_x_res = VCOS_ALIGN_UP(width/2, 32); //high resolution, divide width and height by 2
+                dscale_y_res = VCOS_ALIGN_UP(height/2, 16);
+                
                 break;
-        case 3: dscale_x_res = 640;
-                dscale_y_res = 480;
+        case 3: dscale_x_res = VCOS_ALIGN_UP(width/4, 32); //low resolution, divide width and height by 4
+                dscale_y_res = VCOS_ALIGN_UP(height/4, 16);
+                
                 break;
-        case 4: dscale_x_res = 960;
-                dscale_y_res = 720;
-                break;             
+        
    }        
 }  
 #if HAVE_LIBSWSCALE  
@@ -281,7 +279,10 @@ if (!ctype) { //motion vectors from software h264 decoding
             AVFrameSideData *sd=NULL;
 
             sd = av_frame_get_side_data(mRawFrame, AV_FRAME_DATA_MOTION_VECTORS);
-            uint16_t vector_ceiling=((((mRawFrame->width * mRawFrame->height)/16)*(double)20)/100);  //FIXMEC, just 20% of the maximum number of 4x4 blocks that will fit
+            
+            //FIXMEC, just 20% of the maximum number of 4x4 blocks that will fit is probably enough motion vectors to determine if a scene has motion
+            //this is also an attempt to reduce the size of the mvect_buffer that needs to be passed via mmap
+            uint16_t vector_ceiling=((((mRawFrame->width * mRawFrame->height)/16)*(double)20)/100);  
         
             if (sd) {
 
@@ -316,8 +317,11 @@ if (!ctype) { //motion vectors from software h264 decoding
                         
                         if (vec_count > vector_ceiling) {  
                             memset(mvect_buffer,0,image.mv_size);
+                            
+                           //below is an attempt to fix alignment errors and is equivalent to the line above, i dont think its working
                            // char * temp_ptr = (char *)mvect_buffer;
                            //memset(temp_ptr,0,image.mv_size);
+                           
                             vec_count=0;
                             break;
                         }     
@@ -361,10 +365,11 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                 } 
                 
                 
-                bool got_eframe=false;
+                
                 bool got_dframe=false;
+                
                 while ((buffer = mmal_queue_get(contexte.queue)) != NULL) {
-                      got_eframe=true;
+                      
                       if(buffer->flags & MMAL_BUFFER_HEADER_FLAG_CODECSIDEINFO) {
                           
                         uint16_t t_offset=sizeof(uint16_t)*2; //skip the first 4 bytes, reserved for size and vec_type
@@ -391,22 +396,26 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                             if ((abs(mvs.x_vector) + abs(mvs.y_vector)) < 1)
                                continue;
                                
-                            //adjust the coords so that they represent the non downscaled resolution
-                            //FIXMEC this adds a performance hit that might negate the benefit of downscaling before motion vector extraction
                             
-                            if (( dscale_x_mult > 1 ) || ( dscale_y_mult > 1 ))  {
-							  mvt.xcoord = mvt.xcoord * dscale_x_mult ;
-							  mvt.ycoord = mvt.ycoord * dscale_y_mult ;	
-							
-						    }	  
                                 
                           
                             mvt.xcoord = (i*16) % (dscale_x_res + 16);  //these blocks are tiled to cover the entire frame and are 16x16 size
                             mvt.ycoord = ((i*16)/(dscale_x_res+16))*16;
                             
-                            //Future expansion, save the magnitude of vectors
+                            
+                            //Adjust the coords so that they represent the non downscaled resolution.  This is because the coordinates of the motion_vectors will be constrained to the dimensions of the downscaled frame.
+                            //FIXMEC this adds a performance hit that might negate the benefit of downscaling before motion vector extraction
+                            
+                            if ( mvect_mode > 1 )  {
+							  mvt.xcoord = mvt.xcoord * mvect_mode ;
+							  mvt.ycoord = mvt.ycoord * mvect_mode ;	
+							
+						    }	  
+                            
+                            //Future expansion, save the magnitude of vectors, will need to be upscaled by dscale_factor
                             //mvt.x_vector = mv->x_vector;
                             //mvt.y_vector = mv->y_vector;
+                            
                             vec_count++;  //this is a count of 16x16 blocks
                             
                             memcpy(mvect_buffer+t_offset,&mvt,sizeof(motion_vector));
@@ -423,8 +432,12 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                         } 
                          memcpy(mvect_buffer,&vec_count, sizeof(vec_count));  //size at first byte
                          
-                         //FIXMEC One solution to downscaled frame for encoding is to send the information to zm_zone.cpp to rescale the zone polygons there based on the vector type we pass here.
-                         //OR the coords of the motion vectors are adjusted to actual width and height here so no polygon rescaling is necessary in zm_zone.cpp
+                         //The polygon inclusion test in zm_zone will test each motion vector to see if the vector's coordinates fit inside the polygon.
+                         //The coordinates have already been adjusted to non downscaled frame coordinates.
+                         //However, each 16x16 macroblock would be worth 4 macroblocks or one 32x32 macroblock if the resolution was divided by 2;
+                         //and a 16x16 macroblock would be worth a 64x64 macroblock if the resolution was divided by 4. 
+                         //Pass a vec_type of 2 means each 16x16 macroblock needs to be weighted as x2
+                         //Pass a vec_type of 4 means each 16x16 macroblock needs to be weighted as x4
                          uint16_t vec_type = mvect_mode;
                          
                          memcpy(mvect_buffer+sizeof(vec_count),&vec_type, sizeof(vec_type));   //type of vector at 3rd byte

@@ -128,15 +128,20 @@ class FfmpegCamera : public Camera {
      short sad;
     };
     
-    uint16_t dscale_x_res,dscale_y_res,dscale_x_mult,dscale_y_mult;
+    uint16_t dscale_x_res,dscale_y_res;
     
     enum mvect_modes {
-        software_default,
-        hardware_default,  //no downscale
-        //the following resolutions are already aligned 16 and 32 so no need to vcos_align_up
-        low_resolution,  //320x240    //downscale from any video source larger than this
-        medium_resolution, //640x480  //downscale from 704x480
-        high_resolution //960x720     //downscale from 1920x1080
+        software_default,  // 0 
+        hardware_default,  // 1, hardware no downscale
+        
+        high_resolution,   // 2, hardware divide the resolution by 2, need vcos_align_up
+        
+        low_resolution = 4     // 4, hardware divide the resolution by 4, need vcos_align_up
+        
+        //vcos_align_up aligns the width to a multiple of 32 and the height to a multiple of 16
+        //example :
+        //format->es->video.width = VCOS_ALIGN_UP(state->width, 32);
+        //format->es->video.height = VCOS_ALIGN_UP(state->height, 16);
     };
     
     mvect_modes mvect_mode;
