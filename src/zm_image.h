@@ -24,7 +24,14 @@
 extern "C"
 {
 #include "zm_jpeg.h"
+
+#include <libavcodec/avcodec.h>
+#include <libavutil/motion_vector.h>
+#include <libavutil/imgutils.h>
+#include <libavformat/avformat.h>
+#include "libswscale/swscale.h"
 }
+
 #include "zm_rgb.h"
 #include "zm_coord.h"
 #include "zm_box.h"
@@ -124,6 +131,21 @@ protected:
 public:
 	enum { ZM_CHAR_HEIGHT=11, ZM_CHAR_WIDTH=6 };
 	enum { LINE_HEIGHT=ZM_CHAR_HEIGHT+0 };
+	
+	//maximum size bytes required to store at 0 byte the size in uint16_t, and each pair of uint16_t for x, and y values
+        unsigned int mv_size;
+        
+        struct motion_vector { //SW vectors will be 4x4, HW vectors will be 16x16
+        uint16_t xcoord;  //location of top left corner
+        uint16_t ycoord;
+    
+        //Future expansion
+        //int16_t x_vector;  //magnitude of displacement could be a negative number       
+        //int16_t y_vector;
+        };
+        
+        unsigned int width;
+	unsigned int height;
 
 protected:
 	static bool initialised;
@@ -137,14 +159,16 @@ protected:
 	static jpeg_decompress_struct *decodejpg_dcinfo;
 	static struct zm_error_mgr jpg_err;
 
-	unsigned int width;
-	unsigned int height;
+	
 	unsigned int pixels;
 	unsigned int colours;
 	unsigned int size;
 	unsigned int subpixelorder;
 	unsigned long allocation;
 	uint8_t *buffer;
+	
+	uint8_t *mv_buffer=NULL;
+	
 	int buffertype; /* 0=not ours, no need to call free(), 1=malloc() buffer, 2=new buffer */
 	int holdbuffer; /* Hold the buffer instead of replacing it with new one */
 	char text[1024];
@@ -169,6 +193,8 @@ public:
 	/* Internal buffer should not be modified from functions outside of this class */
 	inline const uint8_t* Buffer() const { return( buffer ); }
 	inline const uint8_t* Buffer( unsigned int x, unsigned int y= 0 ) const { return( &buffer[colours*((y*width)+x)] ); }
+	/* Request writeable mv_buffer */
+        uint8_t*& VectBuffer ();
 	/* Request writeable buffer */
 	uint8_t* WriteBuffer(const unsigned int p_width, const unsigned int p_height, const unsigned int p_colours, const unsigned int p_subpixelorder);
 	

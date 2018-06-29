@@ -89,6 +89,8 @@ Image::Image()
   buffer = 0;
   buffertype = 0;
   holdbuffer = 0;
+  mv_size = 0;
+  //VectBuffer();
   text[0] = '\0';
 }
 
@@ -106,6 +108,8 @@ Image::Image( const char *filename )
   buffer = 0;
   buffertype = 0;
   holdbuffer = 0;
+  mv_size = 0;
+  //VectBuffer();
   ReadJpeg( filename, ZM_COLOUR_RGB24, ZM_SUBPIX_ORDER_RGB);
   text[0] = '\0';
 }
@@ -122,6 +126,8 @@ Image::Image( int p_width, int p_height, int p_colours, int p_subpixelorder, uin
   size = pixels*colours;
   buffer = 0;
   holdbuffer = 0;
+  mv_size = 0;
+  //VectBuffer();
   if ( p_buffer )
   {
     allocation = size;
@@ -147,13 +153,22 @@ Image::Image( const Image &p_image )
   size = p_image.size; // allocation is set in AllocImgBuffer
   buffer = 0;
   holdbuffer = 0;
+  mv_size = 0;
   AllocImgBuffer(size);
   (*fptr_imgbufcpy)(buffer, p_image.buffer, size);
+  if (p_image.mv_buffer) {
+     VectBuffer();
+     memcpy(mv_buffer,p_image.mv_buffer,mv_size);
+  }
   strncpy( text, p_image.text, sizeof(text) );
 }
 
 Image::~Image() {
   DumpImgBuffer();
+  if (mv_buffer) {
+        free(mv_buffer);
+        mv_buffer = NULL;
+  }
 }
 
 /* Should be called as part of program shutdown to free everything */
@@ -344,6 +359,16 @@ void Image::Initialise()
   initialised = true;
 }
 
+uint8_t *& Image::VectBuffer() {
+    if (!mv_buffer) {
+        mv_size=((((((width * height)/16)*(double)20)/100))*4)+4; 
+        mv_buffer = (uint8_t *) malloc(mv_size);
+        memset(mv_buffer,0,mv_size);
+        //Fatal("mv_buffer with no allocation");
+    }
+    return mv_buffer;
+}    
+
 /* Requests a writeable buffer to the image. This is safer than buffer() because this way we can guarantee that a buffer of required size exists */
 uint8_t* Image::WriteBuffer(const unsigned int p_width, const unsigned int p_height, const unsigned int p_colours, const unsigned int p_subpixelorder) {
   unsigned int newsize;
@@ -425,8 +450,10 @@ void Image::AssignDirect( const unsigned int p_width, const unsigned int p_heigh
       size = new_buffer_size; // was pixels*colours, but we already calculated it above as new_buffer_size
       
       /* Copy into the held buffer */
-      if(new_buffer != buffer)
+      if(new_buffer != buffer) {
         (*fptr_imgbufcpy)(buffer, new_buffer, size);
+       memset(mv_buffer,0,mv_size);  //FIXMEC just reset the mv_buffer since it is not valid with a new image buffer, 
+      }    
       
       /* Free the new buffer */
       DumpBuffer(new_buffer, p_buffertype);
@@ -445,6 +472,7 @@ void Image::AssignDirect( const unsigned int p_width, const unsigned int p_heigh
     allocation = buffer_size;
     buffertype = p_buffertype;
     buffer = new_buffer;
+    memset(mv_buffer,0,mv_size); //just reset the mv_buffer since it is not valid with a new image buffer
   }
   
 }
@@ -494,8 +522,10 @@ void Image::Assign(const unsigned int p_width, const unsigned int p_height, cons
     size = new_size;
   }
   
-  if(new_buffer != buffer)
+  if(new_buffer != buffer) {
     (*fptr_imgbufcpy)(buffer, new_buffer, size);
+    memset(mv_buffer,0,mv_size);
+  }
   
 }
 
@@ -534,8 +564,10 @@ void Image::Assign( const Image &image ) {
     size = new_size;
   }
   
-  if(image.buffer != buffer)
+  if(image.buffer != buffer) {
     (*fptr_imgbufcpy)(buffer, image.buffer, size);
+      memcpy(mv_buffer,image.mv_buffer,mv_size);
+  }  
 }
 
 Image *Image::HighlightEdges( Rgb colour, unsigned int p_colours, unsigned int p_subpixelorder, const Box *limits )
