@@ -309,13 +309,16 @@ if (!ctype) { //motion vectors from software h264 decoding
                                 mvt.xcoord=mv->dst_x+i*4;
                                 mvt.ycoord=mv->dst_y+j*4;
                                 
-                                memcpy(mvect_buffer+offset,&mvt,sizeof(motion_vector));
-                                offset+=sizeof(motion_vector);
-                                vec_count++;  //this is a count of 4x4 blocks
+                                if (vec_count < vector_ceiling) { //Dont write past the buffer
+                                   memcpy(mvect_buffer+offset,&mvt,sizeof(motion_vector));
+                                   offset+=sizeof(motion_vector);
+                                   vec_count++;  //this is a count of 4x4 blocks
+                                }
+                                   
                            }
                        }
                         
-                        if (vec_count > vector_ceiling) {  
+                        if (vec_count >= vector_ceiling) {  //if we hit the ceiling, just pretend we did not get any vectors
                             memset(mvect_buffer,0,image.mv_size);
                             
                            //below is an attempt to fix alignment errors and is equivalent to the line above, i dont think its working
@@ -416,12 +419,15 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                             //mvt.x_vector = mv->x_vector;
                             //mvt.y_vector = mv->y_vector;
                             
-                            vec_count++;  //this is a count of 16x16 blocks
                             
-                            memcpy(mvect_buffer+t_offset,&mvt,sizeof(motion_vector));
-                            t_offset+=sizeof(motion_vector);
                             
-                            if (vec_count > vector_ceiling) {  
+                            if (vec_count < vector_ceiling) { //Dont write past the buffer
+                              memcpy(mvect_buffer+t_offset,&mvt,sizeof(motion_vector));
+                              t_offset+=sizeof(motion_vector);
+                              vec_count++;  //this is a count of 16x16 blocks
+                            }
+                            
+                            if (vec_count >= vector_ceiling) {  //we have more vectors that will fit in the buffer, pretend we did not get any vectors at all
                               memset(mvect_buffer,0,image.mv_size);
                               vec_count=0;
                               
