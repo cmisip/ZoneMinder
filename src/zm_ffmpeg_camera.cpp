@@ -496,8 +496,8 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                    Warning("failed to send free buffer to encoder output for frame %d\n", frameCount);
                  } 
                  
-                if ( !got_dframe ) 
-                  return (-1);
+            //    if ( !got_dframe ) 
+        //      return (-1);
                 
 } //if ctype
         
