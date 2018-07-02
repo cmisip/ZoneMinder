@@ -367,10 +367,10 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                   }
                 } 
                 
-                bool got_dframe=false;
+                //bool got_dframe=false;
                 
                 while ((rbuffer = mmal_queue_get(contextr.queue)) != NULL) {
-                    got_dframe=true;   
+                    //got_dframe=true;   
                     mmal_buffer_header_mem_lock(rbuffer);
                         
                     //copy buffer->data to directbuffer
@@ -463,8 +463,8 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                     
                 }
                 
-                if ( !got_dframe ) 
-                  return (-1);
+                //if ( !got_dframe ) 
+                  //return (-1);
                 
                 
                 
