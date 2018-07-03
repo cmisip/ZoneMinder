@@ -509,7 +509,7 @@ end:
 
         
 
-//if (!ctype) {        //restore use of swscale for both hardware and software decode
+if (!ctype) {        //restore use of swscale for both hardware and software decode
 #if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
         av_image_fill_arrays(mFrame->data, mFrame->linesize,
             directbuffer, imagePixFormat, width, height, 1);
@@ -536,7 +536,7 @@ end:
         Fatal( "You must compile ffmpeg with the --enable-swscale option to use ffmpeg cameras" );
 #endif // HAVE_LIBSWSCALE
 
-//}
+}
 
 
         frameCount++;
