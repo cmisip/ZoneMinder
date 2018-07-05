@@ -492,7 +492,7 @@ end:
           mConvertContext = sws_getContext(mVideoCodecContext->width,
                                            mVideoCodecContext->height,
                                            mVideoCodecContext->pix_fmt,
-                                           width-1, height, imagePixFormat,
+                                           width, height, imagePixFormat,
                                            SWS_BICUBIC, NULL, NULL, NULL);
 
           if(mConvertContext == NULL)
