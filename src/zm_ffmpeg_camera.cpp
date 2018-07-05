@@ -325,7 +325,7 @@ if (!ctype) { //motion vectors from software h264 decoding
                            // char * temp_ptr = (char *)mvect_buffer;
                            //memset(temp_ptr,0,image.mv_size);
                            
-                            vec_count=0;
+                           vec_count=0;
                             break;
                         }     
                    
@@ -523,7 +523,7 @@ if (!ctype) {        //restore use of swscale for both hardware and software dec
           mConvertContext = sws_getContext(mVideoCodecContext->width,
                                            mVideoCodecContext->height,
                                            mVideoCodecContext->pix_fmt,
-                                           width-1, height, imagePixFormat,
+                                           width, height, imagePixFormat,
                                            SWS_BICUBIC, NULL, NULL, NULL);
 
           if(mConvertContext == NULL)

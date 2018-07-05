@@ -409,15 +409,24 @@ void Image::Initialise()
   initialised = true;
 }
 
+
+
 uint8_t *& Image::VectBuffer() {
     if (!mv_buffer) {
-        mv_size=((((((width * height)/16)*(double)20)/100))*4)+4; 
-        mv_buffer = (uint8_t *) malloc(mv_size);
-        memset(mv_buffer,0,mv_size);
+        //mv_size=((((((width * height)/16)*(double)20)/100))*4)+4; 
+        
+        mv_size=((((((width * height)/16)*(double)20)/100)))+4;
+        uint32_t *mem = (uint32_t*)malloc(mv_size);
+        memset(mem,0,mv_size);
+        mv_buffer = (uint8_t *)  mem;
+        
+        mv_size=mv_size*4;
+        free(mem);
         //Fatal("mv_buffer with no allocation");
     }
     return mv_buffer;
 }    
+
 
 
 /* Requests a writeable buffer to the image. This is safer than buffer() because this way we can guarantee that a buffer of required size exists */
