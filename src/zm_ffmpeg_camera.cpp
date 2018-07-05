@@ -420,7 +420,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                                continue;
                           
                             mvt.xcoord = (i*16) % (encoder->output[0]->format->es->video.width + 16);  //these blocks are tiled to cover the entire frame and are 16x16 size
-                            mvt.ycoord = ((i*16)/(encoder->output[0]->format->es->video.height +16))*16;
+                            mvt.ycoord = ((i*16)/(encoder->output[0]->format->es->video.width +16))*16;
                             
                             //Future expansion, save the magnitude of vectors
                             //mvt.x_vector = mv->x_vector;
@@ -478,7 +478,7 @@ end:
 
         
 
-if (!ctype) {   //FIXME, try to restore use of swscale for ctype if the following fails     
+//if (!ctype) {   //FIXME, try to restore use of swscale for ctype if the following fails     
 #if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
         av_image_fill_arrays(mFrame->data, mFrame->linesize,
             directbuffer, imagePixFormat, width, height, 1);
@@ -505,7 +505,7 @@ if (!ctype) {   //FIXME, try to restore use of swscale for ctype if the followin
         Fatal( "You must compile ffmpeg with the --enable-swscale option to use ffmpeg cameras" );
 #endif // HAVE_LIBSWSCALE
 
-}
+//}
 
 
         frameCount++;
