@@ -347,7 +347,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
     }*/
     
     //Debug( 5, "Adjusted score is %d", score );
-    Debug("vec_type %d, min_alarm_pixels %d, size %d,  MVT %d, vec_count %d, AP %d, score %d, polygon area %d ", 
+    Debug(5,"vec_type %d, min_alarm_pixels %d, size %d,  MVT %d, vec_count %d, AP %d, score %d, polygon area %d ", 
 	      vec_type,    min_alarm_pixels   ,    size,  minimum_vector_threshold   , vec_count ,alarm_pixels  , score,    polygon.Area());
         
     if (vec_count < minimum_vector_threshold ) {
