@@ -257,32 +257,39 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
         
         uint16_t offset=4;
         for (int i = 0; i < size; i++) {
-                motion_vector mv;
+                //motion_vector mv;
                 
                 
-                memcpy(&mv,mvect_buffer+offset,sizeof(motion_vector));
-                offset+=sizeof(motion_vector);
+                //memcpy(&mv,mvect_buffer+offset,sizeof(motion_vector));
+                //offset+=sizeof(motion_vector);
+                
+                vector_package vpackage;
+                memcpy(&vpackage,mvect_buffer+offset,sizeof(vpackage));
+                offset+=sizeof(vector_package);
+                vpackage.xcoord<<=4;
+                vpackage.ycoord<<=4;
+                            
 
                 //Are the vectors inside the zone polygon?
-                if (!polygon.isInside(Coord(mv.xcoord,mv.ycoord)))      
+                if (!polygon.isInside(Coord(vpackage.xcoord,vpackage.ycoord)))      
                     continue;
                 
-                    //uint16_t x;
-                    //uint16_t y;
+                if (vec_type == 1 )
+                   vec_count+=vpackage.numvec;   
                         
-                if (vec_type == 0 ) {//software macroblock with size of 4x4
+                /*if (vec_type == 0 ) {//software macroblock with size of 4x4
                     vec_count++; 
-                    //x_sum+=mv.xcoord;
-                    //y_sum+=mv.ycoord;
+                    x_sum+=mv.xcoord;
+                    y_sum+=mv.ycoord;
                   
                 } else {//hardware macroblock with size of 16x16, there are 16 4x4 blocks in each one
                   vec_count=vec_count + 16;
-                  //x_sum=x_sum+(16*mv.xcoord);  
-                  //y_sum=y_sum+(16*mv.ycoord); 
-                  //x_sum=x_sum+(mv.xcoord<<4);  
-                  //y_sum=y_sum+(mv.ycoord<<4);
+                  x_sum=x_sum+(16*mv.xcoord);  
+                  y_sum=y_sum+(16*mv.ycoord); 
+                  x_sum=x_sum+(mv.xcoord<<4);  
+                  y_sum=y_sum+(mv.ycoord<<4);
                   
-                }   
+                } */  
              
                 if (vec_count > minimum_vector_threshold)    
                     break;   

@@ -117,11 +117,13 @@ class FfmpegCamera : public Camera {
     };
     h264_codec ctype; 
     
+    
+    
     Monitor::Function cfunction;
     
     
     typedef Image::motion_vector motion_vector;
-    
+    typedef Image::vector_package vector_package;
   
   
   

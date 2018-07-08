@@ -47,7 +47,8 @@ public:
   typedef enum { ALARMED_PIXELS=1, FILTERED_PIXELS, BLOBS } CheckMethod;
 
   
-  typedef Image::motion_vector motion_vector;
+  //typedef Image::motion_vector motion_vector;
+  typedef Image::vector_package vector_package;
   
 
 protected:

@@ -144,6 +144,12 @@ public:
         //int16_t y_vector;
         };
         
+        struct vector_package {
+	      int8_t xcoord;
+	      int8_t ycoord;
+	      uint16_t numvec;	
+	    };	
+        
 protected:
 	static bool initialised;
 	static unsigned char *abs_table;

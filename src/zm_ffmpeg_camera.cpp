@@ -258,6 +258,9 @@ if (!ctype) { //motion vectors from software h264 decoding
                    const AVMotionVector *mvs = (const AVMotionVector *)sd->data;
                    //uint16_t size=sd->size / sizeof(AVMotionVector);
                    uint16_t vec_count=0;
+                   uint16_t mfour=0;
+                   uint16_t meight=0;
+                   uint16_t msixtn=0;
                    
                    for (unsigned int i = 0; i < sd->size / sizeof(*mvs); i++) {
                         const AVMotionVector *mv = &mvs[i];
@@ -271,6 +274,16 @@ if (!ctype) { //motion vectors from software h264 decoding
                         if ((abs(x_disp) + abs(y_disp)) < 1)
                             continue;
                         
+                        if (mv->dst_x % 4 != 0) 
+                            mfour=mfour+1;
+                            
+                        if (mv->dst_x % 8 != 0)
+                            meight=meight+1;
+                            
+                        if (mv->dst_x % 16 !=16)
+                            msixtn=msixtn+1;        
+                        
+                        
                         for (uint16_t i=0 ; i< mv->w/4; i++) { //Count each macroblock as equivalent number of 4x4 blocks so a 16x16 macroblock is counted as 4 4x4 blocks
                            for (uint16_t j=0 ; j< mv->h/4; j++) {
                                 mvt.xcoord=mv->dst_x+i*4;
@@ -283,6 +296,8 @@ if (!ctype) { //motion vectors from software h264 decoding
                                 }   
                            }
                        }
+                       
+                        
                         
                         if (vec_count >= vector_ceiling) { //if we hit the ceiling, just pretend we did not get any vectors
                             
@@ -301,7 +316,7 @@ if (!ctype) { //motion vectors from software h264 decoding
                        uint16_t vec_type = 0;
                          
                        memcpy(mvect_buffer+2,&vec_type, 2);   //type of vector (software or hardware) at 3rd byte
-                    //Info("FFMPEG SW VEC_COUNT %d, ceiling %d", vec_count, vector_ceiling);
+                    Info("FFMPEG SW VEC_COUNT %d, fours %d, eights %d, sixtn %d", vec_count, mfour, meight, msixtn);
                
             } 
 }         
@@ -422,6 +437,8 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                         for (int i=0;i < size ; i++) {
                             mmal_motion_vector mvs;
                             motion_vector mvt;
+                            vector_package vpackage;
+                            
                             memcpy(&mvs,mvarray+i,sizeof(mmal_motion_vector));
                             
                             if ((abs(mvs.x_vector) + abs(mvs.y_vector)) < 1)
@@ -430,14 +447,17 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                             mvt.xcoord = (i*16) % (encoder->output[0]->format->es->video.width + 16);  //these blocks are tiled to cover the entire frame and are 16x16 size
                             mvt.ycoord = ((i*16)/(encoder->output[0]->format->es->video.width +16))*16;
                             
-                            //Future expansion, save the magnitude of vectors
-                            //mvt.x_vector = mv->x_vector;
-                            //mvt.y_vector = mv->y_vector;
+                            //Build vector package, its 4 bytes 
+                            vpackage.xcoord=mvt.xcoord>>4;
+                            vpackage.ycoord=mvt.ycoord>>4;
+                            vpackage.numvec=16;
                             
                             
                             if (vec_count < vector_ceiling) { //Dont write past the buffer
-                               memcpy(mvect_buffer+t_offset,&mvt,sizeof(motion_vector));
-                               t_offset+=sizeof(motion_vector);
+                               //memcpy(mvect_buffer+t_offset,&mvt,sizeof(motion_vector));
+                               //t_offset+=sizeof(motion_vector);
+                               memcpy(mvect_buffer+t_offset,&mvt,sizeof(vector_package));
+                               t_offset+=sizeof(vector_package);
                                vec_count++;
                             }
                             if (vec_count >= vector_ceiling) {   //we have more vectors that will fit in the buffer, pretend we did not get any vectors at all
