@@ -128,6 +128,8 @@ int FfmpegCamera::PreCapture()
 }
 
 int FfmpegCamera::Capture( Image &image ) {
+	 
+	
   if (!mCanCapture){
     return -1;
   }
@@ -214,7 +216,7 @@ int FfmpegCamera::Capture( Image &image ) {
         }
         
 
-        
+         
  
       uint8_t* mvect_buffer=NULL;     
 if (!( cfunction == Monitor::MVDECT )) {     
@@ -236,6 +238,7 @@ if (!( cfunction == Monitor::MVDECT )) {
 }
 
      
+ 
         
 if (!ctype) { //motion vectors from software h264 decoding
             
@@ -295,7 +298,7 @@ if (!ctype) { //motion vectors from software h264 decoding
                   
                     }
                        memcpy(mvect_buffer,&vec_count, 2); //size on first byte
-                       uint16_t vec_type = 1;
+                       uint16_t vec_type = 0;
                          
                        memcpy(mvect_buffer+2,&vec_type, 2);   //type of vector (software or hardware) at 3rd byte
                     //Info("FFMPEG SW VEC_COUNT %d, ceiling %d", vec_count, vector_ceiling);
@@ -306,6 +309,10 @@ if (!ctype) { //motion vectors from software h264 decoding
 #ifdef __arm__        
 if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels and there are a fixed number covering the entire frame.
                 MMAL_BUFFER_HEADER_T *buffer, *rbuffer;
+                uint16_t vec_count=0;
+                uint16_t vector_ceiling=(((encoder->output[0]->format->es->video.width * encoder->output[0]->format->es->video.height)/256)*(double)20)/100;  //FIXMEC, the size of hardware buffer is smaller than software buffer so can save memory by requesting smaller buffer size
+                
+                //Rgb signalcolor;
                 
                 //send free buffer to encoder
                 if ((buffer = mmal_queue_get(pool_out->queue)) != NULL) {
@@ -367,12 +374,12 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                   }
                 } 
                 
-                //bool got_dframe=false;
+              
                 
                 while ((rbuffer = mmal_queue_get(contextr.queue)) != NULL) {
-                    //got_dframe=true;   
+                    
                     mmal_buffer_header_mem_lock(rbuffer);
-                        
+                      
                     //copy buffer->data to directbuffer
                     if (colours == ZM_COLOUR_GRAY8)
                         memcpy(directbuffer,rbuffer->data,resizer->output[0]->format->es->video.width * resizer->output[0]->format->es->video.height);
@@ -392,15 +399,16 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                     
                 }
                 
+                        
                 while ((buffer = mmal_queue_get(context.queue)) != NULL) {
                         
                       if(buffer->flags & MMAL_BUFFER_HEADER_FLAG_CODECSIDEINFO) {
                           
                         uint16_t t_offset=sizeof(uint16_t)*2; //skip the first 4 bytes, reserved for size and vec_type
-                        uint16_t vector_ceiling=(((encoder->output[0]->format->es->video.width * encoder->output[0]->format->es->video.height)/256)*(double)20)/100;  //FIXMEC, the size of hardware buffer is smaller than software buffer so can save memory by requesting smaller buffer size
+                        //uint16_t vector_ceiling=(((encoder->output[0]->format->es->video.width * encoder->output[0]->format->es->video.height)/256)*(double)20)/100;  //FIXMEC, the size of hardware buffer is smaller than software buffer so can save memory by requesting smaller buffer size
                         //uint16_t vector_ceiling=(((mRawFrame->width * mRawFrame->height)/256)*(double)20)/100;
                         vector_ceiling--;
-                        uint16_t vec_count=0;  
+                        //uint16_t vec_count=0;  
                         
                         mmal_buffer_header_mem_lock(buffer);
                         uint16_t size=buffer->length/sizeof(mmal_motion_vector);
@@ -441,15 +449,17 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                          
                             
                         } 
-                         memcpy(mvect_buffer,&vec_count, sizeof(vec_count));  //size at first byte
-                         uint16_t vec_type = 0;
+                         /*memcpy(mvect_buffer,&vec_count, sizeof(vec_count));  //size at first byte
+                         uint16_t vec_type = 1;
                          
                          memcpy(mvect_buffer+sizeof(vec_count),&vec_type, sizeof(vec_type));   //type of vector at 3rd byte
                          
                          //if (vec_count > 4)
                              //Info("FFMPEG HW VEC_COUNT %d, ceiling %d", vec_count, vector_ceiling);
-                        
+                        */
                       } 
+                      
+                       
                     
                     
                     mmal_buffer_header_release(buffer);
@@ -463,9 +473,21 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                     
                 }
                 
-                //if ( !got_dframe ) 
-                  //return (-1);
                 
+                memcpy(mvect_buffer,&vec_count, sizeof(vec_count));  //size at first byte
+                uint16_t vec_type = 1;
+                         
+                memcpy(mvect_buffer+sizeof(vec_count),&vec_type, sizeof(vec_type));   //type of vector at 3rd byte
+                         
+                //if (vec_count > 4)
+                 //  Info("FFMPEG HW VEC_COUNT %d, ceiling %d, framenum %d", vec_count, vector_ceiling, frameCount );
+                 
+               
+                 
+                //only send buffer data when this is an odd frame 
+                if (frameCount & 1)
+                   memset(mvect_buffer,0,image.mv_size);
+                       
                 
                 
 } //if ctype
@@ -476,9 +498,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
 end:      
         
 
-        
 
-//if (!ctype) {   //FIXME, try to restore use of swscale for ctype if the following fails     
 #if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
         av_image_fill_arrays(mFrame->data, mFrame->linesize,
             directbuffer, imagePixFormat, width, height, 1);
@@ -487,6 +507,7 @@ end:
             imagePixFormat, width, height);
 #endif
 
+if (!ctype) {   //FIXME, try to restore use of swscale for ctype if the following fails     
 #if HAVE_LIBSWSCALE
         if(mConvertContext == NULL) {
           mConvertContext = sws_getContext(mVideoCodecContext->width,
@@ -505,7 +526,7 @@ end:
         Fatal( "You must compile ffmpeg with the --enable-swscale option to use ffmpeg cameras" );
 #endif // HAVE_LIBSWSCALE
 
-//}
+}
 
 
         frameCount++;
@@ -517,6 +538,13 @@ end:
     } // end if packet.stream_index == mVideoStreamId
     zm_av_packet_unref( &packet );
   } // end while ! frameComplete
+  
+  
+ 
+	
+
+  
+  
   return (0);
 } // FfmpegCamera::Capture
 
@@ -700,7 +728,7 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
    format_out->es->video.height = height;
   
    
-   /*if ( colours == ZM_COLOUR_RGB32 ) {
+   if ( colours == ZM_COLOUR_RGB32 ) {
        format_out->encoding = MMAL_ENCODING_RGBA;
        format_out->encoding_variant = MMAL_ENCODING_RGBA;
    } else if ( colours == ZM_COLOUR_RGB24 ) {
@@ -709,16 +737,16 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
    } else if(colours == ZM_COLOUR_GRAY8) { 
        format_out->encoding = MMAL_ENCODING_I420;
        format_out->encoding_variant = MMAL_ENCODING_I420;
-   }*/
+   }
    
    
-   if ( colours == ZM_COLOUR_RGB32 ) {
+   /*if ( colours == ZM_COLOUR_RGB32 ) {
        format_out->encoding = MMAL_ENCODING_RGBA;
    } else if ( colours == ZM_COLOUR_RGB24 ) {
        format_out->encoding = MMAL_ENCODING_RGB24;
    } else if(colours == ZM_COLOUR_GRAY8) { 
        format_out->encoding = MMAL_ENCODING_I420;
-   }
+   }*/
    
    
    

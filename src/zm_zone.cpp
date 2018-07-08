@@ -205,17 +205,21 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
     //CONFIG section
     //USE the AlarmedPixels Method and Percent Units to set the Min/Max Alarmed Area
     //uint16_t minimum_vector_threshold=(double)min_alarm_pixels/20;  //20 is 4 pixels per macroblock multiplied by the skew value of 5
-    uint16_t minimum_vector_coverage=((double)min_alarm_pixels/polygon.Area())*100; //best case assumed, all vectors are within polygon resulting in minimum score
-    uint16_t maximum_vector_coverage=((double)max_alarm_pixels/polygon.Area())*100; //worst case assumed, all vectors could be thrown out
+    //uint16_t minimum_vector_coverage=((double)min_alarm_pixels/polygon.Area())*100; //best case assumed, all vectors are within polygon resulting in minimum score
+    //uint16_t maximum_vector_coverage=((double)max_alarm_pixels/polygon.Area())*100; //worst case assumed, all vectors could be thrown out
     
-    uint16_t vec_count=0;
-    uint16_t x_sum=0;
-    uint16_t y_sum=0;
+    
+    //uint32_t minimum_vector_coverage=((double)min_alarm_pixels/100)*polygon.Area(); //best case assumed, all vectors are within polygon resulting in minimum score
+    //uint32_t maximum_vector_coverage=((double)max_alarm_pixels/100)*polygon.Area(); //worst case assumed, all vectors could be thrown out
+    
+    uint32_t vec_count=0;
+    uint32_t x_sum=0;
+    uint32_t y_sum=0;
     uint16_t size;
     uint16_t vec_type;
     
     uint16_t minimum_vector_threshold;
-    uint16_t available_vectors=0;
+    uint32_t available_vectors=0;
     
   
     if (mvect_buffer) {
@@ -227,18 +231,28 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
         
         //Info("vec type : %d, x_res %d, y_res %d\n ", vec_type, dscale_x_res, dscale_y_res);
         //Info("Image width %d, height %d\n ", image_width, image_height);
-
-      if (size > 0) {
+       
+       
+        
+      if (vec_type == 0 ) { 
+            minimum_vector_threshold=(double)((min_alarm_pixels*.2)/16); 
+            
+      } else
+            minimum_vector_threshold=(double)((min_alarm_pixels*.2)/256); 
+      
+      
+      //Info("vec_type %d, min_alarm_pixels %d, min vect thres %d, size %d, polygon area %d ", vec_type, min_alarm_pixels, minimum_vector_threshold,size, polygon.Area());
+      if (size > minimum_vector_threshold) {
         
         //Minimum number of 4x4 vectors to satisfy the minimum score  
         //If we get at least 20% of min_alarm_pixels, that is equivalent to 100%
         //Divide 20% with number of 4x4 vectors that will fit  
-        minimum_vector_threshold=(double)min_alarm_pixels * .20 / 16 ; 
+        //minimum_vector_threshold=(double)min_alarm_pixels * .20 / 16 ; 
         
-        //Each hardware macroblock is 16x16 which dissolves into 4 4x4 blocks, just make the same assumption for software decoding
-        available_vectors=(double)size * 4 ;    
+        //Each hardware macroblock is 16x16 which dissolves into 16 4x4 blocks, just make the same assumption for software decoding
+        //available_vectors=(double)size * 4 ;    
         
-        if (available_vectors > minimum_vector_threshold) { 
+        //if (available_vectors > minimum_vector_threshold) { 
         
         
         uint16_t offset=4;
@@ -258,71 +272,94 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
                         
                 if (vec_type == 0 ) {//software macroblock with size of 4x4
                     vec_count++; 
-                    x_sum+=mv.xcoord;
-                    y_sum+=mv.ycoord;
+                    //x_sum+=mv.xcoord;
+                    //y_sum+=mv.ycoord;
                   
-                } else {//hardware macroblock with size of 16x16, there are 4 4x4 blocks in each one
-                  vec_count=vec_count + 4;
-                  x_sum=x_sum+(4*mv.xcoord);  
-                  y_sum=y_sum+(4*mv.ycoord); 
+                } else {//hardware macroblock with size of 16x16, there are 16 4x4 blocks in each one
+                  vec_count=vec_count + 16;
+                  //x_sum=x_sum+(16*mv.xcoord);  
+                  //y_sum=y_sum+(16*mv.ycoord); 
+                  //x_sum=x_sum+(mv.xcoord<<4);  
+                  //y_sum=y_sum+(mv.ycoord<<4);
                   
                 }   
              
-                     
-                       
+                if (vec_count > minimum_vector_threshold)    
+                    break;   
         }
         
-	    }
-	    
+	    //}
+	    //Info("vec_type %d, min_alarm_pixels %d, size %d,  minimum vector threshold %d, vec_count %d,  polygon area %d ", 
+	     //     vec_type,    min_alarm_pixels   ,    size,  minimum_vector_threshold   , vec_count   , polygon.Area());
+    
 	    }
         
         memset(mvect_buffer,0,4);
     }   
     
     
-    if (vec_count) {
-          alarm_centre=Coord((uint16_t)(x_sum/vec_count),(uint16_t)(y_sum/vec_count));
-    }
+    //if (vec_count) {
+    //      alarm_centre=Coord((uint16_t)(x_sum/vec_count),(uint16_t)(y_sum/vec_count));
+    //}
   
     //vec_count is now count of 4x4 macroblocks
-    alarm_pixels = vec_count*80 ; //16 pixels per 4x4 macroblock multiplied by the skew value of 5; that is 4x4x5, that is, each 4x4 motion vector is weighted as x5 such that if the frame in question generates a certain number of 4x4 macroblocks and they cover 20% of the screen, then we consider that 100% covered.
-    score = ((double) alarm_pixels/(polygon.Area()))*100;  //score adjusted to faux pixel values for users who insist on using pixels for setting min_alarm_pixels and max_alarm_pixels instead of percentages, value is in the stat UI of the event score. 
+    //alarm_pixels = vec_count*80 ; //16 pixels per 4x4 macroblock multiplied by the skew value of 5; that is 4x4x5, that is, each 4x4 motion vector is weighted as x5 such that if the frame in question generates a certain number of 4x4 macroblocks and they cover 20% of the screen, then we consider that 100% covered.
+    //score = ((double) alarm_pixels/(polygon.Area()))*100;  //score adjusted to faux pixel values for users who insist on using pixels for setting min_alarm_pixels and max_alarm_pixels instead of percentages, value is in the stat UI of the event score. 
     //possible values 0 to 500 where 100 is equal to .2 
     //0-100 values mean 0.0 to 0.2,  anything higher probably won't happen since there are not very many vectors but this can be adjusted in the code in the future if testing can show a more practical range of values
     //User expects value of percent min_alarm_pixels and max_alarm_pixels to be 0-100, I think 0.0 - 0.2 is practical (corresponding to percentages 0-100)
     
     /* bool result=score > minimum_vector_coverage && score < maximum_vector_coverage;
+    */
+    //if (result) {
+       //Info("ALARM | SCORE ==> %d | VECS_TESTED ==> %d |  VECS PASSED==> %d | SCORE RANGE ==> %d  <>  %d", score, available_vectors, vec_count,   minimum_vector_coverage, maximum_vector_coverage);
+    //} 
     
-    if (result) {
-       Info("ALARM | SCORE ==> %d | VECS_TESTED ==> %d |  VECS PASSED==> %d | SCORE RANGE ==> %d  <>  %d", score, available_vectors, vec_count,   minimum_vector_coverage, maximum_vector_coverage);
-    }*/ 
     
     
-    
-    if( score ) {
+/*    if( score ) {
+
       if( min_alarm_pixels && (score < minimum_vector_coverage) ) {
-        /* Not enough pixels alarmed */
+        // Not enough pixels alarmed 
         return (false);
       } else if( max_alarm_pixels && (score > maximum_vector_coverage) ) {
-        /* Too many pixels alarmed */
+        // Too many pixels alarmed 
         overload_count = overload_frames;
         return (false);
       }
+
+
+
     } else {
-      /* No pixels */
+      // No pixels 
       return (false);
     }
+*/
+
+ 
     
-    
-    if ( type == INCLUSIVE ) {
+    /*if ( type == INCLUSIVE ) {
     // score >>= 1;
     score /= 2;
     } else if ( type == EXCLUSIVE ) {
     // score <<= 1;
     score *= 2;
-    }
+    }*/
     
-    Debug( 5, "Adjusted score is %d", score );
+    //Debug( 5, "Adjusted score is %d", score );
+    Debug("vec_type %d, min_alarm_pixels %d, size %d,  MVT %d, vec_count %d, AP %d, score %d, polygon area %d ", 
+	      vec_type,    min_alarm_pixels   ,    size,  minimum_vector_threshold   , vec_count ,alarm_pixels  , score,    polygon.Area());
+        
+    if (vec_count < minimum_vector_threshold ) {
+		score=0;
+        return false;
+    }   
+    else 
+        score=100; 
+        
+    
+    
+    
     return true; 
 };
 
