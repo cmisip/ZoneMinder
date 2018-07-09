@@ -258,9 +258,7 @@ if (!ctype) { //motion vectors from software h264 decoding
                    const AVMotionVector *mvs = (const AVMotionVector *)sd->data;
                    //uint16_t size=sd->size / sizeof(AVMotionVector);
                    uint16_t vec_count=0;
-                   uint16_t mfour=0;
-                   uint16_t meight=0;
-                   uint16_t msixtn=0;
+                   
                    
                    for (unsigned int i = 0; i < sd->size / sizeof(*mvs); i++) {
                         const AVMotionVector *mv = &mvs[i];
@@ -273,17 +271,9 @@ if (!ctype) { //motion vectors from software h264 decoding
                         
                         if ((abs(x_disp) + abs(y_disp)) < 1)
                             continue;
+                        //Vector sizes  16*16, 16*8, 8*16, 8*8 in order of occurence
                         
-                        if (mv->dst_x % 4 != 0) 
-                            mfour=mfour+1;
-                            
-                        if (mv->dst_x % 8 != 0)
-                            meight=meight+1;
-                            
-                        if (mv->dst_x % 16 !=16)
-                            msixtn=msixtn+1;        
-                        
-                        
+                        //Info("SW xsize %d, ysize%d. xcoord %d, ycoord %d ", mv->w, mv->h, mv->dst_x, mv->dst_y);
                         for (uint16_t i=0 ; i< mv->w/4; i++) { //Count each macroblock as equivalent number of 4x4 blocks so a 16x16 macroblock is counted as 4 4x4 blocks
                            for (uint16_t j=0 ; j< mv->h/4; j++) {
                                 mvt.xcoord=mv->dst_x+i*4;
@@ -303,9 +293,7 @@ if (!ctype) { //motion vectors from software h264 decoding
                             
                             memset(mvect_buffer,0,image.mv_size);
                             
-                            //below is an attempt to fix alignment errors and is equivalent to the line above, i dont think its working
-                           // char * temp_ptr = (char *)mvect_buffer;
-                           //memset(temp_ptr,0,image.mv_size);
+                            
                             vec_count=0;
                             break;
                         }     
@@ -316,7 +304,7 @@ if (!ctype) { //motion vectors from software h264 decoding
                        uint16_t vec_type = 0;
                          
                        memcpy(mvect_buffer+2,&vec_type, 2);   //type of vector (software or hardware) at 3rd byte
-                    Info("FFMPEG SW VEC_COUNT %d, fours %d, eights %d, sixtn %d", vec_count, mfour, meight, msixtn);
+                    //Info("FFMPEG SW VEC_COUNT %d", vec_count);
                
             } 
 }         
@@ -327,7 +315,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                 uint16_t vec_count=0;
                 uint16_t vector_ceiling=(((encoder->output[0]->format->es->video.width * encoder->output[0]->format->es->video.height)/256)*(double)20)/100;  //FIXMEC, the size of hardware buffer is smaller than software buffer so can save memory by requesting smaller buffer size
                 
-                //Rgb signalcolor;
+              
                 
                 //send free buffer to encoder
                 if ((buffer = mmal_queue_get(pool_out->queue)) != NULL) {
@@ -347,6 +335,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                 
                 //send buffer with yuv420 data to encoder
                 if ((buffer = mmal_queue_get(pool_in->queue)) != NULL)  {
+				 
                     
                   int bufsize=av_image_get_buffer_size(AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 1);  
                     
@@ -370,7 +359,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                 
                 //send buffer with yuv420 data to resizer
                 if ((rbuffer = mmal_queue_get(pool_inr->queue)) != NULL)  {
-                    
+                  
                   int bufsize=av_image_get_buffer_size(AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 1);  
                     
                   mmal_buffer_header_mem_lock(rbuffer);
@@ -504,7 +493,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                  
                
                  
-                //only send buffer data when this is an odd frame 
+                //only send buffer data when this is an odd frame FIXMEC 
                 if (frameCount & 1)
                    memset(mvect_buffer,0,image.mv_size);
                        
@@ -516,8 +505,12 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
 #endif
         
 end:      
-        
 
+//Need SWScale when Source Type is FFmpeg with Function as Mvdect or Modect
+//or Source type is FFmpeghw and Function is Modect        
+if (((ctype) && (cfunction == Monitor::MODECT)) || (!ctype)) {   
+	
+ 
 
 #if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
         av_image_fill_arrays(mFrame->data, mFrame->linesize,
@@ -527,7 +520,8 @@ end:
             imagePixFormat, width, height);
 #endif
 
-if (!ctype) {   //FIXME, try to restore use of swscale for ctype if the following fails     
+
+ 
 #if HAVE_LIBSWSCALE
         if(mConvertContext == NULL) {
           mConvertContext = sws_getContext(mVideoCodecContext->width,
@@ -546,9 +540,8 @@ if (!ctype) {   //FIXME, try to restore use of swscale for ctype if the followin
         Fatal( "You must compile ffmpeg with the --enable-swscale option to use ffmpeg cameras" );
 #endif // HAVE_LIBSWSCALE
 
-}
-
-
+} // closing bracket for "if (((ctype) && (cfunction == Monitor::MODECT)) || (!ctype))"
+ 
         frameCount++;
       } // end if frameComplete
       
@@ -710,7 +703,7 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
    
 
    // Create the encoder component.
-  // if ( mmal_component_create("vc.ril.resize", &resizer)  != MMAL_SUCCESS) {
+   //if ( mmal_component_create("vc.ril.resize", &resizer)  != MMAL_SUCCESS) {
    if ( mmal_component_create("vc.ril.isp", &resizer)  != MMAL_SUCCESS) { 
       Fatal("failed to create mmal resizer");
    }   
@@ -742,13 +735,13 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
    
    MMAL_ES_FORMAT_T *format_out = resizer->output[0]->format;
    
-   format_out->es->video.crop.width = width;
-   format_out->es->video.crop.height = height;
-   format_out->es->video.width = width;
-   format_out->es->video.height = height;
+   format_out->es->video.crop.width = mVideoCodecContext->width;
+   format_out->es->video.crop.height = mVideoCodecContext->height;
+   format_out->es->video.width = mVideoCodecContext->width;
+   format_out->es->video.height = mVideoCodecContext->height;
   
    
-   if ( colours == ZM_COLOUR_RGB32 ) {
+   /*if ( colours == ZM_COLOUR_RGB32 ) {
        format_out->encoding = MMAL_ENCODING_RGBA;
        format_out->encoding_variant = MMAL_ENCODING_RGBA;
    } else if ( colours == ZM_COLOUR_RGB24 ) {
@@ -757,16 +750,16 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
    } else if(colours == ZM_COLOUR_GRAY8) { 
        format_out->encoding = MMAL_ENCODING_I420;
        format_out->encoding_variant = MMAL_ENCODING_I420;
-   }
+   }*/
    
    
-   /*if ( colours == ZM_COLOUR_RGB32 ) {
+   if ( colours == ZM_COLOUR_RGB32 ) {
        format_out->encoding = MMAL_ENCODING_RGBA;
    } else if ( colours == ZM_COLOUR_RGB24 ) {
        format_out->encoding = MMAL_ENCODING_RGB24;
    } else if(colours == ZM_COLOUR_GRAY8) { 
        format_out->encoding = MMAL_ENCODING_I420;
-   }*/
+   }
    
    
    
