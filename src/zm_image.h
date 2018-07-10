@@ -144,10 +144,11 @@ public:
         //int16_t y_vector;
         };
         
-        struct vector_package {
-	      int8_t xcoord;
-	      int8_t ycoord;
-	      uint16_t numvec;	
+        struct vector_package { //package will be 32 bit wide to optimize memory transfers
+	      uint8_t xcoord1=0;
+	      uint8_t ycoord1=0;
+	      uint8_t xcoord2=0;
+	      uint8_t ycoord2=0;
 	    };	
         
 protected:

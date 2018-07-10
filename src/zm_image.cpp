@@ -413,7 +413,8 @@ uint8_t *& Image::VectBuffer() {
     if (!mv_buffer) {
         //mv_size=((((((width * height)/16)*(double)20)/100))*4)+4; 
         
-        mv_size=((((((width * height)/16)*(double)20)/100)))+4;
+        //mv_size=((((((width * height)/16)*(double)20)/100)))+4;
+        mv_size=((((((width * height)/256)*(double)20)/100)))+4;
         uint32_t *mem = (uint32_t*)malloc(mv_size);
         memset(mem,0,mv_size);
         mv_buffer = (uint8_t *)  mem;

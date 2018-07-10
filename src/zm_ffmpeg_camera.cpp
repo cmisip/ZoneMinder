@@ -249,7 +249,8 @@ if (!ctype) { //motion vectors from software h264 decoding
             
             //FIXMEC, just 20% of the maximum number of 4x4 blocks that will fit is probably enough motion vectors to determine if a scene has motion
             //this is also an attempt to reduce the size of the mvect_buffer that needs to be passed via mmap
-            uint16_t vector_ceiling=((((mRawFrame->width * mRawFrame->height)/16)*(double)20)/100);  
+            //uint16_t vector_ceiling=((((mRawFrame->width * mRawFrame->height)/16)*(double)20)/100); 
+            uint16_t vector_ceiling=((((mRawFrame->width * mRawFrame->height)/256)*(double)20)/100);  
         
             if (sd) {
 
@@ -258,7 +259,7 @@ if (!ctype) { //motion vectors from software h264 decoding
                    const AVMotionVector *mvs = (const AVMotionVector *)sd->data;
                    //uint16_t size=sd->size / sizeof(AVMotionVector);
                    uint16_t vec_count=0;
-                   
+                   vector_package ups;
                    
                    for (unsigned int i = 0; i < sd->size / sizeof(*mvs); i++) {
                         const AVMotionVector *mv = &mvs[i];
@@ -272,9 +273,48 @@ if (!ctype) { //motion vectors from software h264 decoding
                         if ((abs(x_disp) + abs(y_disp)) < 1)
                             continue;
                         //Vector sizes  16*16, 16*8, 8*16, 8*8 in order of occurence
+                        //To save memory space and optimize for 4 byte transfers:
+                        //only save vectors that are at least 16 width or height
+                        //x and y coordinates will be reduced to nearest multiples of 16
+                        //
+                        
+                        
+                        
+                        //only save buffer data when this is an odd frame  
+                        if (vec_count & 1) {
+                                                
+                          if ((mv->w==16) || (mv->h==16)) {
+                             ups.xcoord2=(mv->dst_x+8)>>4;
+                             ups.ycoord2=(mv->dst_y+8)>>4;
+                             
+                             if (vec_count < vector_ceiling) { //Dont write past the buffer
+                                 memcpy(mvect_buffer+offset,&ups,sizeof(vector_package));
+                                 offset+=sizeof(vector_package);
+                                 vec_count++;
+                             } else {
+								  vec_count=0;
+								  memset(mvect_buffer,0,image.mv_size);
+								  break; 
+						     }		 
+                                
+		    			  } else
+		    			     continue;
+		    			     
+		    			}else {
+						  if ((mv->w==16) || (mv->h==16)) {	
+				    		 ups.xcoord1=(mv->dst_x+8)>>4;
+                             ups.ycoord1=(mv->dst_y+8)>>4;
+                             vec_count++;
+                          } else
+                             continue;   
+						}	
+					    
+					    
+                        
                         
                         //Info("SW xsize %d, ysize%d. xcoord %d, ycoord %d ", mv->w, mv->h, mv->dst_x, mv->dst_y);
-                        for (uint16_t i=0 ; i< mv->w/4; i++) { //Count each macroblock as equivalent number of 4x4 blocks so a 16x16 macroblock is counted as 4 4x4 blocks
+ 
+                        /*for (uint16_t i=0 ; i< mv->w/4; i++) { //Count each macroblock as equivalent number of 4x4 blocks so a 16x16 macroblock is counted as 4 4x4 blocks
                            for (uint16_t j=0 ; j< mv->h/4; j++) {
                                 mvt.xcoord=mv->dst_x+i*4;
                                 mvt.ycoord=mv->dst_y+j*4;
@@ -285,18 +325,11 @@ if (!ctype) { //motion vectors from software h264 decoding
                                    vec_count++;  //this is a count of 4x4 blocks
                                 }   
                            }
-                       }
+                        }*/
                        
                         
                         
-                        if (vec_count >= vector_ceiling) { //if we hit the ceiling, just pretend we did not get any vectors
-                            
-                            memset(mvect_buffer,0,image.mv_size);
-                            
-                            
-                            vec_count=0;
-                            break;
-                        }     
+                       
                    
                   
                     }
@@ -417,6 +450,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                         mmal_buffer_header_mem_lock(buffer);
                         uint16_t size=buffer->length/sizeof(mmal_motion_vector);
                         struct mmal_motion_vector mvarray[size];
+                        vector_package ups;
                         
                         //copy buffer->data to temporary
                         memcpy(mvarray,buffer->data,buffer->length);
@@ -426,7 +460,6 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                         for (int i=0;i < size ; i++) {
                             mmal_motion_vector mvs;
                             motion_vector mvt;
-                            vector_package vpackage;
                             
                             memcpy(&mvs,mvarray+i,sizeof(mmal_motion_vector));
                             
@@ -436,36 +469,34 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                             mvt.xcoord = (i*16) % (encoder->output[0]->format->es->video.width + 16);  //these blocks are tiled to cover the entire frame and are 16x16 size
                             mvt.ycoord = ((i*16)/(encoder->output[0]->format->es->video.width +16))*16;
                             
-                            //Build vector package, its 4 bytes 
-                            vpackage.xcoord=mvt.xcoord>>4;
-                            vpackage.ycoord=mvt.ycoord>>4;
-                            vpackage.numvec=16;
                             
+                            //only save buffer data when this is an odd frame  
+                            if (vec_count & 1) {
+                                                
+                                  ups.xcoord2=(mvt.xcoord)>>4;
+                                  ups.ycoord2=(mvt.ycoord)>>4;
+                                  
+                                  if (vec_count < vector_ceiling) {
+                                     memcpy(mvect_buffer+t_offset,&ups,sizeof(vector_package));
+                                     t_offset+=sizeof(vector_package);
+                                     vec_count++;
+                                  } else {
+									 memset(mvect_buffer,0,image.mv_size);
+									 vec_count=0;
+									 break;
+								  }	  
+                                  
+		    			     
+		    			    }else {
+				    		      ups.xcoord1=(mvt.xcoord)>>4;
+                                  ups.ycoord1=(mvt.ycoord)>>4;
+                                  vec_count++;
+						    }	
                             
-                            if (vec_count < vector_ceiling) { //Dont write past the buffer
-                               //memcpy(mvect_buffer+t_offset,&mvt,sizeof(motion_vector));
-                               //t_offset+=sizeof(motion_vector);
-                               memcpy(mvect_buffer+t_offset,&mvt,sizeof(vector_package));
-                               t_offset+=sizeof(vector_package);
-                               vec_count++;
-                            }
-                            if (vec_count >= vector_ceiling) {   //we have more vectors that will fit in the buffer, pretend we did not get any vectors at all
-                              memset(mvect_buffer,0,image.mv_size);
-                              vec_count=0;
-                              
-                              break;
-                            }    
-                         
                             
                         } 
-                         /*memcpy(mvect_buffer,&vec_count, sizeof(vec_count));  //size at first byte
-                         uint16_t vec_type = 1;
                          
-                         memcpy(mvect_buffer+sizeof(vec_count),&vec_type, sizeof(vec_type));   //type of vector at 3rd byte
                          
-                         //if (vec_count > 4)
-                             //Info("FFMPEG HW VEC_COUNT %d, ceiling %d", vec_count, vector_ceiling);
-                        */
                       } 
                       
                        

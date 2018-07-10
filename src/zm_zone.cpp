@@ -234,11 +234,18 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
        
        
         
-      if (vec_type == 0 ) { 
-            minimum_vector_threshold=(double)((min_alarm_pixels*.2)/16); 
+      //if (vec_type == 0 ) { 
+      //      minimum_vector_threshold=(double)((min_alarm_pixels*.2)/16); 
             
-      } else
-            minimum_vector_threshold=(double)((min_alarm_pixels*.2)/256); 
+      //} else
+      //      minimum_vector_threshold=(double)((min_alarm_pixels*.2)/256); 
+      
+      //size contains the number of 16x16 macroblocks or equivalent to 256 pixels  per macroblock or <<8
+      //we consider each macroblock to be 4x its value so <<2
+      //minimum_vector_threshold is the minimum number of vectors needed to generate min_alarm_pixels
+      //min_alarm_pixels is from the config Min_Alarmed_Area in AlarmPixels. It is the number of pixels that
+      //is equivalent to the percentage number. So 20 means 20% of the Polygon area. 
+      minimum_vector_threshold=min_alarm_pixels>>10;
       
       
       //Info("vec_type %d, min_alarm_pixels %d, min vect thres %d, size %d, polygon area %d ", vec_type, min_alarm_pixels, minimum_vector_threshold,size, polygon.Area());
@@ -256,6 +263,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
         
         
         uint16_t offset=4;
+        vector_package ups;
         for (int i = 0; i < size; i++) {
                 //motion_vector mv;
                 
@@ -263,19 +271,27 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
                 //memcpy(&mv,mvect_buffer+offset,sizeof(motion_vector));
                 //offset+=sizeof(motion_vector);
                 
-                vector_package vpackage;
-                memcpy(&vpackage,mvect_buffer+offset,sizeof(vpackage));
-                offset+=sizeof(vector_package);
-                vpackage.xcoord<<=4;
-                vpackage.ycoord<<=4;
+                if (i & 0) { //only read from the buffer when iterator is an odd number  
+                   memcpy(&ups,mvect_buffer+offset,sizeof(vector_package));//4 byte read
+                   offset+=sizeof(vector_package);
+                   //Are the vectors inside the zone polygon?
+                   if (!polygon.isInside(Coord(ups.xcoord1<<4,ups.ycoord1<<4)))      
+                      continue;
+                } else {
+                   //Are the vectors inside the zone polygon?
+                   if (!polygon.isInside(Coord(ups.xcoord2<<4,ups.ycoord2<<4)))      
+                      continue; 
+                }   
+                
+                vec_count++;
                             
 
                 //Are the vectors inside the zone polygon?
-                if (!polygon.isInside(Coord(vpackage.xcoord,vpackage.ycoord)))      
-                    continue;
+                //if (!polygon.isInside(Coord(vpackage.xcoord,vpackage.ycoord)))      
+                    //continue;
                 
-                if (vec_type == 1 )
-                   vec_count+=vpackage.numvec;   
+                //if (vec_type == 1 )
+                 //  vec_count+=vpackage.numvec;   
                         
                 /*if (vec_type == 0 ) {//software macroblock with size of 4x4
                     vec_count++; 
@@ -291,6 +307,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
                   
                 } */  
              
+                //quit if we have enough to satisfy the minimum score so that zma will not be overrun
                 if (vec_count > minimum_vector_threshold)    
                     break;   
         }
