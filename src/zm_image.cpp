@@ -429,7 +429,7 @@ void Image::Initialise()
 
 uint8_t *& Image::VectBuffer() {
 	   if (mv_buffer ==NULL) {
-		   mv_size=((((((width * height)/16)*(double)20)/100)))+4;
+		   mv_size=((((((width * height)/16)*(double)80)/100)))+4;
 		   mv_buffer = (uint8_t*)zm_mallocaligned(32,mv_size);
 	       if(mv_buffer == NULL)
 		      Fatal("Memory allocation failed: %s",strerror(errno));

@@ -250,7 +250,9 @@ if (!ctype) { //motion vectors from software h264 decoding
             //FIXMEC, just 20% of the maximum number of 4x4 blocks that will fit is probably enough motion vectors to determine if a scene has motion
             //this is also an attempt to reduce the size of the mvect_buffer that needs to be passed via mmap
             //uint16_t vector_ceiling=((((mRawFrame->width * mRawFrame->height)/16)*(double)20)/100); 
-            uint16_t vector_ceiling=((((mRawFrame->width * mRawFrame->height)/256)*(double)20)/100);  
+            //uint16_t vector_ceiling=((((mRawFrame->width * mRawFrame->height)/256)*(double)20)/100); 
+            //uint16_t vector_ceiling=((((mRawFrame->width * mRawFrame->height)/256)*(double)50)/100); 
+            uint16_t vector_ceiling=((((mRawFrame->width * mRawFrame->height)/256)*(double)80)/100);  
         
             if (sd) {
 
@@ -346,7 +348,7 @@ if (!ctype) { //motion vectors from software h264 decoding
 if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels and there are a fixed number covering the entire frame.
                 MMAL_BUFFER_HEADER_T *buffer, *rbuffer;
                 uint16_t vec_count=0;
-                uint16_t vector_ceiling=(((encoder->output[0]->format->es->video.width * encoder->output[0]->format->es->video.height)/256)*(double)20)/100;  //FIXMEC, the size of hardware buffer is smaller than software buffer so can save memory by requesting smaller buffer size
+                uint16_t vector_ceiling=(((encoder->output[0]->format->es->video.width * encoder->output[0]->format->es->video.height)/256)*(double)80)/100;  //FIXMEC, the size of hardware buffer is smaller than software buffer so can save memory by requesting smaller buffer size
                 
               
                 
@@ -488,7 +490,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                                   
 		    			     
 		    			    }else {
-								  //Info("ZMC vec_count is even < %d >  just reading", vec_count);
+								  //Info("ZMC vec_count is even < %d >  just operating", vec_count);
 				    		      ups.xcoord1=(mvt.xcoord)>>4;
                                   ups.ycoord1=(mvt.ycoord)>>4;
                                   vec_count++;
