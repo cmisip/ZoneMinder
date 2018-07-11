@@ -375,7 +375,7 @@ Monitor::Monitor(
        + sizeof(VideoStoreData) //Information to pass back to the capture process
        + (image_buffer_count*sizeof(struct timeval))
        + (image_buffer_count*camera->ImageSize())
-       //+ (image_buffer_count*( (((((width * height)/16)*(double)20)/100)*4)+4)  )
+       //FIXMEC mv_buffer size is resolution divided by pixel dimension of 16x16 macroblock, assuming up to 80% frame covered as max case, plus 4 bytes for header info (number of vectors and how vector was extracted : hardware or software
        + (image_buffer_count*( (((((width * height)/256)*(double)80)/100)*4)+4)  )
        + 64; /* Padding used to permit aligning the images buffer to 64 byte boundary */
 
@@ -562,8 +562,7 @@ bool Monitor::connect() {
   image_buffer = new Snapshot[image_buffer_count];
 
 
-  
-  //uint16_t mv_buffer_size = ((((((width * height)/16)*(double)20)/100)*4)+4);
+  //FIXMEC mv_buffer size is resolution divided by pixel dimension of 16x16 macroblock, assuming up to 80% frame covered as max case, plus 4 bytes for header info (number of vectors and how vector was extracted : hardware or software
   uint16_t mv_buffer_size = ((((((width * height)/256)*(double)80)/100)*4)+4);
   for ( int i = 0; i < image_buffer_count; i++ ) {
     image_buffer[i].timestamp = &(shared_timestamps[i]);

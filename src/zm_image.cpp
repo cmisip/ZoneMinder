@@ -90,7 +90,6 @@ Image::Image() {
   buffertype = 0;
   holdbuffer = 0;
   mv_size = 0;
-  //VectBuffer();
   text[0] = '\0';
 }
 
@@ -108,7 +107,6 @@ Image::Image( const char *filename ) {
   buffertype = 0;
   holdbuffer = 0;
   mv_size = 0;
-  //VectBuffer();
   ReadJpeg( filename, ZM_COLOUR_RGB24, ZM_SUBPIX_ORDER_RGB);
   text[0] = '\0';
 }
@@ -126,7 +124,6 @@ Image::Image( int p_width, int p_height, int p_colours, int p_subpixelorder, uin
   buffer = 0;
   holdbuffer = 0;
   mv_size = 0;
-  //VectBuffer();
   if ( p_buffer )
   {
     allocation = size;
@@ -166,7 +163,6 @@ Image::~Image() {
   DumpImgBuffer();
   if (mv_buffer) {
 	    zm_freealigned(mv_buffer);
-        //free(mv_buffer);
         mv_buffer = NULL;
   }
 }
@@ -410,25 +406,10 @@ void Image::Initialise()
   initialised = true;
 }
 
-/*uint8_t *& Image::VectBuffer() {
-    if (!mv_buffer) {
-        //mv_size=((((((width * height)/16)*(double)20)/100))*4)+4; 
-        
-        //mv_size=((((((width * height)/16)*(double)20)/100)))+4;
-        mv_size=((((((width * height)/256)*(double)20)/100)))+4;
-        uint32_t *mem = (uint32_t*)malloc(mv_size);
-        memset(mem,0,mv_size);
-        mv_buffer = (uint8_t *)  mem;
-        
-        mv_size=mv_size*4;
-        //free(mem);
-        //Fatal("mv_buffer with no allocation");
-    }
-    return mv_buffer;
-} */
 
 uint8_t *& Image::VectBuffer() {
 	   if (mv_buffer ==NULL) {
+		   //FIXMEC mv_buffer size is resolution divided by pixel dimension of 16x16 macroblock, assuming up to 80% frame covered as max case, plus 4 bytes for header info (number of vectors and how vector was extracted : hardware or software
 		   mv_size=((((((width * height)/16)*(double)80)/100)))+4;
 		   mv_buffer = (uint8_t*)zm_mallocaligned(32,mv_size);
 	       if(mv_buffer == NULL)
@@ -542,7 +523,7 @@ void Image::AssignDirect( const unsigned int p_width, const unsigned int p_heigh
     allocation = buffer_size;
     buffertype = p_buffertype;
     buffer = new_buffer;
-    memset(mv_buffer,0,mv_size); //just reset the mv_buffer since it is not valid with a new image buffer
+    memset(mv_buffer,0,mv_size); //FIXMEC just reset the mv_buffer since it is not valid with a new image buffer
   }
 
 }

@@ -247,11 +247,8 @@ if (!ctype) { //motion vectors from software h264 decoding
 
             sd = av_frame_get_side_data(mRawFrame, AV_FRAME_DATA_MOTION_VECTORS);
             
-            //FIXMEC, just 20% of the maximum number of 4x4 blocks that will fit is probably enough motion vectors to determine if a scene has motion
-            //this is also an attempt to reduce the size of the mvect_buffer that needs to be passed via mmap
-            //uint16_t vector_ceiling=((((mRawFrame->width * mRawFrame->height)/16)*(double)20)/100); 
-            //uint16_t vector_ceiling=((((mRawFrame->width * mRawFrame->height)/256)*(double)20)/100); 
-            //uint16_t vector_ceiling=((((mRawFrame->width * mRawFrame->height)/256)*(double)50)/100); 
+            //Establish a reasonable limit to vectors that could be extracted.  More than this and just skip the frame
+            //Expect no more than 80% of the frame will be covered by motion
             uint16_t vector_ceiling=((((mRawFrame->width * mRawFrame->height)/256)*(double)80)/100);  
         
             if (sd) {
@@ -259,7 +256,7 @@ if (!ctype) { //motion vectors from software h264 decoding
                    
                    uint8_t offset=sizeof(uint16_t)*2;
                    const AVMotionVector *mvs = (const AVMotionVector *)sd->data;
-                   //uint16_t size=sd->size / sizeof(AVMotionVector);
+                  
                    uint16_t vec_count=0;
                    vector_package ups;
                    
@@ -278,15 +275,23 @@ if (!ctype) { //motion vectors from software h264 decoding
                         //To save memory space and optimize for 4 byte transfers:
                         //only save vectors that are at least 16 width or height
                         //x and y coordinates will be reduced to nearest multiples of 16
-                        //
+                        //by bit shifting so they are storeable in 8 bit in order to save memory.  
                         
+                        //As the ARM likes 32 bit transfers, I decided for the sake of performance
+                        //despite increased code complexity, to put a series of 2 vectors (each coordinate is 8 bit)  into one 4 byte struct
+                        //and just write the struct to memory on alternate frames. 
+                        //There is some fuzziness here as the vector coordinates are not exactly multiples of 16
+                        //but we don't need high accuracy here. 
+                        
+                        //The vector data will be reduced to 8 bit here and sent via mmap
+                        //then they will be restored to 16 bit in zma. 
                         
                         
                         //only save buffer data when this is an odd frame  
                         if (vec_count & 1) {
                                                 
                           if ((mv->w==16) || (mv->h==16)) {
-                             ups.xcoord2=(mv->dst_x+8)>>4;
+                             ups.xcoord2=(mv->dst_x+8)>>4; //Reduce to 8 bit
                              ups.ycoord2=(mv->dst_y+8)>>4;
                              
                              if (vec_count < vector_ceiling) { //Dont write past the buffer
@@ -314,9 +319,9 @@ if (!ctype) { //motion vectors from software h264 decoding
 					    
                         
                         
-                        //Info("SW xsize %d, ysize%d. xcoord %d, ycoord %d ", mv->w, mv->h, mv->dst_x, mv->dst_y);
- 
-                        /*for (uint16_t i=0 ; i< mv->w/4; i++) { //Count each macroblock as equivalent number of 4x4 blocks so a 16x16 macroblock is counted as 4 4x4 blocks
+                        //Old method when I was dissolving bigger macroblocks to 4x4 and just counting them
+                        //Each 4x4 macroblock had an adjusted coordinate depending on its location in the 16x16 macroblock
+                        /*for (uint16_t i=0 ; i< mv->w/4; i++) { //Count each macroblock as equivalent number of 4x4 blocks so a 16x16 macroblock is counted as 16 4x4 blocks
                            for (uint16_t j=0 ; j< mv->h/4; j++) {
                                 mvt.xcoord=mv->dst_x+i*4;
                                 mvt.ycoord=mv->dst_y+j*4;
@@ -345,7 +350,7 @@ if (!ctype) { //motion vectors from software h264 decoding
 }         
 
 #ifdef __arm__        
-if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels and there are a fixed number covering the entire frame.
+if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels tile Left to Right and then top to bottom and there are a fixed number covering the entire frame.
                 MMAL_BUFFER_HEADER_T *buffer, *rbuffer;
                 uint16_t vec_count=0;
                 uint16_t vector_ceiling=(((encoder->output[0]->format->es->video.width * encoder->output[0]->format->es->video.height)/256)*(double)80)/100;  //FIXMEC, the size of hardware buffer is smaller than software buffer so can save memory by requesting smaller buffer size
@@ -414,7 +419,8 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                 } 
                 
               
-                
+                //SWScale replacement in hardware mmal
+                //Directbuffer is created here 
                 while ((rbuffer = mmal_queue_get(contextr.queue)) != NULL) {
                     
                     mmal_buffer_header_mem_lock(rbuffer);
@@ -444,10 +450,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                       if(buffer->flags & MMAL_BUFFER_HEADER_FLAG_CODECSIDEINFO) {
                           
                         uint16_t t_offset=sizeof(uint16_t)*2; //skip the first 4 bytes, reserved for size and vec_type
-                        //uint16_t vector_ceiling=(((encoder->output[0]->format->es->video.width * encoder->output[0]->format->es->video.height)/256)*(double)20)/100;  //FIXMEC, the size of hardware buffer is smaller than software buffer so can save memory by requesting smaller buffer size
-                        //uint16_t vector_ceiling=(((mRawFrame->width * mRawFrame->height)/256)*(double)20)/100;
                         vector_ceiling--;
-                        //uint16_t vec_count=0;  
                         
                         mmal_buffer_header_mem_lock(buffer);
                         uint16_t size=buffer->length/sizeof(mmal_motion_vector);
@@ -472,7 +475,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                             mvt.ycoord = ((i*16)/(encoder->output[0]->format->es->video.width +16))*16;
                             
                             
-                            //only save buffer data when this is an odd frame  
+                            //only save buffer data when this is an odd frame, see notes on software decoding above
                             if (vec_count & 1) {
                                   //Info("ZMC vec_count is odd < %d >  saving", vec_count);              
                                   ups.xcoord2=(mvt.xcoord)>>4;
@@ -544,8 +547,10 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
         
 end:      
 
+//This is the software scaler. Directbuffer is packaged into mFrame and processed by swscale to convert to appropriate format and size
 //Need SWScale when Source Type is FFmpeg with Function as Mvdect or Modect
-//or Source type is FFmpeghw and Function is Modect        
+//or Source type is FFmpeghw and Function is Modect  
+//This is only used if source is FFmpeg or source is FFmpeghw and Function is Modect.      
 if (((ctype) && (cfunction == Monitor::MODECT)) || (!ctype)) {   
 	
  
