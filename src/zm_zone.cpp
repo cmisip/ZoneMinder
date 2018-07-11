@@ -271,13 +271,15 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
                 //memcpy(&mv,mvect_buffer+offset,sizeof(motion_vector));
                 //offset+=sizeof(motion_vector);
                 
-                if (i & 0) { //only read from the buffer when iterator is an odd number  
+                if (!(i & 1)) { //only read from the buffer when iterator is an even number  
+				   //Info("ZMA index is even < %d >  reading", vec_count);  
                    memcpy(&ups,mvect_buffer+offset,sizeof(vector_package));//4 byte read
                    offset+=sizeof(vector_package);
                    //Are the vectors inside the zone polygon?
                    if (!polygon.isInside(Coord(ups.xcoord1<<4,ups.ycoord1<<4)))      
                       continue;
                 } else {
+				   //Info("ZMA index is odd < %d >  just checking", vec_count);  
                    //Are the vectors inside the zone polygon?
                    if (!polygon.isInside(Coord(ups.xcoord2<<4,ups.ycoord2<<4)))      
                       continue; 
@@ -378,9 +380,10 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
 		score=0;
         return false;
     }   
-    else 
-        score=100; 
-        
+    else {
+        score=100;
+        Info("Motion %d of %d ", vec_count, size);  
+    }    
     
     
     

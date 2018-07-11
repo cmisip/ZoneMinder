@@ -165,7 +165,8 @@ Image::Image( const Image &p_image )
 Image::~Image() {
   DumpImgBuffer();
   if (mv_buffer) {
-        free(mv_buffer);
+	    zm_freealigned(mv_buffer);
+        //free(mv_buffer);
         mv_buffer = NULL;
   }
 }
@@ -409,7 +410,7 @@ void Image::Initialise()
   initialised = true;
 }
 
-uint8_t *& Image::VectBuffer() {
+/*uint8_t *& Image::VectBuffer() {
     if (!mv_buffer) {
         //mv_size=((((((width * height)/16)*(double)20)/100))*4)+4; 
         
@@ -420,11 +421,22 @@ uint8_t *& Image::VectBuffer() {
         mv_buffer = (uint8_t *)  mem;
         
         mv_size=mv_size*4;
-        free(mem);
+        //free(mem);
         //Fatal("mv_buffer with no allocation");
     }
     return mv_buffer;
-}    
+} */
+
+uint8_t *& Image::VectBuffer() {
+	   if (mv_buffer ==NULL) {
+		   mv_size=((((((width * height)/16)*(double)20)/100)))+4;
+		   mv_buffer = (uint8_t*)zm_mallocaligned(32,mv_size);
+	       if(mv_buffer == NULL)
+		      Fatal("Memory allocation failed: %s",strerror(errno));
+  	   
+	   }
+	   return mv_buffer;
+}	      
 
 
 /* Requests a writeable buffer to the image. This is safer than buffer() because this way we can guarantee that a buffer of required size exists */

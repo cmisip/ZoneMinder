@@ -472,7 +472,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                             
                             //only save buffer data when this is an odd frame  
                             if (vec_count & 1) {
-                                                
+                                  //Info("ZMC vec_count is odd < %d >  saving", vec_count);              
                                   ups.xcoord2=(mvt.xcoord)>>4;
                                   ups.ycoord2=(mvt.ycoord)>>4;
                                   
@@ -488,6 +488,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                                   
 		    			     
 		    			    }else {
+								  //Info("ZMC vec_count is even < %d >  just reading", vec_count);
 				    		      ups.xcoord1=(mvt.xcoord)>>4;
                                   ups.ycoord1=(mvt.ycoord)>>4;
                                   vec_count++;
@@ -514,19 +515,23 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                 }
                 
                 
+                //only send buffer data when this is an odd frame FIXMEC 
+                //if (frameCount & 1) {
+                //   memset(mvect_buffer,0,image.mv_size);
+                //   vec_count=0;
+                //}
+                
                 memcpy(mvect_buffer,&vec_count, sizeof(vec_count));  //size at first byte
                 uint16_t vec_type = 1;
                          
                 memcpy(mvect_buffer+sizeof(vec_count),&vec_type, sizeof(vec_type));   //type of vector at 3rd byte
                          
-                //if (vec_count > 4)
-                 //  Info("FFMPEG HW VEC_COUNT %d, ceiling %d, framenum %d", vec_count, vector_ceiling, frameCount );
+                //if (vec_count > 10)
+                   //Info("FFMPEG HW VEC_COUNT %d, ceiling %d, framenum %d", vec_count, vector_ceiling, frameCount );
                  
                
                  
-                //only send buffer data when this is an odd frame FIXMEC 
-                if (frameCount & 1)
-                   memset(mvect_buffer,0,image.mv_size);
+                
                        
                 
                 
