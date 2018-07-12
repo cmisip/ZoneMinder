@@ -368,8 +368,7 @@ Monitor::Monitor(
     event_close_mode = CLOSE_IDLE;
 
   Debug( 1, "monitor purpose=%d", purpose );
-  //uint16_t mv_buffer_size=(((width*height)/16)*8)+2;
-  // + (image_buffer_count*( (((width*height)/16)*8)+2 ))
+  
   mem_size = sizeof(SharedData)
        + sizeof(TriggerData)
        + sizeof(VideoStoreData) //Information to pass back to the capture process
