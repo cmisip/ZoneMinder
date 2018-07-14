@@ -468,7 +468,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                             
                             memcpy(&mvs,mvarray+i,sizeof(mmal_motion_vector));
                             
-                            if ((abs(mvs.x_vector) + abs(mvs.y_vector)) < 5) //Ignore if did not move pixels. Maybe this should be a config option.
+                            if ((abs(mvs.x_vector) + abs(mvs.y_vector)) < 5) //Ignore if did not move 5 pixels. Maybe this should be a config option.
                                continue;
                           
                             mvt.xcoord = (i*16) % (encoder->output[0]->format->es->video.width + 16);  //these blocks are tiled to cover the entire frame and are 16x16 size
