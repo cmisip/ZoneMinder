@@ -645,8 +645,8 @@ int FfmpegCamera::OpenMmal(AVCodecContext *mVideoCodecContext){
    format_in->type = MMAL_ES_TYPE_VIDEO;
    format_in->encoding = MMAL_ENCODING_I420;
    //FIXME, consider using vcos_align_up here
-   format_in->es->video.width = mVideoCodecContext->width;
-   format_in->es->video.height = mVideoCodecContext->height;
+   format_in->es->video.width = VCOS_ALIGN_UP(mVideoCodecContext->width,32);
+   format_in->es->video.height = VCOS_ALIGN_UP(mVideoCodecContext->height,16);
    format_in->es->video.frame_rate.num = 30;
    format_in->es->video.frame_rate.den = 1;
    format_in->es->video.par.num = 1;
@@ -681,7 +681,7 @@ int FfmpegCamera::OpenMmal(AVCodecContext *mVideoCodecContext){
    }   
 
    /* Display the input port format */
-   Info("ENCODER INPUT FORMAT \n");
+   Info("ENCODER INPUTTTTT FORMAT \n");
    Info("%s\n", encoder->input[0]->name);
    Info(" type: %i, fourcc: %4.4s\n", format_in->type, (char *)&format_in->encoding);
    Info(" bitrate: %i, framed: %i\n", format_in->bitrate,
@@ -757,8 +757,8 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
    format_in->encoding = MMAL_ENCODING_I420;
    format_in->encoding_variant = MMAL_ENCODING_I420;
    //FIXME, consider using vcos_align_up here
-   format_in->es->video.width = mVideoCodecContext->width;
-   format_in->es->video.height = mVideoCodecContext->height;
+   format_in->es->video.width = VCOS_ALIGN_UP(mVideoCodecContext->width,32);
+   format_in->es->video.height = VCOS_ALIGN_UP(mVideoCodecContext->height,16);
    format_in->es->video.frame_rate.num = 30;
    format_in->es->video.frame_rate.den = 1;
    format_in->es->video.par.num = 1;
@@ -778,13 +778,14 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
    
    MMAL_ES_FORMAT_T *format_out = resizer->output[0]->format;
    
+   format_out->es->video.width = VCOS_ALIGN_UP(mVideoCodecContext->width,32);
+   format_out->es->video.height = VCOS_ALIGN_UP(mVideoCodecContext->height,16);
    format_out->es->video.crop.width = mVideoCodecContext->width;
    format_out->es->video.crop.height = mVideoCodecContext->height;
-   format_out->es->video.width = mVideoCodecContext->width;
-   format_out->es->video.height = mVideoCodecContext->height;
+   
   
    
-   /*if ( colours == ZM_COLOUR_RGB32 ) {
+   if ( colours == ZM_COLOUR_RGB32 ) {
        format_out->encoding = MMAL_ENCODING_RGBA;
        format_out->encoding_variant = MMAL_ENCODING_RGBA;
    } else if ( colours == ZM_COLOUR_RGB24 ) {
@@ -793,16 +794,16 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
    } else if(colours == ZM_COLOUR_GRAY8) { 
        format_out->encoding = MMAL_ENCODING_I420;
        format_out->encoding_variant = MMAL_ENCODING_I420;
-   }*/
+   }
    
    
-   if ( colours == ZM_COLOUR_RGB32 ) {
+   /*if ( colours == ZM_COLOUR_RGB32 ) {
        format_out->encoding = MMAL_ENCODING_RGBA;
    } else if ( colours == ZM_COLOUR_RGB24 ) {
        format_out->encoding = MMAL_ENCODING_RGB24;
    } else if(colours == ZM_COLOUR_GRAY8) { 
        format_out->encoding = MMAL_ENCODING_I420;
-   }
+   }*/
    
    
    
