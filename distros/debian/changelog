@@ -1,3 +1,12 @@
+zoneminder (1.28.108-nmu2015100101.1) UNRELEASED; urgency=medium
+
+  * Non-maintainer upload.
+  * Motion Vector extraction in software and hardware mmal routines as an alternative to pixel analysis on the raspberry pi3B.
+  * This is built natively on the RPI3 and will probably not work or compile on other systems. 
+  * Use at your own risk.
+
+ -- Christopher Isip <cmisip@gmail.com>  Wed, 11 Jul 2018 17:28:35 -0400
+
 zoneminder (1.28.108-nmu2015100101) wheezy; urgency=low
 
   * 
