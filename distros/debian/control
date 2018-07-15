@@ -6,7 +6,7 @@ Build-Depends: debhelper (>= 9), cmake
     , libphp-serialization-perl
     , libgnutls28-dev | libgnutls-dev
     , libmysqlclient-dev | libmariadbclient-dev
-    , libjpeg8-dev | libjpeg-dev
+    , libjpeg8-dev | libjpeg-dev | libturbojpeg0-dev
     , libpcre3-dev
     , libavcodec-dev, libavformat-dev (>= 3:0.svn20090204), libswscale-dev (>= 3:0.svn20090204), libavutil-dev
     , libavdevice-dev
@@ -31,7 +31,7 @@ Package: zoneminder
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, ${perl:Depends}
     , apache2 | httpd, libapache2-mod-php5 | libapache2-mod-fcgid | php5-fpm
-    , php5-mysqlnd | php5-mysql
+    , php5-mysqlnd | php-mysql
     , mariadb-client | mysql-client
     , libphp-serialization-perl
     , libdate-manip-perl, libmime-lite-perl, libmime-tools-perl, libdbd-mysql-perl
@@ -44,10 +44,11 @@ Depends: ${shlibs:Depends}, ${misc:Depends}, ${perl:Depends}
     , libpcre3
     , ffmpeg | libav-tools, libavdevice53 | libavdevice55 | libavdevice57
     , rsyslog | system-log-daemon
-    , netpbm , libjpeg8
+    , netpbm
+    , libjpeg8 | libturbojpeg0
     , zip
     , libvlccore5 | libvlccore7 | libvlccore8, libvlc5
-    , libpolkit-gobject-1-0, php5-gd
+    , libpolkit-gobject-1-0, php-gd
 Recommends: mysql-server | mariadb-server
 Description: Video camera security and surveillance solution
  ZoneMinder is intended for use in single or multi-camera video security 
