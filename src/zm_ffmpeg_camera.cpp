@@ -459,7 +459,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                         
                         //copy buffer->data to temporary
                         memcpy(mvarray,buffer->data,buffer->length);
-                        memset(mvect_buffer,buffer->length,sizeof(buffer->length));
+                        //memset(mvect_buffer,buffer->length,sizeof(buffer->length));//WHY
                         mmal_buffer_header_mem_unlock(buffer);   
                         
                         for (int i=0;i < size ; i++) {
