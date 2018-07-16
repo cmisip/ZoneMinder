@@ -239,7 +239,7 @@ if (!( cfunction == Monitor::MVDECT )) {
 
      
  
-        
+/*        
 if (!ctype) { //motion vectors from software h264 decoding
             
          
@@ -321,18 +321,18 @@ if (!ctype) { //motion vectors from software h264 decoding
                         
                         //Old method when I was dissolving bigger macroblocks to 4x4 and just counting them
                         //Each 4x4 macroblock had an adjusted coordinate depending on its location in the 16x16 macroblock
-                        /*for (uint16_t i=0 ; i< mv->w/4; i++) { //Count each macroblock as equivalent number of 4x4 blocks so a 16x16 macroblock is counted as 16 4x4 blocks
-                           for (uint16_t j=0 ; j< mv->h/4; j++) {
-                                mvt.xcoord=mv->dst_x+i*4;
-                                mvt.ycoord=mv->dst_y+j*4;
+                        //for (uint16_t i=0 ; i< mv->w/4; i++) { //Count each macroblock as equivalent number of 4x4 blocks so a 16x16 macroblock is counted as 16 4x4 blocks
+                        //   for (uint16_t j=0 ; j< mv->h/4; j++) {
+                        //        mvt.xcoord=mv->dst_x+i*4;
+                        //        mvt.ycoord=mv->dst_y+j*4;
                                 
-                                if (vec_count < vector_ceiling) { //Dont write past the buffer
-                                   memcpy(mvect_buffer+offset,&mvt,sizeof(motion_vector));
-                                   offset+=sizeof(motion_vector);
-                                   vec_count++;  //this is a count of 4x4 blocks
-                                }   
-                           }
-                        }*/
+                        //        if (vec_count < vector_ceiling) { //Dont write past the buffer
+                         //          memcpy(mvect_buffer+offset,&mvt,sizeof(motion_vector));
+                        //           offset+=sizeof(motion_vector);
+                         //          vec_count++;  //this is a count of 4x4 blocks
+                        //        }   
+                        //   }
+                       // }
                        
                         
                         
@@ -347,7 +347,7 @@ if (!ctype) { //motion vectors from software h264 decoding
                     //Info("FFMPEG SW VEC_COUNT %d", vec_count);
                
             } 
-}         
+}  */       
 
 #ifdef __arm__        
 if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels tile Left to Right and then top to bottom and there are a fixed number covering the entire frame.
@@ -355,7 +355,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                 uint16_t vec_count=0;
                 uint16_t vector_ceiling=(((encoder->output[0]->format->es->video.width * encoder->output[0]->format->es->video.height)/256)*(double)80)/100;  //FIXMEC, the size of hardware buffer is smaller than software buffer so can save memory by requesting smaller buffer size
                 
-              
+                uint16_t numblocks=((encoder->output[0]->format->es->video.width * encoder->output[0]->format->es->video.height)/256);
                 
                 //send free buffer to encoder
                 if ((buffer = mmal_queue_get(pool_out->queue)) != NULL) {
@@ -449,32 +449,50 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                         
                       if(buffer->flags & MMAL_BUFFER_HEADER_FLAG_CODECSIDEINFO) {
                           
-                        uint16_t t_offset=sizeof(uint16_t)*2; //skip the first 4 bytes, reserved for size and vec_type
-                        vector_ceiling--;
+                        //uint16_t t_offset=sizeof(uint16_t)*2; //skip the first 4 bytes, reserved for size and vec_type
+                        //vector_ceiling--;
                         
+                        uint16_t t_offset=0; 
+                      
                         mmal_buffer_header_mem_lock(buffer);
                         uint16_t size=buffer->length/sizeof(mmal_motion_vector);
                         struct mmal_motion_vector mvarray[size];
-                        vector_package ups;
+                        uint32_t registers;
+                  
                         
                         //copy buffer->data to temporary
                         memcpy(mvarray,buffer->data,buffer->length);
-                        memset(mvect_buffer,buffer->length,sizeof(buffer->length));
+                        //memset(mvect_buffer,buffer->length,sizeof(buffer->length));
                         mmal_buffer_header_mem_unlock(buffer);   
                         
-                        for (int i=0;i < size ; i++) {
+                        registers=0;
+                        uint16_t count=0;
+                        uint16_t wcount=0;
+                        for (int i=0;i < numblocks/4 ; i++) {
                             mmal_motion_vector mvs;
                             motion_vector mvt;
                             
                             memcpy(&mvs,mvarray+i,sizeof(mmal_motion_vector));
                             
-                            if ((abs(mvs.x_vector) + abs(mvs.y_vector)) < 5) //Ignore if did not move pixels. Maybe this should be a config option.
-                               continue;
+                            if ((abs(mvs.x_vector) + abs(mvs.y_vector)) > 5) //Ignore if did not move pixels. Maybe this should be a config option.
+                               registers =registers | (1 << count);
+                            
+                            count++;
+                            
+                            if (( count == 32) || (i == numblocks-1)) {
+                               memcpy(mvect_buffer+t_offset , &registers, 4 ) ;  
+                               //std::cout << "Count in "<< count << std::endl;
+                               count=0;
+                               wcount+=1;
+                               t_offset+=4;
+                               //std::cout << "Word " << wcount;
+      
+                               registers=0;
+
+                             }
                           
-                            mvt.xcoord = (i*16) % (encoder->output[0]->format->es->video.width + 16);  //these blocks are tiled to cover the entire frame and are 16x16 size
-                            mvt.ycoord = ((i*16)/(encoder->output[0]->format->es->video.width +16))*16;
                             
-                            
+                            /*OLD CODE superseded by vector mask
                             //only save buffer data when this is an odd frame, see notes on software decoding above
                             if (vec_count & 1) {
                                   //Info("ZMC vec_count is odd < %d >  saving", vec_count);              
@@ -497,7 +515,10 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
 				    		      ups.xcoord1=(mvt.xcoord)>>4;
                                   ups.ycoord1=(mvt.ycoord)>>4;
                                   vec_count++;
-						    }	
+						    }*/
+						    
+						    
+						    	
                             
                             
                         } 

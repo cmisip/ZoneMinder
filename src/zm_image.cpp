@@ -407,7 +407,8 @@ void Image::Initialise()
 }
 
 
-uint8_t *& Image::VectBuffer() {
+/* OLD CODE, superseded by vector mask
+  uint8_t *& Image::VectBuffer() {
 	   if (mv_buffer ==NULL) {
 		   //FIXMEC mv_buffer size is resolution divided by pixel dimension of 16x16 macroblock, assuming up to 80% frame covered as max case, plus 4 bytes for header info (number of vectors and how vector was extracted : hardware or software
 		   mv_size=((((((width * height)/16)*(double)80)/100)))+4;
@@ -417,8 +418,20 @@ uint8_t *& Image::VectBuffer() {
   	   
 	   }
 	   return mv_buffer;
-}	      
+}*/	      
 
+
+ uint8_t *& Image::VectBuffer() {
+	   if (mv_buffer ==NULL) {
+		   //Good enough for 1920x1080
+		   mv_size=1024;
+		   mv_buffer = (uint8_t*)zm_mallocaligned(32,mv_size);
+	       if(mv_buffer == NULL)
+		      Fatal("Memory allocation for mvect buffer failed: %s",strerror(errno));
+  	   
+	   }
+	   return mv_buffer;
+}
 
 /* Requests a writeable buffer to the image. This is safer than buffer() because this way we can guarantee that a buffer of required size exists */
 uint8_t* Image::WriteBuffer(const unsigned int p_width, const unsigned int p_height, const unsigned int p_colours, const unsigned int p_subpixelorder) {

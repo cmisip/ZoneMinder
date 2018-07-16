@@ -386,6 +386,9 @@ public:
   inline Function GetFunction() const {
     return( function );
   }
+  inline Purpose GetPurpose() const {
+    return( purpose );
+  }
   inline bool Enabled() {
     if ( function <= MONITOR )
       return( false );

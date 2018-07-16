@@ -99,6 +99,10 @@ protected:
 
   int       overload_count;
   int       extend_alarm_count;
+  
+  //Motion vector mask
+  uint16_t zm_size=1024; //good enough for 1920x1080
+  uint8_t *zone_vector_mask=NULL;
 
 protected:
   void Setup( Monitor *p_monitor, int p_id, const char *p_label, ZoneType p_type, const Polygon &p_polygon, const Rgb p_alarm_rgb, CheckMethod p_check_method, int p_min_pixel_threshold, int p_max_pixel_threshold, int p_min_alarm_pixels, int p_max_alarm_pixels, const Coord &p_filter_box, int p_min_filter_pixels, int p_max_filter_pixels, int p_min_blob_pixels, int p_max_blob_pixels, int p_min_blobs, int p_max_blobs, int p_overload_frames, int p_extend_alarm_frames );
@@ -158,8 +162,9 @@ public:
   }
   void RecordStats( const Event *event );
   bool CheckAlarms( const Image *delta_image );
-  bool CheckAlarms( uint8_t *& mvect_buffer);
+  bool CheckAlarms( uint8_t *& mvect_buffer, uint16_t width, uint16_t height);
   bool DumpSettings( char *output, bool verbose );
+  void SetVectorMask();
 
   static bool ParsePolygonString( const char *polygon_string, Polygon &polygon );
   static bool ParseZoneString( const char *zone_string, int &zone_id, int &colour, Polygon &polygon );
