@@ -468,7 +468,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                         registers=0;
                         uint16_t count=0;
                         uint16_t wcount=0;
-                        for (int i=0;i < numblocks/4 ; i++) {
+                        for (int i=0;i < numblocks ; i++) {
                             mmal_motion_vector mvs;
                             motion_vector mvt;
                             
@@ -660,6 +660,25 @@ int FfmpegCamera::OpenMmal(AVCodecContext *mVideoCodecContext){
    if ( mmal_component_create(MMAL_COMPONENT_DEFAULT_VIDEO_ENCODER, &encoder)  != MMAL_SUCCESS) {
       Fatal("failed to create mmal encoder");
    }   
+   
+   /* Get statistics on the input port */
+   MMAL_PARAMETER_CORE_STATISTICS_T stats = {{0}};
+   stats.hdr.id = MMAL_PARAMETER_CORE_STATISTICS;
+   stats.hdr.size = sizeof(MMAL_PARAMETER_CORE_STATISTICS_T);
+   if (mmal_port_parameter_get(encoder->input[0], &stats.hdr) != MMAL_SUCCESS) {
+     Info("failed to get mmal port statistics");
+   }
+   else {
+     Info("stats: %i, %i", stats.stats.buffer_count, stats.stats.max_delay);
+   }
+   /* Set the zero-copy parameter on the input port */
+   MMAL_PARAMETER_BOOLEAN_T zc = {{MMAL_PARAMETER_ZERO_COPY, sizeof(zc)}, MMAL_TRUE};
+   if (mmal_port_parameter_set(encoder->input[0], &zc.hdr) != MMAL_SUCCESS)
+     Info("Failed to set zero copy on encoder input");
+
+   /* Set the zero-copy parameter on the output port */
+   if (mmal_port_parameter_set_boolean(encoder->output[0], MMAL_PARAMETER_ZERO_COPY, MMAL_TRUE) != MMAL_SUCCESS)
+     Info("Failed to set zero copy on encoder output");
 
    /* Set format of video encoder input port */
    MMAL_ES_FORMAT_T *format_in = encoder->input[0]->format;
@@ -732,9 +751,9 @@ int FfmpegCamera::OpenMmal(AVCodecContext *mVideoCodecContext){
    //encoder->input[0]->buffer_size = encoder->input[0]->buffer_size_min;
    //encoder->output[0]->buffer_num = encoder->output[0]->buffer_num_min;
    //encoder->output[0]->buffer_size = encoder->output[0]->buffer_size_min;
-   pool_in = mmal_pool_create(encoder->input[0]->buffer_num,
+   pool_in = mmal_port_pool_create(encoder->input[0],encoder->input[0]->buffer_num,
                               encoder->input[0]->buffer_size);
-   pool_out = mmal_pool_create(encoder->output[0]->buffer_num,
+   pool_out = mmal_port_pool_create(encoder->output[0],encoder->output[0]->buffer_num,
                                encoder->output[0]->buffer_size);
 
    /* Create a queue to store our decoded video frames. The callback we will get when
