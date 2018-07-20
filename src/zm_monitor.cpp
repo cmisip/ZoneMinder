@@ -2861,9 +2861,10 @@ Monitor *Monitor::Load( unsigned int p_id, bool load_zones, Purpose purpose ) {
 #endif    
   } else if ( type == "Ffmpeghw" ) {
 #if HAVE_LIBAVFORMAT      
-      
-    width=VCOS_ALIGN_UP(width,32);
-    height=VCOS_ALIGN_UP(height,16);
+     
+    // Allows to adjust directbuffer to accomodate alignment required by mmal
+    //width=VCOS_ALIGN_UP(width,32);
+    //height=VCOS_ALIGN_UP(height,16);
     
     camera = new FfmpegCamera(
       id,
