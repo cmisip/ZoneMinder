@@ -427,10 +427,13 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                       
                     //copy buffer->data to directbuffer
                     if (colours == ZM_COLOUR_GRAY8)
-                        memcpy(directbuffer,rbuffer->data,resizer->output[0]->format->es->video.width * resizer->output[0]->format->es->video.height);
-                    else
-                        memcpy(directbuffer,rbuffer->data,rbuffer->length);
-                    
+                        //memcpy(directbuffer,rbuffer->data,resizer->output[0]->format->es->video.width * resizer->output[0]->format->es->video.height);
+                        memcpy(directbuffer,rbuffer->data,width *height);
+                    else if (colours == ZM_COLOUR_RGB24)
+                        //memcpy(directbuffer,rbuffer->data,rbuffer->length);
+                        memcpy(directbuffer,rbuffer->data,width * height * 3);
+                    else if (colours == ZM_COLOUR_RGB32)
+                        memcpy(directbuffer,rbuffer->data,width * height * 4);
                     mmal_buffer_header_mem_unlock(rbuffer);   
                     
                     mmal_buffer_header_release(rbuffer);
@@ -469,17 +472,19 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                         uint16_t count=0;
                         uint16_t wcount=0;
                         for (int i=0;i < numblocks ; i++) {
-                            mmal_motion_vector mvs;
-                            motion_vector mvt;
+                            //mmal_motion_vector mvs;
+                            //motion_vector mvt;
                             
-                            memcpy(&mvs,mvarray+i,sizeof(mmal_motion_vector));
+                            //memcpy(&mvs,mvarray+i,sizeof(mmal_motion_vector));
                             
-                            if ((abs(mvs.x_vector) + abs(mvs.y_vector)) > 5) //Ignore if did not move pixels. Maybe this should be a config option.
+                            //if ((abs(mvs.x_vector) + abs(mvs.y_vector)) > 8) //Ignore if did not move pixels. Maybe this should be a config option.if ((abs(mvarray[i].x_vector) + abs(mvarray[i].y_vector)) > 5) 
+                            if ((abs(mvarray[i].x_vector) + abs(mvarray[i].y_vector)) > 8) 
                                registers =registers | (1 << count);
                             
                             count++;
                             
-                            if (( count == 32) || (i == numblocks-1)) {
+                            //if (( count == 32) || (i == numblocks-1)) {
+                            if ( count == 32) {
                                memcpy(mvect_buffer+t_offset , &registers, 4 ) ;  
                                //std::cout << "Count in "<< count << std::endl;
                                count=0;
@@ -660,14 +665,33 @@ int FfmpegCamera::OpenMmal(AVCodecContext *mVideoCodecContext){
    if ( mmal_component_create(MMAL_COMPONENT_DEFAULT_VIDEO_ENCODER, &encoder)  != MMAL_SUCCESS) {
       Fatal("failed to create mmal encoder");
    }   
+   
+   /* Get statistics on the input port */
+   MMAL_PARAMETER_CORE_STATISTICS_T stats = {{0}};
+   stats.hdr.id = MMAL_PARAMETER_CORE_STATISTICS;
+   stats.hdr.size = sizeof(MMAL_PARAMETER_CORE_STATISTICS_T);
+   if (mmal_port_parameter_get(encoder->input[0], &stats.hdr) != MMAL_SUCCESS) {
+     Info("failed to get mmal port statistics");
+   }
+   else {
+     Info("Encoder stats: %i, %i", stats.stats.buffer_count, stats.stats.max_delay);
+   }
+   /* Set the zero-copy parameter on the input port */
+   MMAL_PARAMETER_BOOLEAN_T zc = {{MMAL_PARAMETER_ZERO_COPY, sizeof(zc)}, MMAL_TRUE};
+   if (mmal_port_parameter_set(encoder->input[0], &zc.hdr) != MMAL_SUCCESS)
+     Info("Failed to set zero copy on encoder input");
+
+   /* Set the zero-copy parameter on the output port */
+   if (mmal_port_parameter_set_boolean(encoder->output[0], MMAL_PARAMETER_ZERO_COPY, MMAL_TRUE) != MMAL_SUCCESS)
+     Info("Failed to set zero copy on encoder output");
 
    /* Set format of video encoder input port */
    MMAL_ES_FORMAT_T *format_in = encoder->input[0]->format;
    format_in->type = MMAL_ES_TYPE_VIDEO;
    format_in->encoding = MMAL_ENCODING_I420;
-   //FIXME, consider using vcos_align_up here
-   format_in->es->video.width = mVideoCodecContext->width;
-   format_in->es->video.height = mVideoCodecContext->height;
+   
+   format_in->es->video.width = width;
+   format_in->es->video.height = height;
    format_in->es->video.frame_rate.num = 30;
    format_in->es->video.frame_rate.den = 1;
    format_in->es->video.par.num = 1;
@@ -684,9 +708,9 @@ int FfmpegCamera::OpenMmal(AVCodecContext *mVideoCodecContext){
    MMAL_ES_FORMAT_T *format_out = encoder->output[0]->format;
    format_out->type = MMAL_ES_TYPE_VIDEO;
    format_out->encoding = MMAL_ENCODING_H264;
-   //FIXME, consider using vcos_align_up here
-   format_out->es->video.width = mVideoCodecContext->width;
-   format_out->es->video.height = mVideoCodecContext->height;
+  
+   format_out->es->video.width = width;
+   format_out->es->video.height = height;
    format_out->es->video.frame_rate.num = 30;
    format_out->es->video.frame_rate.den = 1;
    format_out->es->video.par.num = 0; 
@@ -728,13 +752,13 @@ int FfmpegCamera::OpenMmal(AVCodecContext *mVideoCodecContext){
 
    /* The format of both ports is now set so we can get their buffer requirements and create
     * our buffer headers. We use the buffer pool API to create these. */
-   //encoder->input[0]->buffer_num = encoder->input[0]->buffer_num_min;
-   //encoder->input[0]->buffer_size = encoder->input[0]->buffer_size_min;
-   //encoder->output[0]->buffer_num = encoder->output[0]->buffer_num_min;
-   //encoder->output[0]->buffer_size = encoder->output[0]->buffer_size_min;
-   pool_in = mmal_pool_create(encoder->input[0]->buffer_num,
+   encoder->input[0]->buffer_num = encoder->input[0]->buffer_num_min;
+   encoder->input[0]->buffer_size = encoder->input[0]->buffer_size_min;
+   encoder->output[0]->buffer_num = encoder->output[0]->buffer_num_min;
+   encoder->output[0]->buffer_size = encoder->output[0]->buffer_size_min;
+   pool_in = mmal_port_pool_create(encoder->input[0],encoder->input[0]->buffer_num,
                               encoder->input[0]->buffer_size);
-   pool_out = mmal_pool_create(encoder->output[0]->buffer_num,
+   pool_out = mmal_port_pool_create(encoder->output[0],encoder->output[0]->buffer_num,
                                encoder->output[0]->buffer_size);
 
    /* Create a queue to store our decoded video frames. The callback we will get when
@@ -771,15 +795,34 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
    if ( mmal_component_create("vc.ril.isp", &resizer)  != MMAL_SUCCESS) { 
       Fatal("failed to create mmal resizer");
    }   
+   
+   
+   /* Get statistics on the input port */
+   MMAL_PARAMETER_CORE_STATISTICS_T stats = {{0}};
+   stats.hdr.id = MMAL_PARAMETER_CORE_STATISTICS;
+   stats.hdr.size = sizeof(MMAL_PARAMETER_CORE_STATISTICS_T);
+   if (mmal_port_parameter_get(resizer->input[0], &stats.hdr) != MMAL_SUCCESS) {
+     Info("failed to get mmal port statistics");
+   }
+   else {
+     Info("Resizer stats: %i, %i", stats.stats.buffer_count, stats.stats.max_delay);
+   }
+   /* Set the zero-copy parameter on the input port */
+   MMAL_PARAMETER_BOOLEAN_T zc = {{MMAL_PARAMETER_ZERO_COPY, sizeof(zc)}, MMAL_TRUE};
+   if (mmal_port_parameter_set(resizer->input[0], &zc.hdr) != MMAL_SUCCESS)
+     Info("Failed to set zero copy on resizer input");
+
+   /* Set the zero-copy parameter on the output port */
+   if (mmal_port_parameter_set_boolean(resizer->output[0], MMAL_PARAMETER_ZERO_COPY, MMAL_TRUE) != MMAL_SUCCESS)
+     Info("Failed to set zero copy on resizer output");
 
    /* Set format of video resizer input port */
    MMAL_ES_FORMAT_T *format_in = resizer->input[0]->format;
    format_in->type = MMAL_ES_TYPE_VIDEO;
    format_in->encoding = MMAL_ENCODING_I420;
    format_in->encoding_variant = MMAL_ENCODING_I420;
-   //FIXME, consider using vcos_align_up here
-   format_in->es->video.width = mVideoCodecContext->width;
-   format_in->es->video.height = mVideoCodecContext->height;
+   format_in->es->video.width = width;
+   format_in->es->video.height = height;
    format_in->es->video.frame_rate.num = 30;
    format_in->es->video.frame_rate.den = 1;
    format_in->es->video.par.num = 1;
@@ -799,10 +842,11 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
    
    MMAL_ES_FORMAT_T *format_out = resizer->output[0]->format;
    
+   format_out->es->video.width = width;
+   format_out->es->video.height = height;
    format_out->es->video.crop.width = mVideoCodecContext->width;
    format_out->es->video.crop.height = mVideoCodecContext->height;
-   format_out->es->video.width = mVideoCodecContext->width;
-   format_out->es->video.height = mVideoCodecContext->height;
+   
   
    
    /*if ( colours == ZM_COLOUR_RGB32 ) {
@@ -860,13 +904,13 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
 
    /* The format of both ports is now set so we can get their buffer requirements and create
     * our buffer headers. We use the buffer pool API to create these. */
-   //resizer->input[0]->buffer_num = resizer->input[0]->buffer_num_min;
-   //resizer->input[0]->buffer_size = resizer->input[0]->buffer_size_min;
-   //resizer->output[0]->buffer_num = resizer->output[0]->buffer_num_min;
-   //resizer->output[0]->buffer_size = resizer->output[0]->buffer_size_min;
-   pool_inr = mmal_pool_create(resizer->input[0]->buffer_num,
+   resizer->input[0]->buffer_num = resizer->input[0]->buffer_num_min;
+   resizer->input[0]->buffer_size = resizer->input[0]->buffer_size_min;
+   resizer->output[0]->buffer_num = resizer->output[0]->buffer_num_min;
+   resizer->output[0]->buffer_size = resizer->output[0]->buffer_size_min;
+   pool_inr = mmal_port_pool_create(resizer->input[0],resizer->input[0]->buffer_num,
                               resizer->input[0]->buffer_size);
-   pool_outr = mmal_pool_create(resizer->output[0]->buffer_num,
+   pool_outr = mmal_port_pool_create(resizer->output[0],resizer->output[0]->buffer_num,
                                resizer->output[0]->buffer_size);
 
    /* Create a queue to store our decoded video frames. The callback we will get when
