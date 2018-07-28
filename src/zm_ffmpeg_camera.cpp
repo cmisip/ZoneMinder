@@ -427,13 +427,13 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                       
                     //copy buffer->data to directbuffer
                     if (colours == ZM_COLOUR_GRAY8)
-                        //memcpy(directbuffer,rbuffer->data,resizer->output[0]->format->es->video.width * resizer->output[0]->format->es->video.height);
-                        memcpy(directbuffer,rbuffer->data,width *height);
-                    else if (colours == ZM_COLOUR_RGB24)
-                        //memcpy(directbuffer,rbuffer->data,rbuffer->length);
-                        memcpy(directbuffer,rbuffer->data,width * height * 3);
-                    else if (colours == ZM_COLOUR_RGB32)
-                        memcpy(directbuffer,rbuffer->data,width * height * 4);
+                        memcpy(directbuffer,rbuffer->data,resizer->output[0]->format->es->video.width * resizer->output[0]->format->es->video.height);
+                        //memcpy(directbuffer,rbuffer->data,width *height);
+                    else //if (colours == ZM_COLOUR_RGB24)
+                        memcpy(directbuffer,rbuffer->data,rbuffer->length);
+                        //memcpy(directbuffer,rbuffer->data,width * height * 3);
+                    //else if (colours == ZM_COLOUR_RGB32)
+                      //  memcpy(directbuffer,rbuffer->data,width * height * 4);
                     mmal_buffer_header_mem_unlock(rbuffer);   
                     
                     mmal_buffer_header_release(rbuffer);
@@ -792,7 +792,8 @@ int FfmpegCamera::OpenMmalSWS(AVCodecContext *mVideoCodecContext){
 
    // Create the encoder component.
    //if ( mmal_component_create("vc.ril.resize", &resizer)  != MMAL_SUCCESS) {
-   if ( mmal_component_create("vc.ril.isp", &resizer)  != MMAL_SUCCESS) { 
+   //if ( mmal_component_create("vc.ril.isp", &resizer)  != MMAL_SUCCESS) { 
+   if ( mmal_component_create(MMAL_COMPONENT_DEFAULT_VIDEO_SPLITTER, &resizer)  != MMAL_SUCCESS) { 
       Fatal("failed to create mmal resizer");
    }   
    
