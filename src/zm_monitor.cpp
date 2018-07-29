@@ -2862,6 +2862,7 @@ Monitor *Monitor::Load( unsigned int p_id, bool load_zones, Purpose purpose ) {
   } else if ( type == "Ffmpeghw" ) {
 #if HAVE_LIBAVFORMAT      
       
+    //setup directbuffer with vcos_aligned_size (mmal upsizes to these multiples)  
     width=VCOS_ALIGN_UP(width,32);
     height=VCOS_ALIGN_UP(height,16);
     

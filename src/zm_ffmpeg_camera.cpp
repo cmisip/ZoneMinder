@@ -468,7 +468,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                         registers=0;
                         uint16_t count=0;
                         uint16_t wcount=0;
-                        for (int i=0;i < numblocks/4 ; i++) {
+                        for (int i=0;i < numblocks ; i++) {
                             mmal_motion_vector mvs;
                             motion_vector mvt;
                             
@@ -479,7 +479,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                             
                             count++;
                             
-                            if (( count == 32) || (i == numblocks-1)) {
+                            if ( count == 32) {
                                memcpy(mvect_buffer+t_offset , &registers, 4 ) ;  
                                //std::cout << "Count in "<< count << std::endl;
                                count=0;
