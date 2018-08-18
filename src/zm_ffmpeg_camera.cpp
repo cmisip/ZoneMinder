@@ -379,14 +379,12 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                     
                   int bufsize=av_image_get_buffer_size(AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 1);  
                     
-                  mmal_buffer_header_mem_lock(buffer);
                    
                   av_image_copy_to_buffer(buffer->data, bufsize, (const uint8_t **)mRawFrame->data, mRawFrame->linesize,
                                  AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 1);
                   buffer->length=bufsize;
                   //buffer->offset = 0; buffer->pts = buffer->dts = MMAL_TIME_UNKNOWN;  //could be used to check if buffer and frame synchronized
                                                                                         //if we supply a time stamp to pts, the first buffer returned with the same time stamp is the matching data for the frame sent
-                  mmal_buffer_header_mem_unlock(buffer);
                   
            
                   if (mmal_port_send_buffer(encoder->input[0], buffer) != MMAL_SUCCESS) {
@@ -402,15 +400,12 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                   
                   int bufsize=av_image_get_buffer_size(AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 1);  
                     
-                  mmal_buffer_header_mem_lock(rbuffer);
                    
                   av_image_copy_to_buffer(rbuffer->data, bufsize, (const uint8_t **)mRawFrame->data, mRawFrame->linesize,
                                  AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 1);
                   rbuffer->length=bufsize;
                   //buffer->pts = buffer->dts = frameCount;  //could be used to check if buffer and frame synchronized
                                                                                         //if we supply a time stamp to pts, the first buffer returned with the same time stamp is the matching data for the frame sent
-                  mmal_buffer_header_mem_unlock(rbuffer);
-                  
            
                   if (mmal_port_send_buffer(resizer->input[0], rbuffer) != MMAL_SUCCESS) {
                        Warning("failed to send YUV420 buffer to resizer for frame %d\n", frameCount);
@@ -423,18 +418,12 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                 //Directbuffer is created here 
                 while ((rbuffer = mmal_queue_get(contextr.queue)) != NULL) {
                     
-                    mmal_buffer_header_mem_lock(rbuffer);
-                      
-                    //copy buffer->data to directbuffer
+                    
                     if (colours == ZM_COLOUR_GRAY8)
                         memcpy(directbuffer,rbuffer->data,resizer->output[0]->format->es->video.width * resizer->output[0]->format->es->video.height);
-                        //memcpy(directbuffer,rbuffer->data,width *height);
-                    else //if (colours == ZM_COLOUR_RGB24)
+                    else 
                         memcpy(directbuffer,rbuffer->data,rbuffer->length);
-                        //memcpy(directbuffer,rbuffer->data,width * height * 3);
-                    //else if (colours == ZM_COLOUR_RGB32)
-                      //  memcpy(directbuffer,rbuffer->data,width * height * 4);
-                    mmal_buffer_header_mem_unlock(rbuffer);   
+                   
                     
                     mmal_buffer_header_release(rbuffer);
                     
@@ -451,80 +440,33 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                 while ((buffer = mmal_queue_get(context.queue)) != NULL) {
                         
                       if(buffer->flags & MMAL_BUFFER_HEADER_FLAG_CODECSIDEINFO) {
-                          
-                        //uint16_t t_offset=sizeof(uint16_t)*2; //skip the first 4 bytes, reserved for size and vec_type
-                        //vector_ceiling--;
-                        
+                       
                         uint16_t t_offset=0; 
                       
-                        mmal_buffer_header_mem_lock(buffer);
-                        uint16_t size=buffer->length/sizeof(mmal_motion_vector);
-                        struct mmal_motion_vector mvarray[size];
+                        //uint16_t size=buffer->length/sizeof(mmal_motion_vector);
                         uint32_t registers;
                   
-                        
-                        //copy buffer->data to temporary
-                        memcpy(mvarray,buffer->data,buffer->length);
-                        //memset(mvect_buffer,buffer->length,sizeof(buffer->length));
-                        mmal_buffer_header_mem_unlock(buffer);   
+                        mmal_motion_vector *mvarray=(mmal_motion_vector *)buffer->data;
                         
                         registers=0;
                         uint16_t count=0;
                         uint16_t wcount=0;
                         for (int i=0;i < numblocks ; i++) {
-                            //mmal_motion_vector mvs;
-                            //motion_vector mvt;
                             
-                            //memcpy(&mvs,mvarray+i,sizeof(mmal_motion_vector));
-                            
-                            //if ((abs(mvs.x_vector) + abs(mvs.y_vector)) > 8) //Ignore if did not move pixels. Maybe this should be a config option.if ((abs(mvarray[i].x_vector) + abs(mvarray[i].y_vector)) > 5) 
                             if ((abs(mvarray[i].x_vector) + abs(mvarray[i].y_vector)) > 8) 
                                registers =registers | (1 << count);
                             
                             count++;
                             
-                            //if (( count == 32) || (i == numblocks-1)) {
                             if ( count == 32) {
                                memcpy(mvect_buffer+t_offset , &registers, 4 ) ;  
-                               //std::cout << "Count in "<< count << std::endl;
                                count=0;
                                wcount+=1;
                                t_offset+=4;
-                               //std::cout << "Word " << wcount;
       
                                registers=0;
 
                              }
-                          
-                            
-                            /*OLD CODE superseded by vector mask
-                            //only save buffer data when this is an odd frame, see notes on software decoding above
-                            if (vec_count & 1) {
-                                  //Info("ZMC vec_count is odd < %d >  saving", vec_count);              
-                                  ups.xcoord2=(mvt.xcoord)>>4;
-                                  ups.ycoord2=(mvt.ycoord)>>4;
-                                  
-                                  if (vec_count < vector_ceiling) {
-                                     memcpy(mvect_buffer+t_offset,&ups,sizeof(vector_package));
-                                     t_offset+=sizeof(vector_package);
-                                     vec_count++;
-                                  } else {
-									 memset(mvect_buffer,0,image.mv_size);
-									 vec_count=0;
-									 break;
-								  }	  
-                                  
-		    			     
-		    			    }else {
-								  //Info("ZMC vec_count is even < %d >  just operating", vec_count);
-				    		      ups.xcoord1=(mvt.xcoord)>>4;
-                                  ups.ycoord1=(mvt.ycoord)>>4;
-                                  vec_count++;
-						    }*/
-						    
-						    
-						    	
-                            
                             
                         } 
                          
@@ -545,18 +487,7 @@ if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the s
                     
                 }
                 
-                
-                //only send buffer data when this is an odd frame FIXMEC 
-                //if (frameCount & 1) {
-                //   memset(mvect_buffer,0,image.mv_size);
-                //   vec_count=0;
-                //}
-                
-                //memcpy(mvect_buffer,&vec_count, sizeof(vec_count));  //size at first byte
-                //uint16_t vec_type = 1;
-                         
-                //memcpy(mvect_buffer+sizeof(vec_count),&vec_type, sizeof(vec_type));   //type of vector at 3rd byte
-                         
+             
                 //if (vec_count > 10)
                    //Info("FFMPEG HW VEC_COUNT %d, ceiling %d, framenum %d", vec_count, vector_ceiling, frameCount );
                  
