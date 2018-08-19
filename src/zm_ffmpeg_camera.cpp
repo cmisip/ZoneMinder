@@ -184,7 +184,7 @@ int FfmpegCamera::mmal_decode(AVPacket *packet) {
      
       
       
-     return status;    
+     return (0);    
 }	
 
 int  FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mRawFrame data 
@@ -193,8 +193,8 @@ int  FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mRawFrame data
                
 	if ((buffer = mmal_queue_get(pool_ine->queue)) != NULL) {  
          
-         av_image_copy_to_buffer(buffer->data, bufsize, (const uint8_t **)mRawFrame->->data, mRawFrame->->linesize,
-                                 AV_PIX_FMT_YUV420P, mRawFrame->->width, mRawFrame->->height, 1);
+         av_image_copy_to_buffer(buffer->data, bufsize, (const uint8_t **)mRawFrame->data, mRawFrame->linesize,
+                                 AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 1);
          buffer->length=bufsize;
          
          
@@ -236,7 +236,7 @@ int  FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mRawFrame data
                             count++;
                             
                             if ( count == 32) {
-                               memcpy((*mvect_buffer)+t_offset , &registers, 4 ) ;  
+                               memcpy((*mv_buffer)+t_offset , &registers, 4 ) ;  
                                count=0;
                                wcount+=1;
                                t_offset+=4;
@@ -263,7 +263,7 @@ int  FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mRawFrame data
       }
       
       
-     return status;    
+     return (0);    
 }	
 
 
@@ -271,8 +271,8 @@ int  FfmpegCamera::mmal_resize(uint8_t** dbuffer) {   //uses mRawFrame data
 	MMAL_BUFFER_HEADER_T *buffer;
 	if ((buffer = mmal_queue_get(pool_inr->queue)) != NULL) {  
          
-         av_image_copy_to_buffer(buffer->data, bufsize, (const uint8_t **)mRawFrame->->data, mRawFrame->->linesize,
-                                 AV_PIX_FMT_YUV420P, mRawFrame->->width, mRawFrame->->height, 1);
+         av_image_copy_to_buffer(buffer->data, bufsize, (const uint8_t **)mRawFrame->data, mRawFrame->linesize,
+                                 AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 1);
          buffer->length=bufsize;
          
          
@@ -325,7 +325,7 @@ int  FfmpegCamera::mmal_resize(uint8_t** dbuffer) {   //uses mRawFrame data
       }
       
       
-     return status;    
+     return (0);    
 }	
 
 
@@ -420,8 +420,8 @@ int FfmpegCamera::Capture( Image &image ) {
      mmal_decode(&packet);
             
             
-            if (frame->data[0]) {  //framecomplete
-              framecomplete=1;
+            if (mRawFrame->data[0]) {  //framecomplete
+              frameComplete=1;
               
               /*for (uint32_t i = 0; i < 200; ++i) {
                     fprintf(stderr, "\\%02x", (unsigned char)(*frame->data)[i]);
@@ -1256,11 +1256,11 @@ int FfmpegCamera::OpenFfmpeg() {
 
 #if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
   int pSize = av_image_get_buffer_size( imagePixFormat, width, height,1 );
-    bufsize = av_image_get_buffer_size(AV_PIX_FMT_YUV420P , frame->width, frame->height,1 );
+    bufsize = av_image_get_buffer_size(AV_PIX_FMT_YUV420P , mRawFrame->width, mRawFrame->height,1 );
   
 #else
   int pSize = avpicture_get_size( imagePixFormat, width, height );
-    bufsize = avpicture_get_size(AV_PIX_FMT_YUV420P, frame->width, frame->height );
+    bufsize = avpicture_get_size(AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height );
   
 #endif
 

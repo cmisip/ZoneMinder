@@ -103,6 +103,7 @@ class FfmpegCamera : public Camera {
 
     struct CONTEXT_T {
     MMAL_QUEUE_T *dqueue,*equeue,*rqueue=NULL;
+    MMAL_STATUS_T status;
     } context;
     
     int bufsize=0;
@@ -157,7 +158,7 @@ class FfmpegCamera : public Camera {
     int mmal_encode(uint8_t **mv_buffer);
     int mmal_resize(uint8_t **dbuffer);
     
-    int OpenMMalDecoder(mVideoCodecContext);
+    int OpenMmalDecoder(AVCodecContext *mVideoCodecContext);
     int OpenMmalEncoder(AVCodecContext *mVideoCodecContext);
     int OpenMmalResizer(AVCodecContext *mVideoCodecContext);
     int CloseMmal();
