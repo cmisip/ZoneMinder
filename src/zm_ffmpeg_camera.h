@@ -48,7 +48,7 @@ class FfmpegCamera : public Camera {
     std::string         mMethod;
     std::string         mOptions;
 
-    int frameCount;    
+    int frameCount=0;    
 
 #if HAVE_LIBAVFORMAT
     AVFormatContext     *mFormatContext;

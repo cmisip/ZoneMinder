@@ -605,13 +605,13 @@ void FfmpegCamera::control_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf
 
 void FfmpegCamera::display_format(MMAL_PORT_T **port, MMAL_ES_FORMAT_T **iformat){
  	/* Display the port format */
-   fprintf(stderr,"---------------------------------------------------\n");
-   fprintf(stderr, "PORT %s\n", (*port)->name);
-   fprintf(stderr, " type: %i, fourcc: %4.4s\n", (*iformat)->type, (char *)&(*iformat)->encoding);
-   fprintf(stderr, " bitrate: %i, framed: %i\n", (*iformat)->bitrate,
+   Info("---------------------------------------------------\n");
+   Info("PORT %s\n", (*port)->name);
+   Info(" type: %i, fourcc: %4.4s\n", (*iformat)->type, (char *)&(*iformat)->encoding);
+   Info(" bitrate: %i, framed: %i\n", (*iformat)->bitrate,
            !!((*iformat)->flags & MMAL_ES_FORMAT_FLAG_FRAMED));
-   fprintf(stderr, " extra data: %i, %p\n", (*iformat)->extradata_size, (*iformat)->extradata);
-   fprintf(stderr, " width: %i, height: %i, (%i,%i,%i,%i)\n",
+   Info(" extra data: %i, %p\n", (*iformat)->extradata_size, (*iformat)->extradata);
+   Info(" width: %i, height: %i, (%i,%i,%i,%i)\n",
            (*iformat)->es->video.width, (*iformat)->es->video.height,
            (*iformat)->es->video.crop.x, (*iformat)->es->video.crop.y,
            (*iformat)->es->video.crop.width, (*iformat)->es->video.crop.height);
@@ -633,8 +633,6 @@ int FfmpegCamera::OpenMmalDecoder(AVCodecContext *mVideoCodecContext){
      Fatal("failed to enable mmal decoder control port");
    }  
    
-   if ( mmal_port_enable(decoder->control, control_callback);
-   CHECK_STATUS(status, "failed to enable control port");
    
    /* Get statistics on the input port */
    MMAL_PARAMETER_CORE_STATISTICS_T stats = {{0}};
@@ -687,8 +685,10 @@ int FfmpegCamera::OpenMmalDecoder(AVCodecContext *mVideoCodecContext){
    format_out->es->video.par.den = 1;
    
    //ALLOCATE Extradata, copying from avcodec context
-   status = mmal_format_extradata_alloc(format_in, mVideoCodecContext->extradata_size);
-   Info(stderr,"Decoder extradata size %d\n", mVideoCodecContext->extradata_size);
+   if (mmal_format_extradata_alloc(format_in, mVideoCodecContext->extradata_size) != MMAL_SUCCESS)
+     Fatal("failed to allocate extradata ");
+     
+   Info("Decoder extradata size %d\n", mVideoCodecContext->extradata_size);
    format_in->extradata_size = mVideoCodecContext->extradata_size;
    if (format_in->extradata_size)
       memcpy(format_in->extradata, mVideoCodecContext->extradata, mVideoCodecContext->extradata_size);
@@ -1314,7 +1314,7 @@ int FfmpegCamera::OpenFfmpeg() {
     mmal_decode(&mRawPacket);
     zm_av_packet_unref(&mRawPacket);
 	 
-	OpenMMalDecoder(mVideoCodecContext);
+	OpenMmalDecoder(mVideoCodecContext);
     OpenMmalEncoder(mVideoCodecContext);
     OpenMmalResizer(mVideoCodecContext);
   }
