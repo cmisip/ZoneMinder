@@ -94,8 +94,13 @@ class FfmpegCamera : public Camera {
   public:
       
 #ifdef __arm__
+<<<<<<< Updated upstream
     MMAL_COMPONENT_T *encoder;
     MMAL_POOL_T *pool_in, *pool_out;
+=======
+    MMAL_COMPONENT_T *encoder, *decoder, *resizer=NULL;
+    MMAL_POOL_T *pool_ind, *pool_outd, *pool_ine, *pool_oute, *pool_inr, *pool_outr;
+>>>>>>> Stashed changes
 
     struct CONTEXT_T {
     MMAL_QUEUE_T *queue;
@@ -146,11 +151,28 @@ class FfmpegCamera : public Camera {
     
 #ifdef __arm__
     static void input_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
+<<<<<<< Updated upstream
     static void output_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
     static void input_callbackr(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
     static void output_callbackr(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
     int OpenMmal(AVCodecContext *mVideoCodecContext);
     int OpenMmalSWS(AVCodecContext *mVideoCodecContext);
+=======
+    static void output_callbackr(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
+    static void output_callbacke(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
+    static void output_callbackd(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
+    static void control_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
+    
+    static void display_format(MMAL_PORT_T **port, MMAL_ES_FORMAT_T **iformat);
+    
+    int mmal_decode(AVPacket *packet);
+    int mmal_encode(uint8_t **mv_buffer);
+    int mmal_resize(uint8_t **dbuffer);
+    
+    int OpenMmalDecoder(AVCodecContext *mVideoCodecContext);
+    int OpenMmalEncoder(AVCodecContext *mVideoCodecContext);
+    int OpenMmalResizer(AVCodecContext *mVideoCodecContext);
+>>>>>>> Stashed changes
     int CloseMmal();
 #endif
 };
