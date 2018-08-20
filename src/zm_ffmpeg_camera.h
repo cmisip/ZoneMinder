@@ -94,15 +94,18 @@ class FfmpegCamera : public Camera {
   public:
       
 #ifdef __arm__
-    MMAL_COMPONENT_T *encoder;
-    MMAL_POOL_T *pool_in, *pool_out;
+
+    MMAL_COMPONENT_T *encoder, *decoder, *resizer=NULL;
+    MMAL_POOL_T *pool_ind, *pool_outd, *pool_ine, *pool_oute, *pool_inr, *pool_outr;
+
 
     struct CONTEXT_T {
-    MMAL_QUEUE_T *queue;
-    } context,contextr;
+    MMAL_QUEUE_T *rqueue,*equeue,*dqueue;
+    MMAL_STATUS_T status;
+    } context;
     
-    MMAL_COMPONENT_T *resizer;
-    MMAL_POOL_T *pool_inr, *pool_outr;
+    
+    
 
     
 
@@ -146,14 +149,25 @@ class FfmpegCamera : public Camera {
     
 #ifdef __arm__
     static void input_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
-    static void output_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
-    static void input_callbackr(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
+
     static void output_callbackr(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
-    int OpenMmal(AVCodecContext *mVideoCodecContext);
-    int OpenMmalSWS(AVCodecContext *mVideoCodecContext);
+    static void output_callbacke(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
+    //static void output_callbackd(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
+    
+    static void control_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
+    
+    static void display_format(MMAL_PORT_T **port, MMAL_ES_FORMAT_T **iformat);
+    
+    int mmal_decode(AVPacket *packet);
+    int mmal_encode(uint8_t **mv_buffer);
+    int mmal_resize(uint8_t **dbuffer);
+    
+    //int OpenMmalDecoder(AVCodecContext *mVideoCodecContext);
+    int OpenMmalEncoder(AVCodecContext *mVideoCodecContext);
+    int OpenMmalResizer(AVCodecContext *mVideoCodecContext);
+
     int CloseMmal();
 #endif
 };
 
 #endif // ZM_FFMPEG_CAMERA_H
-
