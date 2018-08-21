@@ -218,46 +218,42 @@ int FfmpegCamera::Capture( Image &image ) {
 
          
  
-      uint8_t* mvect_buffer=NULL;     
-if (!( cfunction == Monitor::MVDECT )) {     
-    //Info("Camera Function is not MVDECT.. Will not capture motion vectors.");
-    goto end;
-}
-
+      
         
-{   
-        mvect_buffer=image.VectBuffer();   
-        if (mvect_buffer ==  NULL ){
+
+        uint8_t* mvect_buffer=NULL;  
+        if  (cfunction == Monitor::MVDECT) {
+	  
+	       mvect_buffer=image.VectBuffer();   
+           if (mvect_buffer ==  NULL ){
                 Error("Failed requesting vector buffer for the captured image.");
                 return (-1); 
-        } else
+           } else
                 memset(mvect_buffer,0,image.mv_size);
-        
-        
-        
-}
 
-     
  
-/*        
-if (!ctype) { //motion vectors from software h264 decoding
-            
+        
+           if (!ctype) { //motion vectors from software h264 decoding
+			   
+               //FIXMEC, still need to write this          
 
-}  */       
+           }         
 
-#ifdef __arm__        
-if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels tile Left to Right and then top to bottom and there are a fixed number covering the entire frame.
+#ifdef __arm__
+        
+           if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels tile Left to Right and then top to bottom and there are a fixed number covering the entire frame.
               
                 mmal_encode(&mvect_buffer);
 
                 mmal_resize(&directbuffer);
                 
-} //if ctype
+           } //if ctype
         
+         }
         
 #endif
         
-end:      
+      
 
 //This is the software scaler. Directbuffer is packaged into mFrame and processed by swscale to convert to appropriate format and size
 //Need SWScale when Source Type is FFmpeg with Function as Mvdect or Modect
