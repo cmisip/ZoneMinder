@@ -45,7 +45,8 @@ class FfmpegCamera : public Camera {
     std::string         mMethod;
     std::string         mOptions;
 
-    int frameCount;    
+    int frameCount; 
+    int bufsize=0;   
 
 #if HAVE_LIBAVFORMAT
     AVFormatContext     *mFormatContext;
@@ -152,7 +153,7 @@ class FfmpegCamera : public Camera {
 
     static void output_callbackr(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
     static void output_callbacke(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
-    //static void output_callbackd(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
+    static void output_callbackd(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
     
     static void control_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
     
