@@ -59,6 +59,7 @@ class FfmpegCamera : public Camera {
     AVFrame             *mRawFrame; 
     AVFrame             *mFrame;
     _AVPIXELFORMAT      imagePixFormat;
+    AVPacket mRawPacket;
 
     // Need to keep track of these because apparently the stream can start with values for pts/dts and then subsequent packets start at zero.
     int64_t audio_last_pts;
@@ -163,7 +164,7 @@ class FfmpegCamera : public Camera {
     int mmal_encode(uint8_t **mv_buffer);
     int mmal_resize(uint8_t **dbuffer);
     
-    //int OpenMmalDecoder(AVCodecContext *mVideoCodecContext);
+    int OpenMmalDecoder(AVCodecContext *mVideoCodecContext);
     int OpenMmalEncoder(AVCodecContext *mVideoCodecContext);
     int OpenMmalResizer(AVCodecContext *mVideoCodecContext);
 
