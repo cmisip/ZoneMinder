@@ -2863,8 +2863,8 @@ Monitor *Monitor::Load( unsigned int p_id, bool load_zones, Purpose purpose ) {
 #if HAVE_LIBAVFORMAT      
      
     // Allows to adjust directbuffer to accomodate alignment required by mmal
-    width=VCOS_ALIGN_UP(width,32);
-    height=VCOS_ALIGN_UP(height,16);
+    //width=VCOS_ALIGN_UP(width,32);
+    //height=VCOS_ALIGN_UP(height,16);
     
     camera = new FfmpegCamera(
       id,

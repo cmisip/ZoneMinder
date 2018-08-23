@@ -445,7 +445,7 @@ int  FfmpegCamera::mmal_resize(uint8_t** dbuffer) {   //uses mRawFrame data
 	
 	MMAL_BUFFER_HEADER_T *buffer;
 	if ((buffer = mmal_queue_get(pool_inr->queue)) != NULL) {  
-         
+         bufsize = avpicture_get_size(AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height );
          av_image_copy_to_buffer(buffer->data, bufsize, (const uint8_t **)mRawFrame->data, mRawFrame->linesize,
                                  AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 1);
          buffer->length=bufsize;
@@ -462,7 +462,8 @@ int  FfmpegCamera::mmal_resize(uint8_t** dbuffer) {   //uses mRawFrame data
       
       while ((buffer = mmal_queue_get(context.rqueue)) != NULL){
         
-         memcpy((*dbuffer),buffer->data,buffer->length);
+         //memcpy((*dbuffer),buffer->data,buffer->length);
+         memcpy((*dbuffer),buffer->data,width*height*colours);
          
          mmal_buffer_header_release(buffer);
       }
@@ -651,15 +652,18 @@ int FfmpegCamera::OpenMmalResizer(AVCodecContext *mVideoCodecContext){
    format_in->type = MMAL_ES_TYPE_VIDEO;
    format_in->encoding = MMAL_ENCODING_I420;
    format_in->encoding_variant = MMAL_ENCODING_I420;
-   format_in->es->video.width = VCOS_ALIGN_UP(width, 32);
-   format_in->es->video.height = VCOS_ALIGN_UP(height,16);
+   //format_in->es->video.width = VCOS_ALIGN_UP(width, 32);
+   //format_in->es->video.height = VCOS_ALIGN_UP(height,16);
+   format_in->es->video.width = width;
+   format_in->es->video.height = height;
    format_in->es->video.frame_rate.num = 30;
    format_in->es->video.frame_rate.den = 1;
    format_in->es->video.par.num = 1;
    format_in->es->video.par.den = 1;
-   format_in->es->video.crop.width = mVideoCodecContext->width;
-   format_in->es->video.crop.height = mVideoCodecContext->height;
-   
+   //format_in->es->video.crop.width = mVideoCodecContext->width;
+   //format_in->es->video.crop.height = mVideoCodecContext->height;
+   format_in->es->video.crop.width = width;
+   format_in->es->video.crop.height = height;
    
  
 
@@ -674,8 +678,8 @@ int FfmpegCamera::OpenMmalResizer(AVCodecContext *mVideoCodecContext){
    
    format_out->es->video.width = width;
    format_out->es->video.height = height;
-   format_out->es->video.crop.width = mVideoCodecContext->width;
-   format_out->es->video.crop.height = mVideoCodecContext->height;
+   format_out->es->video.crop.width = width;
+   format_out->es->video.crop.height = height;
    
   
    
@@ -1002,18 +1006,21 @@ int FfmpegCamera::OpenFfmpeg() {
   if(mRawFrame == NULL || mFrame == NULL)
     Fatal( "Unable to allocate frame for %s", mPath.c_str() );
     
-  mRawFrame->width = width;
-  mRawFrame->height = height;  
+  //mRawFrame->width = width;
+  //mRawFrame->height = height;  
+  
+  //mRawFrame->width = mVideoCodecContext->width;
+  //mRawFrame->height = mVideoCodecContext->height;  
 
   Debug ( 1, "Allocated frames" );
 
 #if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
   int pSize = av_image_get_buffer_size( imagePixFormat, width, height,1 );
-  bufsize = av_image_get_buffer_size(AV_PIX_FMT_YUV420P , mRawFrame->width, mRawFrame->height,1 );
+  //bufsize = av_image_get_buffer_size(AV_PIX_FMT_YUV420P , mRawFrame->width, mRawFrame->height,1 );
   
 #else
   int pSize = avpicture_get_size( imagePixFormat, width, height );
-  bufsize = avpicture_get_size(AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height );
+  //bufsize = avpicture_get_size(AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height );
 #endif
 
   if( (unsigned int)pSize != imagesize) {
@@ -1047,6 +1054,8 @@ int FfmpegCamera::OpenFfmpeg() {
   if ( (unsigned int)mVideoCodecContext->width != width || (unsigned int)mVideoCodecContext->height != height ) {
     Warning( "Monitor dimensions are %dx%d but camera is sending %dx%d", width, height, mVideoCodecContext->width, mVideoCodecContext->height );
   }
+  
+  Info("Width %d, Height %d, Codec->width %d, Codec->height %d",width, height, mVideoCodecContext->width, mVideoCodecContext->height);
 
   mCanCapture = true;
 #ifdef __arm__
