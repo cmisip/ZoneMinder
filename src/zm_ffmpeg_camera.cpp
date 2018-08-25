@@ -221,6 +221,7 @@ int FfmpegCamera::Capture( Image &image ) {
         directbuffer = image.WriteBuffer(width, height, colours, subpixelorder);
         if(directbuffer == NULL) {
           Error("Failed requesting writeable buffer for the captured image.");
+          zm_av_packet_unref( &packet );
           return (-1);
         }
         
@@ -1542,6 +1543,7 @@ else if ( packet.pts && video_last_pts > packet.pts ) {
       }
       Debug(4, "about to decode video" );
       
+    if (!ctype) {   
 #if LIBAVCODEC_VERSION_CHECK(57, 64, 0, 64, 0)
       ret = avcodec_send_packet( mVideoCodecContext, &packet );
       if ( ret < 0 ) {
@@ -1569,6 +1571,12 @@ else if ( packet.pts && video_last_pts > packet.pts ) {
 #endif
 
       Debug( 4, "Decoded video packet at frame %d", frameCount );
+      
+   }  else { //if ctype
+    //the mmal decoder loop is here 	
+      frameComplete=mmal_decode(&packet);
+      Debug( 4, "Decoded video packet at frame %d", frameCount );
+}  //if cytpe   
 
       if ( frameComplete ) {
         Debug( 4, "Got frame %d", frameCount );
@@ -1582,6 +1590,50 @@ else if ( packet.pts && video_last_pts > packet.pts ) {
           zm_av_packet_unref( &packet );
           return (-1);
         }
+        
+        
+        
+        uint8_t* mvect_buffer=NULL;  
+        if  (cfunction == Monitor::MVDECT) {
+	  
+	       mvect_buffer=image.VectBuffer();   
+           if (mvect_buffer ==  NULL ){
+                Error("Failed requesting vector buffer for the captured image.");
+                return (-1); 
+           } //else
+                //memset(mvect_buffer,0,image.mv_size);
+
+ 
+        
+           if (!ctype) { //motion vectors from software h264 decoding
+			   
+               //FIXMEC, still need to write this          
+
+           }  
+        
+        
+#ifdef __arm__
+        
+         if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels tile Left to Right and then top to bottom and there are a fixed number covering the entire frame.
+              
+                mmal_encode(&mvect_buffer);
+
+                mmal_resize(&directbuffer);
+                
+           } //if ctype
+        
+         }
+        
+#endif
+        
+//This is the software scaler. Directbuffer is packaged into mFrame and processed by swscale to convert to appropriate format and size
+//Need SWScale when Source Type is FFmpeg with Function as Mvdect or Modect
+//or Source type is FFmpeghw and Function is Modect  
+//This is only used if source is FFmpeg or source is FFmpeghw and Function is Modect.      
+if (((ctype) && (cfunction == Monitor::MODECT)) || (!ctype)) {   
+	
+         
+        
 #if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
         av_image_fill_arrays(mFrame->data, mFrame->linesize, directbuffer, imagePixFormat, width, height, 1);
 #else
@@ -1594,6 +1646,8 @@ else if ( packet.pts && video_last_pts > packet.pts ) {
           Fatal("Unable to convert raw format %u to target format %u at frame %d",
                 mVideoCodecContext->pix_fmt, imagePixFormat, frameCount);
         }
+        
+} // closing bracket for "if (((ctype) && (cfunction == Monitor::MODECT)) || (!ctype))"        
 
         frameCount++;
       } else {
