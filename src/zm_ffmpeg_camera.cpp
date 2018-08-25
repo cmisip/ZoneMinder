@@ -360,12 +360,12 @@ void FfmpegCamera::control_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf
    {
    case MMAL_EVENT_EOS:
       /* Only sink component generate EOS events */
-      Warning("MMAL EOS\n");
+      Warning("PORT: %s MMAL EOS\n", port->name);
       break;
    case MMAL_EVENT_ERROR:
       /* Something went wrong. Signal this to the application */
       ctx->status = *(MMAL_STATUS_T *)buffer->data;
-      Warning("ERROR: %d\n", ctx->status);
+      Warning("ERROR: PORT: %s Type: %d\n", port->name, ctx->status);
       break;
    default:
       break;
@@ -554,7 +554,7 @@ void FfmpegCamera::display_format(MMAL_PORT_T **port, MMAL_ES_FORMAT_T **iformat
            (*iformat)->es->video.width, (*iformat)->es->video.height,
            (*iformat)->es->video.crop.x, (*iformat)->es->video.crop.y,
            (*iformat)->es->video.crop.width, (*iformat)->es->video.crop.height);
-   Info("PORT %s INPUT BUFFER SIZE %d NUM %d\n", (*port)->name), (*port)->input[0]->buffer_size,(*port)->input[0]->buffer_num_recommended);
+   Info("PORT %s BUFFER SIZE %d NUM %d\n", (*port)->name, (*port)->buffer_size,(*port)->buffer_num_recommended);
    Info("---------------------------------------------------\n");        
        
 }	
@@ -598,9 +598,6 @@ int FfmpegCamera::OpenMmalDecoder(AVCodecContext *mVideoCodecContext){
    format_in->type = MMAL_ES_TYPE_VIDEO;
    format_in->encoding = MMAL_ENCODING_H264;
    
-   //format_in->es->video.width = width;
-   //format_in->es->video.height = height;
-   
    format_in->es->video.width = VCOS_ALIGN_UP(width, 32);
    format_in->es->video.height = VCOS_ALIGN_UP(height,16);
    format_in->es->video.crop.width = mVideoCodecContext->width;
@@ -622,12 +619,6 @@ int FfmpegCamera::OpenMmalDecoder(AVCodecContext *mVideoCodecContext){
    format_out->type = MMAL_ES_TYPE_VIDEO;
    format_out->encoding = MMAL_ENCODING_I420;
   
-   //format_out->es->video.width = width;
-   //format_out->es->video.height = height;
-   //format_out->es->video.frame_rate.num = 30;
-   //format_out->es->video.frame_rate.den = 1;
-   //format_out->es->video.par.num = 1; 
-   //format_out->es->video.par.den = 1;
    
    //ALLOCATE Extradata, copying from avcodec context
    if (mmal_format_extradata_alloc(format_in, mVideoCodecContext->extradata_size) != MMAL_SUCCESS)
@@ -659,10 +650,8 @@ int FfmpegCamera::OpenMmalDecoder(AVCodecContext *mVideoCodecContext){
                                
    /* Display the input port format */
    display_format(&decoder->input[0],&format_in);
-   //Info("DECODER INPUT BUFFER SIZE %d NUM %d\n",decoder->input[0]->buffer_size,decoder->input[0]->buffer_num_recommended);
    
    display_format(&decoder->output[0],&format_out);
-   //Info("DECODER OUTPUT BUFFER SIZE %d NUM %d\n",decoder->output[0]->buffer_size,decoder->output[0]->buffer_num_recommended);
                                
 
    /* Create a queue to store our decoded video frames. The callback we will get when
@@ -730,18 +719,6 @@ int FfmpegCamera::OpenMmalEncoder(AVCodecContext *mVideoCodecContext){
    format_in->type = MMAL_ES_TYPE_VIDEO;
    format_in->encoding = MMAL_ENCODING_I420;
    
-   /*
-   format_in->es->video.width = VCOS_ALIGN_UP(width, 32);;
-   format_in->es->video.height = VCOS_ALIGN_UP(height,16);
-   
-   format_in->es->video.frame_rate.num = 30;
-   format_in->es->video.frame_rate.den = 1;
-   format_in->es->video.par.num = 1;
-   format_in->es->video.par.den = 1;
-   format_in->es->video.crop.width = mVideoCodecContext->width;
-   format_in->es->video.crop.height = mVideoCodecContext->height;
-   */
-   
    format_in->es->video.width = VCOS_ALIGN_UP(width, 32);
    format_in->es->video.height = VCOS_ALIGN_UP(height,16);
    format_in->es->video.crop.width = mVideoCodecContext->width;
@@ -762,13 +739,6 @@ int FfmpegCamera::OpenMmalEncoder(AVCodecContext *mVideoCodecContext){
    MMAL_ES_FORMAT_T *format_out = encoder->output[0]->format;
    format_out->type = MMAL_ES_TYPE_VIDEO;
    format_out->encoding = MMAL_ENCODING_H264;
-  
-   //format_out->es->video.width = width;
-   //format_out->es->video.height = height;
-   //format_out->es->video.frame_rate.num = 30;
-   //format_out->es->video.frame_rate.den = 1;
-   //format_out->es->video.par.num = 1; 
-   //format_out->es->video.par.den = 1;
    
    format_out->es->video.width = VCOS_ALIGN_UP(width, 32);
    format_out->es->video.height = VCOS_ALIGN_UP(height,16);
@@ -786,10 +756,8 @@ int FfmpegCamera::OpenMmalEncoder(AVCodecContext *mVideoCodecContext){
 
    /* Display the input port format */
    display_format(&encoder->input[0],&format_in);
-   //Info("ENCODER INPUT BUFFER SIZE %d NUM %d\n",encoder->input[0]->buffer_size,encoder->input[0]->buffer_num_recommended);
    
    display_format(&encoder->output[0],&format_out);
-   //Info("ENCODER OUTPUT BUFFER SIZE %d NUM %d\n",encoder->output[0]->buffer_size,encoder->output[0]->buffer_num_recommended);
    
 
    /* The format of both ports is now set so we can get their buffer requirements and create
@@ -867,20 +835,6 @@ int FfmpegCamera::OpenMmalResizer(AVCodecContext *mVideoCodecContext){
    format_in->type = MMAL_ES_TYPE_VIDEO;
    format_in->encoding = MMAL_ENCODING_I420;
    format_in->encoding_variant = MMAL_ENCODING_I420;
-   /* 
-   //format_in->es->video.width = VCOS_ALIGN_UP(width, 32);
-   //format_in->es->video.height = VCOS_ALIGN_UP(height,16);
-   format_in->es->video.width = width;
-   format_in->es->video.height = height;
-   format_in->es->video.frame_rate.num = 30;
-   format_in->es->video.frame_rate.den = 1;
-   format_in->es->video.par.num = 1;
-   format_in->es->video.par.den = 1;
-   //format_in->es->video.crop.width = mVideoCodecContext->width;
-   //format_in->es->video.crop.height = mVideoCodecContext->height;
-   format_in->es->video.crop.width = width;
-   format_in->es->video.crop.height = height;
-   */
    
    format_in->es->video.width = VCOS_ALIGN_UP(width, 32);
    format_in->es->video.height = VCOS_ALIGN_UP(height,16);
@@ -903,12 +857,6 @@ int FfmpegCamera::OpenMmalResizer(AVCodecContext *mVideoCodecContext){
    
    
    MMAL_ES_FORMAT_T *format_out = resizer->output[0]->format;
-   /*
-   format_out->es->video.width = width;
-   format_out->es->video.height = height;
-   format_out->es->video.crop.width = width;
-   format_out->es->video.crop.height = height;
-   */
    
    format_out->es->video.width = VCOS_ALIGN_UP(width, 32);
    format_out->es->video.height = VCOS_ALIGN_UP(height,16);
@@ -935,10 +883,8 @@ int FfmpegCamera::OpenMmalResizer(AVCodecContext *mVideoCodecContext){
 
    /* Display the input port format */
    display_format(&resizer->input[0],&format_in);
-   //Info("RESIZER INPUT BUFFER SIZE %d NUM %d\n",resizer->input[0]->buffer_size,resizer->input[0]->buffer_num_recommended);
    
    display_format(&resizer->output[0],&format_out);
-   //Info("RESIZER OUTPUT BUFFER SIZE %d NUM %d\n",resizer->output[0]->buffer_size,resizer->output[0]->buffer_num_recommended);
    
 
    /* The format of both ports is now set so we can get their buffer requirements and create
