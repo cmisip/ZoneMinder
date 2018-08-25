@@ -500,7 +500,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer, uint16_t width, uint16_t height
     
     //Old scoring system
     if( score ) {
-      Info("Motion %d of %d, score %d, min %d, max %d ", vec_count, numblocks, score, minimum_vector_coverage, maximum_vector_coverage);  
+      //Info("Motion %d of %d, score %d, min %d, max %d ", vec_count, numblocks, score, minimum_vector_coverage, maximum_vector_coverage);  
       if( min_alarm_pixels && (score < minimum_vector_coverage) ) {
         // Not enough pixels alarmed 
         return (false);
