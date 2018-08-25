@@ -151,7 +151,9 @@ int FfmpegCamera::Capture( Image &image ) {
   int frameComplete = false;
   while ( !frameComplete ) {
     int ret;
+    av_init_packet( &packet );
     int avResult = av_read_frame( mFormatContext, &packet );
+    
     char errbuf[AV_ERROR_MAX_STRING_SIZE];
     if ( avResult < 0 ) {
       av_strerror(avResult, errbuf, AV_ERROR_MAX_STRING_SIZE);
@@ -170,8 +172,10 @@ int FfmpegCamera::Capture( Image &image ) {
     }
     Debug( 5, "Got packet from stream %d dts (%d) pts(%d)", packet.stream_index, packet.pts, packet.dts );
     // What about audio stream? Maybe someday we could do sound detection...
+
     if ( packet.stream_index == mVideoStreamId ) {
     if (!ctype) { 
+    
 #if LIBAVCODEC_VERSION_CHECK(57, 64, 0, 64, 0)
       ret = avcodec_send_packet( mVideoCodecContext, &packet );
       if ( ret < 0 ) {
@@ -183,7 +187,7 @@ int FfmpegCamera::Capture( Image &image ) {
       ret = avcodec_receive_frame( mVideoCodecContext, mRawFrame );
       if ( ret < 0 ) {
         av_strerror( ret, errbuf, AV_ERROR_MAX_STRING_SIZE );
-        Error( "Unable to send packet at frame %d: %s, continuing", frameCount, errbuf );
+        Error( "Unable to receive frame at frame %d: %s, continuing", frameCount, errbuf );
         zm_av_packet_unref( &packet );
         continue;
       }
@@ -202,34 +206,14 @@ int FfmpegCamera::Capture( Image &image ) {
       Debug( 4, "Decoded video packet at frame %d", frameCount );
 
 }  else { //if ctype
-  //the mmal decoder loop is here 	
-     Info("CTYPE calling mmal_decode start with packet");
-     if (mmal_decode(&packet) == 0) {
-            
-            Info("Capture, check mrawframe->data[0]");
-            if (mRawFrame->data[0]) {  //framecomplete
-              frameComplete=1;
-              Info("CTYPE Capture with framecomplete");
-              //for (uint32_t i = 0; i < 200; ++i) {
-                //    fprintf(stderr, "\\%02x", (unsigned char)(*frame->data)[i]);
-              //}           
-             
-              
-            } else {
-            
-            Info("CTYPE capture before packet unref");
-            zm_av_packet_unref(&packet);   
-            Info("CTYPE capture after packet unref");
-  
-		    }
-	} else
-	    continue;
- 
-
+    //the mmal decoder loop is here 	
+      frameComplete=mmal_decode(&packet);
+      Debug( 4, "Decoded video packet at frame %d", frameCount );
 }  //if cytpe
 
       if ( frameComplete ) {
         Debug( 4, "Got frame %d", frameCount );
+        //Info("Got frame %d", frameCount );
         
         uint8_t* directbuffer;
 
@@ -253,8 +237,8 @@ int FfmpegCamera::Capture( Image &image ) {
            if (mvect_buffer ==  NULL ){
                 Error("Failed requesting vector buffer for the captured image.");
                 return (-1); 
-           } else
-                memset(mvect_buffer,0,image.mv_size);
+           } //else
+                //memset(mvect_buffer,0,image.mv_size);
 
  
         
@@ -394,32 +378,21 @@ void FfmpegCamera::control_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf
 
 int FfmpegCamera::mmal_decode(AVPacket *pkt) {   
 	MMAL_BUFFER_HEADER_T *buffer;
-	
-	Info("mmal_decode start");
-	if ((!pkt->pts) || (!pkt->data)) {
-    Info("packet pts is zero, aborting");
-	   return -1;
-	   
-	}   
+	int got_frame=false;
+	//Info("decode start");
 	
 	if ((buffer = mmal_queue_get(pool_ind->queue)) != NULL) {  
          
-         Info("mmal_decode before copy packet data: Size %" PRId64 " pts : %d \n",pkt->size, pkt->pts);
          memcpy(buffer->data,pkt->data,pkt->size);
-         Info("mmal_decode after copy packet data");
          buffer->length=pkt->size;
          
-         /*uint8_t nal_type=buffer->data[4] & 0x1f;
-         fprintf(stderr,"NAL TYPE --------------------> %d\n",nal_type);
+         buffer->flags|=MMAL_BUFFER_HEADER_FLAG_FRAME_START;
+         buffer->flags|=MMAL_BUFFER_HEADER_FLAG_FRAME_END;
          
-         //PRINT THE BUFFER CONTENTS
+         buffer->pts = pkt->pts == AV_NOPTS_VALUE ? MMAL_TIME_UNKNOWN : pkt->pts;
+         buffer->dts = pkt->dts == AV_NOPTS_VALUE ? MMAL_TIME_UNKNOWN : pkt->dts;
          
-         for (uint32_t i = 0; ((i < buffer->length) && (i < 20)); ++i) {
-                    fprintf(stderr, "\\%02x", (unsigned char)buffer->data[i]);
-         }           
-         */
-         buffer->pts = buffer->dts = MMAL_TIME_UNKNOWN;
-         buffer->flags=pkt->flags;
+         buffer->alloc_size = decoder->input[0]->buffer_size;
             
          if (mmal_port_send_buffer(decoder->input[0], buffer) != MMAL_SUCCESS) {
                  Warning("failed to send H264 buffer to decoder for frame %d\n", frameCount);
@@ -432,37 +405,27 @@ int FfmpegCamera::mmal_decode(AVPacket *pkt) {
       
       while ((buffer = mmal_queue_get(context.dqueue)) != NULL)
       {
-         Info("mmal_decode before av_image_fill_arrays");
          //save it as AVFrame holding an I420 buffer
          av_image_fill_arrays(mRawFrame->data, mRawFrame->linesize, buffer->data, AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 1);
-         //PRINT THE BUFFER CONTENTS
-         /*for (uint32_t i = 0; ((i < buffer->length) && (i < 200)); ++i) {
-                    fprintf(stderr, "\\%02x", (unsigned char)buffer->data[i]);
-         }           
-         */
-         Info("mmal_decode after av_image_fill_arrays");
+         got_frame=true;
          
          mmal_buffer_header_release(buffer);
       }
 
       //if ((buffer = mmal_queue_get(pool_outd->queue)) != NULL) {
       while ((buffer = mmal_queue_get(pool_outd->queue)) != NULL){
-		 Info("mmal_decode before send empty buffer to decoder otuput"); 
 		 if (mmal_port_send_buffer(decoder->output[0], buffer) != MMAL_SUCCESS) {
 			   Warning("failed to send empty buffer to decoder output for frame %d\n", frameCount);
          } 
       }
       
-      
-     
-     Info("mmal_decode end");
-      
-     return (0);    
+     //Info("decode end");
+     return (got_frame);    
 }	
 
 int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mRawFrame data 
-	
 	MMAL_BUFFER_HEADER_T *buffer;
+	//Info("encode start");
 	uint16_t numblocks=((encoder->output[0]->format->es->video.width * encoder->output[0]->format->es->video.height)/256);
                
 	if ((buffer = mmal_queue_get(pool_ine->queue)) != NULL) {  
@@ -472,6 +435,8 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mRawFrame data
          buffer->length=bufsize;
          
          buffer->pts = buffer->dts = MMAL_TIME_UNKNOWN;
+         
+         buffer->alloc_size = encoder->input[0]->buffer_size;
           
          if (mmal_port_send_buffer(encoder->input[0], buffer) != MMAL_SUCCESS) {
                  Warning("failed to send I420 buffer to encoder for frame %d\n", frameCount);
@@ -528,23 +493,25 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mRawFrame data
                    }
 		  
       }
-      
+     //Info("encode end");
      return (0);    
 }	
 
 
 
 int  FfmpegCamera::mmal_resize(uint8_t** dbuffer) {   //uses mRawFrame data
-	
 	MMAL_BUFFER_HEADER_T *buffer;
-	if ((buffer = mmal_queue_get(pool_inr->queue)) != NULL) {  
-         bufsize = avpicture_get_size(AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height );
+	//Info("resize start");
+	if ((buffer = mmal_queue_get(pool_inr->queue)) != NULL) { 
+		 
          av_image_copy_to_buffer(buffer->data, bufsize, (const uint8_t **)mRawFrame->data, mRawFrame->linesize,
                                  AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 1);
          buffer->length=bufsize;
          
          buffer->pts = buffer->dts = MMAL_TIME_UNKNOWN;
          //buffer->flags=packet->flags;
+         
+         buffer->alloc_size = resizer->input[0]->buffer_size;
             
          if (mmal_port_send_buffer(resizer->input[0], buffer) != MMAL_SUCCESS) {
                  Warning("failed to send I420 buffer to resizer for frame %d\n", frameCount);
@@ -555,7 +522,6 @@ int  FfmpegCamera::mmal_resize(uint8_t** dbuffer) {   //uses mRawFrame data
       
       while ((buffer = mmal_queue_get(context.rqueue)) != NULL){
         
-         //memcpy((*dbuffer),buffer->data,buffer->length);
          memcpy((*dbuffer),buffer->data,width*height*colours);
          
          mmal_buffer_header_release(buffer);
@@ -569,7 +535,7 @@ int  FfmpegCamera::mmal_resize(uint8_t** dbuffer) {   //uses mRawFrame data
                    }
 		  
       }
-      
+      //Info("resize end");
      return (0);    
 }	
 
@@ -588,6 +554,8 @@ void FfmpegCamera::display_format(MMAL_PORT_T **port, MMAL_ES_FORMAT_T **iformat
            (*iformat)->es->video.width, (*iformat)->es->video.height,
            (*iformat)->es->video.crop.x, (*iformat)->es->video.crop.y,
            (*iformat)->es->video.crop.width, (*iformat)->es->video.crop.height);
+   Info("PORT %s INPUT BUFFER SIZE %d NUM %d\n", (*port)->name), (*port)->input[0]->buffer_size,(*port)->input[0]->buffer_num_recommended);
+   Info("---------------------------------------------------\n");        
        
 }	
 
@@ -630,14 +598,19 @@ int FfmpegCamera::OpenMmalDecoder(AVCodecContext *mVideoCodecContext){
    format_in->type = MMAL_ES_TYPE_VIDEO;
    format_in->encoding = MMAL_ENCODING_H264;
    
-   format_in->es->video.width = width;
-   format_in->es->video.height = height;
-   format_in->es->video.frame_rate.num = 30;
-   format_in->es->video.frame_rate.den = 1;
-   format_in->es->video.par.num = 1;
-   format_in->es->video.par.den = 1;
+   //format_in->es->video.width = width;
+   //format_in->es->video.height = height;
+   
+   format_in->es->video.width = VCOS_ALIGN_UP(width, 32);
+   format_in->es->video.height = VCOS_ALIGN_UP(height,16);
    format_in->es->video.crop.width = mVideoCodecContext->width;
    format_in->es->video.crop.height = mVideoCodecContext->height;
+   
+   format_in->es->video.frame_rate.num = 24000;
+   format_in->es->video.frame_rate.den = 1001;
+   format_in->es->video.par.num = mVideoCodecContext->sample_aspect_ratio.num;
+   format_in->es->video.par.den = mVideoCodecContext->sample_aspect_ratio.den;
+   format_in->flags = MMAL_ES_FORMAT_FLAG_FRAMED;
  
 
    
@@ -649,12 +622,12 @@ int FfmpegCamera::OpenMmalDecoder(AVCodecContext *mVideoCodecContext){
    format_out->type = MMAL_ES_TYPE_VIDEO;
    format_out->encoding = MMAL_ENCODING_I420;
   
-   format_out->es->video.width = width;
-   format_out->es->video.height = height;
-   format_out->es->video.frame_rate.num = 30;
-   format_out->es->video.frame_rate.den = 1;
-   format_out->es->video.par.num = 1; 
-   format_out->es->video.par.den = 1;
+   //format_out->es->video.width = width;
+   //format_out->es->video.height = height;
+   //format_out->es->video.frame_rate.num = 30;
+   //format_out->es->video.frame_rate.den = 1;
+   //format_out->es->video.par.num = 1; 
+   //format_out->es->video.par.den = 1;
    
    //ALLOCATE Extradata, copying from avcodec context
    if (mmal_format_extradata_alloc(format_in, mVideoCodecContext->extradata_size) != MMAL_SUCCESS)
@@ -670,23 +643,27 @@ int FfmpegCamera::OpenMmalDecoder(AVCodecContext *mVideoCodecContext){
      Fatal("failed to commit decoder output format");
    }
    
-   
-
-   /* Display the input port format */
-   display_format(&decoder->input[0],&format_in);
-   display_format(&decoder->output[0],&format_out);
 
 
    /* The format of both ports is now set so we can get their buffer requirements and create
     * our buffer headers. We use the buffer pool API to create these. */
-   decoder->input[0]->buffer_num = decoder->input[0]->buffer_num_min;
-   decoder->input[0]->buffer_size = decoder->input[0]->buffer_size_min;
-   decoder->output[0]->buffer_num = decoder->output[0]->buffer_num_min;
-   decoder->output[0]->buffer_size = decoder->output[0]->buffer_size_min;
+   decoder->input[0]->buffer_num = decoder->input[0]->buffer_num_recommended;
+   decoder->input[0]->buffer_size = decoder->input[0]->buffer_size_recommended;
+   decoder->output[0]->buffer_num = decoder->output[0]->buffer_num_recommended;
+   decoder->output[0]->buffer_size = decoder->output[0]->buffer_size_recommended;
    pool_ind = mmal_port_pool_create(decoder->input[0],decoder->input[0]->buffer_num,
                               decoder->input[0]->buffer_size);
    pool_outd = mmal_port_pool_create(decoder->output[0],decoder->output[0]->buffer_num,
                                decoder->output[0]->buffer_size);
+                               
+                               
+   /* Display the input port format */
+   display_format(&decoder->input[0],&format_in);
+   //Info("DECODER INPUT BUFFER SIZE %d NUM %d\n",decoder->input[0]->buffer_size,decoder->input[0]->buffer_num_recommended);
+   
+   display_format(&decoder->output[0],&format_out);
+   //Info("DECODER OUTPUT BUFFER SIZE %d NUM %d\n",decoder->output[0]->buffer_size,decoder->output[0]->buffer_num_recommended);
+                               
 
    /* Create a queue to store our decoded video frames. The callback we will get when
     * a frame has been decoded will put the frame into this queue. */
@@ -753,6 +730,7 @@ int FfmpegCamera::OpenMmalEncoder(AVCodecContext *mVideoCodecContext){
    format_in->type = MMAL_ES_TYPE_VIDEO;
    format_in->encoding = MMAL_ENCODING_I420;
    
+   /*
    format_in->es->video.width = VCOS_ALIGN_UP(width, 32);;
    format_in->es->video.height = VCOS_ALIGN_UP(height,16);
    
@@ -762,6 +740,18 @@ int FfmpegCamera::OpenMmalEncoder(AVCodecContext *mVideoCodecContext){
    format_in->es->video.par.den = 1;
    format_in->es->video.crop.width = mVideoCodecContext->width;
    format_in->es->video.crop.height = mVideoCodecContext->height;
+   */
+   
+   format_in->es->video.width = VCOS_ALIGN_UP(width, 32);
+   format_in->es->video.height = VCOS_ALIGN_UP(height,16);
+   format_in->es->video.crop.width = mVideoCodecContext->width;
+   format_in->es->video.crop.height = mVideoCodecContext->height;
+   
+   format_in->es->video.frame_rate.num = 24000;
+   format_in->es->video.frame_rate.den = 1001;
+   format_in->es->video.par.num = mVideoCodecContext->sample_aspect_ratio.num;
+   format_in->es->video.par.den = mVideoCodecContext->sample_aspect_ratio.den;
+   format_in->flags = MMAL_ES_FORMAT_FLAG_FRAMED;
  
 
    
@@ -780,6 +770,11 @@ int FfmpegCamera::OpenMmalEncoder(AVCodecContext *mVideoCodecContext){
    //format_out->es->video.par.num = 1; 
    //format_out->es->video.par.den = 1;
    
+   format_out->es->video.width = VCOS_ALIGN_UP(width, 32);
+   format_out->es->video.height = VCOS_ALIGN_UP(height,16);
+   format_out->es->video.crop.width = mVideoCodecContext->width;
+   format_out->es->video.crop.height = mVideoCodecContext->height;
+   
    
    if ( mmal_port_format_commit(encoder->output[0]) != MMAL_SUCCESS ) {
      Fatal("failed to commit encoder output format");
@@ -791,8 +786,11 @@ int FfmpegCamera::OpenMmalEncoder(AVCodecContext *mVideoCodecContext){
 
    /* Display the input port format */
    display_format(&encoder->input[0],&format_in);
+   //Info("ENCODER INPUT BUFFER SIZE %d NUM %d\n",encoder->input[0]->buffer_size,encoder->input[0]->buffer_num_recommended);
+   
    display_format(&encoder->output[0],&format_out);
-
+   //Info("ENCODER OUTPUT BUFFER SIZE %d NUM %d\n",encoder->output[0]->buffer_size,encoder->output[0]->buffer_num_recommended);
+   
 
    /* The format of both ports is now set so we can get their buffer requirements and create
     * our buffer headers. We use the buffer pool API to create these. */
@@ -869,6 +867,7 @@ int FfmpegCamera::OpenMmalResizer(AVCodecContext *mVideoCodecContext){
    format_in->type = MMAL_ES_TYPE_VIDEO;
    format_in->encoding = MMAL_ENCODING_I420;
    format_in->encoding_variant = MMAL_ENCODING_I420;
+   /* 
    //format_in->es->video.width = VCOS_ALIGN_UP(width, 32);
    //format_in->es->video.height = VCOS_ALIGN_UP(height,16);
    format_in->es->video.width = width;
@@ -881,6 +880,18 @@ int FfmpegCamera::OpenMmalResizer(AVCodecContext *mVideoCodecContext){
    //format_in->es->video.crop.height = mVideoCodecContext->height;
    format_in->es->video.crop.width = width;
    format_in->es->video.crop.height = height;
+   */
+   
+   format_in->es->video.width = VCOS_ALIGN_UP(width, 32);
+   format_in->es->video.height = VCOS_ALIGN_UP(height,16);
+   format_in->es->video.crop.width = mVideoCodecContext->width;
+   format_in->es->video.crop.height = mVideoCodecContext->height;
+   
+   format_in->es->video.frame_rate.num = 24000;
+   format_in->es->video.frame_rate.den = 1001;
+   format_in->es->video.par.num = mVideoCodecContext->sample_aspect_ratio.num;
+   format_in->es->video.par.den = mVideoCodecContext->sample_aspect_ratio.den;
+   format_in->flags = MMAL_ES_FORMAT_FLAG_FRAMED;
    
  
 
@@ -892,11 +903,17 @@ int FfmpegCamera::OpenMmalResizer(AVCodecContext *mVideoCodecContext){
    
    
    MMAL_ES_FORMAT_T *format_out = resizer->output[0]->format;
-   
+   /*
    format_out->es->video.width = width;
    format_out->es->video.height = height;
    format_out->es->video.crop.width = width;
    format_out->es->video.crop.height = height;
+   */
+   
+   format_out->es->video.width = VCOS_ALIGN_UP(width, 32);
+   format_out->es->video.height = VCOS_ALIGN_UP(height,16);
+   format_out->es->video.crop.width = mVideoCodecContext->width;
+   format_out->es->video.crop.height = mVideoCodecContext->height;
    
   
    
@@ -918,7 +935,11 @@ int FfmpegCamera::OpenMmalResizer(AVCodecContext *mVideoCodecContext){
 
    /* Display the input port format */
    display_format(&resizer->input[0],&format_in);
+   //Info("RESIZER INPUT BUFFER SIZE %d NUM %d\n",resizer->input[0]->buffer_size,resizer->input[0]->buffer_num_recommended);
+   
    display_format(&resizer->output[0],&format_out);
+   //Info("RESIZER OUTPUT BUFFER SIZE %d NUM %d\n",resizer->output[0]->buffer_size,resizer->output[0]->buffer_num_recommended);
+   
 
    /* The format of both ports is now set so we can get their buffer requirements and create
     * our buffer headers. We use the buffer pool API to create these. */
@@ -1160,23 +1181,13 @@ int FfmpegCamera::OpenFfmpeg() {
           zm_dump_stream_format(mFormatContext, mVideoStreamId, 0, 0);
       }
   }
-    //hardware decoder  
-  /*if (ctype) {       
-        if ( (mVideoCodec = avcodec_find_decoder_by_name("h264_mmal")) == NULL ) {
-               Fatal("Can't find codec for video stream from %s", mPath.c_str());
-        } else {
-           //Debug(1, "Video Found decoder");
-           Info( "Found HW MMAL decoder");
-           zm_dump_stream_format(mFormatContext, mVideoStreamId, 0, 0);
-        }  
-  
-  } */   
 
   //set the option for motionvector export if this is software h264 decoding
-    if (!ctype)
+   if (!ctype)
         av_dict_set(&optsmv, "flags2", "+export_mvs", 0);
 
    if (!ctype) {
+  // Open the video codec
 #if !LIBAVFORMAT_VERSION_CHECK(53, 8, 0, 8, 0)
   Debug ( 1, "Calling avcodec_open" );
   if (avcodec_open(mVideoCodecContext, mVideoCodec) < 0)
@@ -1200,7 +1211,7 @@ int FfmpegCamera::OpenFfmpeg() {
     } else {
       Debug(1, "Audio Found decoder");
       zm_dump_stream_format(mFormatContext, mAudioStreamId, 0, 0);
-  // Open the codec
+  // Open the audio codec
 #if !LIBAVFORMAT_VERSION_CHECK(53, 8, 0, 8, 0)
   Debug ( 1, "Calling avcodec_open" );
   if (avcodec_open(mAudioCodecContext, mAudioCodec) < 0)
@@ -1219,25 +1230,22 @@ int FfmpegCamera::OpenFfmpeg() {
 
   // Allocate space for the converted video frame
   mFrame = zm_av_frame_alloc();
+  
+  mRawFrame->width = VCOS_ALIGN_UP(width,32);
+  mRawFrame->height = VCOS_ALIGN_UP(height,16);  
 
   if(mRawFrame == NULL || mFrame == NULL)
     Fatal( "Unable to allocate frame for %s", mPath.c_str() );
-    
-  //mRawFrame->width = width;
-  //mRawFrame->height = height;  
-  
-  //mRawFrame->width = mVideoCodecContext->width;
-  //mRawFrame->height = mVideoCodecContext->height;  
 
   Debug ( 1, "Allocated frames" );
 
 #if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
   int pSize = av_image_get_buffer_size( imagePixFormat, width, height,1 );
-  //bufsize = av_image_get_buffer_size(AV_PIX_FMT_YUV420P , mRawFrame->width, mRawFrame->height,1 );
+  bufsize = av_image_get_buffer_size(AV_PIX_FMT_YUV420P , mRawFrame->width, mRawFrame->height,1 );
   
 #else
   int pSize = avpicture_get_size( imagePixFormat, width, height );
-  //bufsize = avpicture_get_size(AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height );
+  bufsize = avpicture_get_size(AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height );
 #endif
 
   if( (unsigned int)pSize != imagesize) {
@@ -1278,14 +1286,14 @@ int FfmpegCamera::OpenFfmpeg() {
 #ifdef __arm__
   
     
-    if (ctype) { 
-	
+  if (ctype) { 
 	
 	OpenMmalDecoder(mVideoCodecContext);
     OpenMmalEncoder(mVideoCodecContext);
     OpenMmalResizer(mVideoCodecContext);
-//>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>    
+   
     av_init_packet(&mRawPacket);
+    
 	//Send the sps and pps as first packet
 	Info("Sending PPS and SPS");
     mRawPacket.data=(uint8_t*)av_mallocz(mVideoCodecContext->extradata_size);
@@ -1295,7 +1303,7 @@ int FfmpegCamera::OpenFfmpeg() {
     mmal_decode(&mRawPacket);
     zm_av_packet_unref(&mRawPacket);
     Info("Done sending PPS and SPS");
-//<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<    
+   
   }  
     
   
