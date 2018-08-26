@@ -119,12 +119,12 @@ void zm_packetqueue::clear_unwanted_packets( timeval *recording_started, int mVi
 		return;
 	}
 
-  // Step 1 - find keyframe < recording_started.
-  // Step 2 - pop packets until we get to the packet in step 2
-  list<ZMPacket *>::reverse_iterator it;
+  // Step 1 - find first keyframe from beginning of list.
+  // Step 2 - pop packets until we get to the first keyframe
+  list<ZMPacket *>::iterator it;
 
   Debug(3, "Looking for keyframe after start recording stream id (%d)", mVideoStreamId );
-  for ( it = pktQueue.rbegin(); it != pktQueue.rend(); ++ it ) {
+  for ( it = pktQueue.begin(); it != pktQueue.end(); ++ it ) {
     ZMPacket *zm_packet = *it;
     AVPacket *av_packet = &(zm_packet->packet);
     if ( 
@@ -138,7 +138,7 @@ void zm_packetqueue::clear_unwanted_packets( timeval *recording_started, int mVi
       break;
     }
   }
-  if ( it == pktQueue.rend() ) {
+  if ( it == pktQueue.end() ) {
     Debug(1, "Didn't find a keyframe packet keeping all" );
     return;
   }
@@ -148,13 +148,12 @@ void zm_packetqueue::clear_unwanted_packets( timeval *recording_started, int mVi
   Debug(3, "Found packet before start with stream index (%d) with keyframe (%d), distance(%d), size(%d)", 
       av_packet->stream_index, 
       ( av_packet->flags & AV_PKT_FLAG_KEY ), 
-      distance( it, pktQueue.rend() ),
+      distance( it, pktQueue.end() ),
       pktQueue.size() );
 
   unsigned int deleted_frames = 0;
   ZMPacket *packet = NULL;
-  while ( distance( it, pktQueue.rend() ) > 1 ) {
-  //while ( pktQueue.rend() != it ) {
+  while ( distance(  pktQueue.begin(), it ) > 1 ) {
     packet = pktQueue.front();
     pktQueue.pop_front();
     delete packet;
@@ -164,8 +163,8 @@ void zm_packetqueue::clear_unwanted_packets( timeval *recording_started, int mVi
   zm_packet = pktQueue.front();
   av_packet = &(zm_packet->packet);
   if ( ( ! ( av_packet->flags & AV_PKT_FLAG_KEY ) ) || ( av_packet->stream_index != mVideoStreamId ) ) {
-    Error( "Done looking for keyframe.  Deleted %d frames. Remaining frames in queue: %d stream of head packet is (%d), keyframe (%d), distance(%d), packets(%d)", deleted_frames, pktQueue.size(), av_packet->stream_index, ( av_packet->flags & AV_PKT_FLAG_KEY ), distance( it, pktQueue.rend() ), pktQueue.size() );
+    Error( "Done looking for keyframe.  Deleted %d frames. Remaining frames in queue: %d stream of head packet is (%d), keyframe (%d), distance(%d), packets(%d)", deleted_frames, pktQueue.size(), av_packet->stream_index, ( av_packet->flags & AV_PKT_FLAG_KEY ), distance( pktQueue.begin(), it ), pktQueue.size() );
   } else {
-    Debug(1, "Done looking for keyframe.  Deleted %d frames. Remaining frames in queue: %d stream of head packet is (%d), keyframe (%d), distance(%d), packets(%d)", deleted_frames, pktQueue.size(), av_packet->stream_index, ( av_packet->flags & AV_PKT_FLAG_KEY ), distance( it, pktQueue.rend() ), pktQueue.size() );
+    Debug(1, "Done looking for keyframe.  Deleted %d frames. Remaining frames in queue: %d stream of head packet is (%d), keyframe (%d), distance(%d), packets(%d)", deleted_frames, pktQueue.size(), av_packet->stream_index, ( av_packet->flags & AV_PKT_FLAG_KEY ), distance( pktQueue.begin(), it ), pktQueue.size() );
   }
 }
