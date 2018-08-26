@@ -1504,9 +1504,14 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
       // Buffer video packets, since we are not recording.
       // All audio packets are keyframes, so only if it's a video keyframe
       if ( packet.stream_index == mVideoStreamId ) {
-        if ( key_frame ) {
+        /*if ( key_frame ) {
           Debug(3, "Clearing queue");
           packetqueue.clearQueue( monitor->GetPreEventCount(), mVideoStreamId );
+        } */
+        if (( packetqueue.size() > 30 ) && (key_frame)){
+          Debug(3, "Clearing queue");
+          //Info("Interval clearing queue");
+          packetqueue.clearQueue( monitor->GetPreEventCount()+15, mVideoStreamId );
         } 
 #if 0
 // Not sure this is valid.  While a camera will PROBABLY always have an increasing pts... it doesn't have to.
@@ -1527,7 +1532,7 @@ else if ( packet.pts && video_last_pts > packet.pts ) {
           packetqueue.queuePacket( &packet );
         }
       } else if ( packet.stream_index == mVideoStreamId ) {
-        if ( key_frame || packetqueue.size() ) // it's a keyframe or we already have something in the queue
+        //if ( key_frame || packetqueue.size() ) // it's a keyframe or we already have something in the queue
           packetqueue.queuePacket( &packet );
       }
     } // end if recording or not

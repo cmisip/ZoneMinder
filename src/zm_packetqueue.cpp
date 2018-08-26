@@ -61,6 +61,7 @@ ZMPacket* zm_packetqueue::popPacket( ) {
 unsigned int zm_packetqueue::clearQueue( unsigned int frames_to_keep, int stream_id ) {
   
   Debug(3, "Clearing all but %d frames, queue has %d", frames_to_keep, pktQueue.size() );
+  //Info("Clearing all but %d frames, queue has %d", frames_to_keep, pktQueue.size() );
   frames_to_keep += 1;
 
 	if ( pktQueue.empty() ) {
@@ -78,9 +79,10 @@ unsigned int zm_packetqueue::clearQueue( unsigned int frames_to_keep, int stream
     Debug(4, "Looking at packet with stream index (%d) with keyframe (%d), frames_to_keep is (%d)", av_packet->stream_index, ( av_packet->flags & AV_PKT_FLAG_KEY ), frames_to_keep );
     
     // Want frames_to_keep video keyframes.  Otherwise, we may not have enough
-    if ( ( av_packet->stream_index == stream_id) && ( av_packet->flags & AV_PKT_FLAG_KEY ) ) {
+    /*if ( ( av_packet->stream_index == stream_id) && ( av_packet->flags & AV_PKT_FLAG_KEY ) ) {
       frames_to_keep --;
-    }
+    }*/
+    frames_to_keep --;
   }
   if ( frames_to_keep ) {
     Debug(3, "Hit end of queue, still need (%d) video keyframes", frames_to_keep );
@@ -96,6 +98,7 @@ unsigned int zm_packetqueue::clearQueue( unsigned int frames_to_keep, int stream
     delete_count += 1;
   }    
   Debug(3, "Deleted (%d) packets", delete_count );
+  //Info("Deleted (%d) packets, Remaining %d", delete_count, pktQueue.size() );
   return delete_count; 
 } // end unsigned int zm_packetqueue::clearQueue( unsigned int frames_to_keep, int stream_id )
 
