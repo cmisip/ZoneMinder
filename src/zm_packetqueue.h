@@ -43,7 +43,7 @@ public:
     unsigned int clearQueue( unsigned int video_frames_to_keep, int stream_id );
     void clearQueue( );
     unsigned int size();
-    void clear_unwanted_packets( timeval *recording, int mVideoStreamId );
+    void clear_unwanted_packets( timeval *recording, int mVideoStreamId, int preeventframes );
 private:
     std::list<ZMPacket *>    pktQueue;
 
