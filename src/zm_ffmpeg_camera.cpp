@@ -1351,7 +1351,7 @@ void *FfmpegCamera::ReopenFfmpegThreadCallback(void *ctx){
 }
 
 //Function to handle capture and store
-int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event_file ) {
+int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event_file, int lag_frames  ) {
   if ( ! mCanCapture ) {
     return -1;
   }
@@ -1405,6 +1405,8 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
 
     //Video recording
     if ( recording.tv_sec ) {
+		
+      //Info("RECORDING queue with lag frames at %d", lag_frames);		
 
       uint32_t last_event_id = monitor->GetLastEventId() ;
 
@@ -1508,10 +1510,11 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
           Debug(3, "Clearing queue");
           packetqueue.clearQueue( monitor->GetPreEventCount(), mVideoStreamId );
         } */
-        if (( packetqueue.size() > 30 ) && (key_frame)){
-          Debug(3, "Clearing queue");
-          //Info("Interval clearing queue");
-          packetqueue.clearQueue( monitor->GetPreEventCount()+15, mVideoStreamId );
+        int queue_length = monitor->GetPreEventCount()+lag_frames; 
+        if (( packetqueue.size() > queue_length  ) && (key_frame)){
+          Debug(3, "Clearing queue with queue length at %d", queue_length);
+          //Info("BUFFERING queue with lag frames at %d", lag_frames);
+          packetqueue.clearQueue( queue_length , mVideoStreamId );
         } 
 #if 0
 // Not sure this is valid.  While a camera will PROBABLY always have an increasing pts... it doesn't have to.

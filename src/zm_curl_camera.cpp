@@ -305,7 +305,7 @@ int cURLCamera::PostCapture() {
     return( 0 );
 }
 
-int cURLCamera::CaptureAndRecord( Image &image, struct timeval recording, char* event_directory ) {
+int cURLCamera::CaptureAndRecord( Image &image, struct timeval recording, char* event_directory, int lag_frames ) {
   Error("Capture and Record not implemented for the cURL camera type");
   // Nothing to do here
   return( 0 );

@@ -1172,10 +1172,12 @@ bool Monitor::Analyse() {
   }
 
   int index;
+  
+  
   if ( adaptive_skip ) {
     int read_margin = shared_data->last_read_index - shared_data->last_write_index;
     if ( read_margin < 0 ) read_margin += image_buffer_count;
-
+    
     int step = 1;
     // Isn't read_margin always > 0 here?
     if ( read_margin > 0 ) {
@@ -2997,6 +2999,10 @@ int Monitor::Capture() {
   Image* capture_image = image_buffer[index].image;
 
   unsigned int deinterlacing_value = deinterlacing & 0xff;
+  
+  //int read_margin = shared_data->last_read_index - shared_data->last_write_index;
+  //if ( read_margin < 0 ) read_margin += image_buffer_count;
+    
 
   if ( deinterlacing_value == 4 ) {
     if ( FirstCapture != 1 ) {
@@ -3010,7 +3016,8 @@ int Monitor::Capture() {
     if ( ( videowriter == H264PASSTHROUGH ) && camera->SupportsNativeVideo() ) {
       captureResult = camera->CaptureAndRecord(*(next_buffer.image),
           video_store_data->recording,
-          video_store_data->event_file );
+          video_store_data->event_file, 
+          image_buffer_count );
     } else {
       captureResult = camera->Capture(*(next_buffer.image));
     }
@@ -3024,7 +3031,10 @@ int Monitor::Capture() {
     //Check if FFMPEG camera
     if ( (videowriter == H264PASSTHROUGH ) && camera->SupportsNativeVideo() ) {
       //Warning("ZMC: Recording: %d", video_store_data->recording);
-      captureResult = camera->CaptureAndRecord(*capture_image, video_store_data->recording, video_store_data->event_file);
+      captureResult = camera->CaptureAndRecord(*capture_image, 
+          video_store_data->recording, 
+          video_store_data->event_file, 
+          image_buffer_count  );
     }else{
       /* Capture directly into image buffer, avoiding the need to memcpy() */
       captureResult = camera->Capture(*capture_image);

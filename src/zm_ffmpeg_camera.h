@@ -146,7 +146,7 @@ class FfmpegCamera : public Camera {
     int PrimeCapture();
     int PreCapture();
     int Capture( Image &image );
-    int CaptureAndRecord( Image &image, timeval recording, char* event_directory );
+    int CaptureAndRecord( Image &image, timeval recording, char* event_directory, int lag_frames );
     int PostCapture();
     
 #ifdef __arm__

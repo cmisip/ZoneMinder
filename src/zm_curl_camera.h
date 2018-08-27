@@ -78,7 +78,7 @@ public:
   int PreCapture();
   int Capture( Image &image );
   int PostCapture();
-  int CaptureAndRecord( Image &image, struct timeval recording, char* event_directory );
+  int CaptureAndRecord( Image &image, struct timeval recording, char* event_directory, int lag_frames );
 
   size_t data_callback(void *buffer, size_t size, size_t nmemb, void *userdata);
   size_t header_callback(void *buffer, size_t size, size_t nmemb, void *userdata);

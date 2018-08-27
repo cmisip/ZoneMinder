@@ -86,7 +86,7 @@ public:
   int PreCapture();
   int Capture( Image &image );
   int PostCapture();
-  int CaptureAndRecord( Image &image, timeval recording, char* event_directory );
+  int CaptureAndRecord( Image &image, timeval recording, char* event_directory, int lag_frames );
 };
 
 #endif // ZM_REMOTE_CAMERA_RTSP_H
