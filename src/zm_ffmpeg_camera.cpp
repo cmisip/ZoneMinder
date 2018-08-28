@@ -1275,6 +1275,7 @@ int FfmpegCamera::ReopenFfmpeg() {
 int FfmpegCamera::CloseFfmpeg(){
 
   Debug(2, "CloseFfmpeg called.");
+  Info("CloseFfmpeg called");
 #ifdef __arm__
   if (ctype) {
      CloseMmal();
@@ -1468,7 +1469,7 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
         ZMPacket *queued_packet;
 
         // Clear all packets that predate the moment when the recording began
-        packetqueue.clear_unwanted_packets( &recording, mVideoStreamId );
+        packetqueue.clear_unwanted_packets( &recording, mVideoStreamId, monitor->GetPreEventCount() );
 
         while ( ( queued_packet = packetqueue.popPacket() ) ) {
           AVPacket *avp = queued_packet->av_packet();
@@ -1504,9 +1505,16 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
       // Buffer video packets, since we are not recording.
       // All audio packets are keyframes, so only if it's a video keyframe
       if ( packet.stream_index == mVideoStreamId ) {
-        if ( key_frame ) {
+        /*if ( key_frame ) {
           Debug(3, "Clearing queue");
           packetqueue.clearQueue( monitor->GetPreEventCount(), mVideoStreamId );
+        }*/
+        int queue_length = monitor->GetPreEventCount()+monitor->GetImageBufferSize(); 
+        if (( packetqueue.size() > queue_length  ) && (key_frame)){
+          Debug(3, "Clearing queue with queue length at %d", queue_length);
+          
+          packetqueue.clearQueue( queue_length , mVideoStreamId );
+          //Info("BUFFERING queue to length %d with result %d", queue_length, packetqueue.size());
         } 
 #if 0
 // Not sure this is valid.  While a camera will PROBABLY always have an increasing pts... it doesn't have to.

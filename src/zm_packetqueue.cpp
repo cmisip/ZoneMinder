@@ -78,9 +78,11 @@ unsigned int zm_packetqueue::clearQueue( unsigned int frames_to_keep, int stream
     Debug(4, "Looking at packet with stream index (%d) with keyframe (%d), frames_to_keep is (%d)", av_packet->stream_index, ( av_packet->flags & AV_PKT_FLAG_KEY ), frames_to_keep );
     
     // Want frames_to_keep video keyframes.  Otherwise, we may not have enough
-    if ( ( av_packet->stream_index == stream_id) && ( av_packet->flags & AV_PKT_FLAG_KEY ) ) {
+    /*if ( ( av_packet->stream_index == stream_id) && ( av_packet->flags & AV_PKT_FLAG_KEY ) ) {
       frames_to_keep --;
-    }
+    }*/
+    frames_to_keep --;
+    
   }
   if ( frames_to_keep ) {
     Debug(3, "Hit end of queue, still need (%d) video keyframes", frames_to_keep );
@@ -113,7 +115,7 @@ unsigned int zm_packetqueue::size() {
 }
 
 
-void zm_packetqueue::clear_unwanted_packets( timeval *recording_started, int mVideoStreamId ) {
+void zm_packetqueue::clear_unwanted_packets( timeval *recording_started, int mVideoStreamId, int preeventframes ) {
   // Need to find the keyframe <= recording_started.  Can get rid of audio packets.
 	if ( pktQueue.empty() ) {
 		return;
@@ -122,17 +124,22 @@ void zm_packetqueue::clear_unwanted_packets( timeval *recording_started, int mVi
   // Step 1 - find keyframe < recording_started.
   // Step 2 - pop packets until we get to the packet in step 2
   list<ZMPacket *>::reverse_iterator it;
-
+  int count=0;
   Debug(3, "Looking for keyframe after start recording stream id (%d)", mVideoStreamId );
   for ( it = pktQueue.rbegin(); it != pktQueue.rend(); ++ it ) {
     ZMPacket *zm_packet = *it;
     AVPacket *av_packet = &(zm_packet->packet);
+    //if (timercmp( &(zm_packet->timestamp), recording_started, < ))
+       //count++;
+    
     if ( 
         ( av_packet->flags & AV_PKT_FLAG_KEY ) 
         && 
         ( av_packet->stream_index == mVideoStreamId )
         && 
         timercmp( &(zm_packet->timestamp), recording_started, < )
+        //&&
+        //(count > preeventframes)
        ) {
     Debug(3, "Found keyframe before start with stream index (%d) with keyframe (%d)", av_packet->stream_index, ( av_packet->flags & AV_PKT_FLAG_KEY ) );
       break;

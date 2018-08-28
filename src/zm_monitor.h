@@ -389,6 +389,9 @@ public:
   inline Purpose GetPurpose() const {
     return( purpose );
   }
+  inline int GetImageBufferSize() const {
+    return( image_buffer_count );
+  }
   inline bool Enabled() {
     if ( function <= MONITOR )
       return( false );
