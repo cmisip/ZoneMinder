@@ -129,22 +129,20 @@ void zm_packetqueue::clear_unwanted_packets( timeval *recording_started, int mVi
   for ( it = pktQueue.rbegin(); it != pktQueue.rend(); ++ it ) {
     ZMPacket *zm_packet = *it;
     AVPacket *av_packet = &(zm_packet->packet);
-    //if (timercmp( &(zm_packet->timestamp), recording_started, < ))
-       //count++;
-    
-    if ( 
-        ( av_packet->flags & AV_PKT_FLAG_KEY ) 
-        && 
-        ( av_packet->stream_index == mVideoStreamId )
-        && 
-        timercmp( &(zm_packet->timestamp), recording_started, < )
-        //&&
-        //(count > preeventframes)
-       ) {
-    Debug(3, "Found keyframe before start with stream index (%d) with keyframe (%d)", av_packet->stream_index, ( av_packet->flags & AV_PKT_FLAG_KEY ) );
-      break;
+    if ( av_packet->stream_index == mVideoStreamId ) {
+     if (timercmp( &(zm_packet->timestamp), recording_started, < )) {
+      count++;
+      if (count >= preeventframes) {
+        if ( av_packet->flags & AV_PKT_FLAG_KEY ) {
+          Debug(3, "Found keyframe before start with stream index (%d) with keyframe (%d)", av_packet->stream_index, ( av_packet->flags & AV_PKT_FLAG_KEY ) );
+          break;
+        }  
+      }
+     }
     }
   }
+  
+  
   if ( it == pktQueue.rend() ) {
     Debug(1, "Didn't find a keyframe packet keeping all" );
     return;
