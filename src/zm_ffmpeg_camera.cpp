@@ -458,6 +458,13 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mRawFrame data
                   
                         mmal_motion_vector *mvarray=(mmal_motion_vector *)buffer->data;
                         
+                        // for ( int n_zone = 0; n_zone < n_zones; n_zone++ ) {
+							 
+						//}	 
+						
+						
+                        
+                        
                         registers=0;
                         uint16_t count=0;
                         uint16_t wcount=0;
@@ -1255,7 +1262,15 @@ int FfmpegCamera::OpenFfmpeg() {
     
   
 #endif  
-
+  
+  //Test to see if zone info could be imported to capture process
+  Info("Zones number %d",monitor->GetZonesNum());
+  Zone **czones=monitor->GetZones();
+  for (int i=0; i < monitor->GetZonesNum() ; i++) {
+	 //if (czones->polygon.isInside(5,5)) 
+	    Info("Polygon test %d",czones[i]->GetPolygon().isInside(Coord(5,5))); 
+  }	  
+  
   return 0;
 } // int FfmpegCamera::OpenFfmpeg()
 
@@ -1396,14 +1411,104 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
       return( -1 );
     }
 
-    int key_frame = packet.flags & AV_PKT_FLAG_KEY;
+   
 
-    Debug( 4, "Got packet from stream %d packet pts (%d) dts(%d), key?(%d)", 
-        packet.stream_index, packet.pts, packet.dts, 
-        key_frame
+    Debug( 4, "Got packet from stream %d packet pts (%d) dts(%d)", 
+        packet.stream_index, packet.pts, packet.dts
         );
 
+
+    if ( packet.stream_index == mVideoStreamId ) {
+     
+      Debug(4, "about to decode video" );
+      
+    if (!ctype) {   
+#if LIBAVCODEC_VERSION_CHECK(57, 64, 0, 64, 0)
+      ret = avcodec_send_packet( mVideoCodecContext, &packet );
+      if ( ret < 0 ) {
+        av_strerror( ret, errbuf, AV_ERROR_MAX_STRING_SIZE );
+        Error( "Unable to send packet at frame %d: %s, continuing", frameCount, errbuf );
+        zm_av_packet_unref( &packet );
+        continue;
+      }
+      ret = avcodec_receive_frame( mVideoCodecContext, mRawFrame );
+      if ( ret < 0 ) {
+        av_strerror( ret, errbuf, AV_ERROR_MAX_STRING_SIZE );
+        Debug( 1, "Unable to send packet at frame %d: %s, continuing", frameCount, errbuf );
+        zm_av_packet_unref( &packet );
+        continue;
+      }
+      frameComplete = 1;
+# else
+      ret = zm_avcodec_decode_video( mVideoCodecContext, mRawFrame, &frameComplete, &packet );
+      if ( ret < 0 ) {
+        av_strerror( ret, errbuf, AV_ERROR_MAX_STRING_SIZE );
+        Error( "Unable to decode frame at frame %d: %s, continuing", frameCount, errbuf );
+        zm_av_packet_unref( &packet );
+        continue;
+      }
+#endif
+
+      Debug( 4, "Decoded video packet at frame %d", frameCount );
+      
+   }  else { //if ctype
+    //the mmal decoder loop is here 	
+      frameComplete=mmal_decode(&packet);
+      Debug( 4, "Decoded video packet at frame %d", frameCount );
+}  //if cytpe   
+
+      if ( frameComplete ) {
+        Debug( 4, "Got frame %d", frameCount );
+
+        uint8_t* directbuffer;
+
+        /* Request a writeable buffer of the target image */
+        directbuffer = image.WriteBuffer(width, height, colours, subpixelorder);
+        if ( directbuffer == NULL ) {
+          Error("Failed requesting writeable buffer for the captured image.");
+          zm_av_packet_unref( &packet );
+          return (-1);
+        }
+        
+        
+        
+        uint8_t* mvect_buffer=NULL;  
+        if  (cfunction == Monitor::MVDECT) {
+	  
+	       mvect_buffer=image.VectBuffer();   
+           if (mvect_buffer ==  NULL ){
+                Error("Failed requesting vector buffer for the captured image.");
+                return (-1); 
+           } //else
+                //memset(mvect_buffer,0,image.mv_size);
+
+ 
+        
+           if (!ctype) { //motion vectors from software h264 decoding
+			   
+               //FIXMEC, still need to write this          
+
+           }  
+        
+        
+#ifdef __arm__
+        
+         if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels tile Left to Right and then top to bottom and there are a fixed number covering the entire frame.
+              
+                mmal_encode(&mvect_buffer);
+
+                mmal_resize(&directbuffer);
+                
+           } //if ctype
+        
+         }
+        
+#endif
+
+       
+        
     //Video recording
+ /*   int key_frame = packet.flags & AV_PKT_FLAG_KEY;
     if ( recording.tv_sec ) {
 
       uint32_t last_event_id = monitor->GetLastEventId() ;
@@ -1531,100 +1636,9 @@ else if ( packet.pts && video_last_pts > packet.pts ) {
           packetqueue.queuePacket( &packet );
       }
     } // end if recording or not
+        
+ */     
 
-    if ( packet.stream_index == mVideoStreamId ) {
-      if ( videoStore ) {
-        //Write the packet to our video store
-        int ret = videoStore->writeVideoFramePacket( &packet );
-        if ( ret < 0 ) { //Less than zero and we skipped a frame
-          zm_av_packet_unref( &packet );
-          return 0;
-        }
-      }
-      Debug(4, "about to decode video" );
-      
-    if (!ctype) {   
-#if LIBAVCODEC_VERSION_CHECK(57, 64, 0, 64, 0)
-      ret = avcodec_send_packet( mVideoCodecContext, &packet );
-      if ( ret < 0 ) {
-        av_strerror( ret, errbuf, AV_ERROR_MAX_STRING_SIZE );
-        Error( "Unable to send packet at frame %d: %s, continuing", frameCount, errbuf );
-        zm_av_packet_unref( &packet );
-        continue;
-      }
-      ret = avcodec_receive_frame( mVideoCodecContext, mRawFrame );
-      if ( ret < 0 ) {
-        av_strerror( ret, errbuf, AV_ERROR_MAX_STRING_SIZE );
-        Debug( 1, "Unable to send packet at frame %d: %s, continuing", frameCount, errbuf );
-        zm_av_packet_unref( &packet );
-        continue;
-      }
-      frameComplete = 1;
-# else
-      ret = zm_avcodec_decode_video( mVideoCodecContext, mRawFrame, &frameComplete, &packet );
-      if ( ret < 0 ) {
-        av_strerror( ret, errbuf, AV_ERROR_MAX_STRING_SIZE );
-        Error( "Unable to decode frame at frame %d: %s, continuing", frameCount, errbuf );
-        zm_av_packet_unref( &packet );
-        continue;
-      }
-#endif
-
-      Debug( 4, "Decoded video packet at frame %d", frameCount );
-      
-   }  else { //if ctype
-    //the mmal decoder loop is here 	
-      frameComplete=mmal_decode(&packet);
-      Debug( 4, "Decoded video packet at frame %d", frameCount );
-}  //if cytpe   
-
-      if ( frameComplete ) {
-        Debug( 4, "Got frame %d", frameCount );
-
-        uint8_t* directbuffer;
-
-        /* Request a writeable buffer of the target image */
-        directbuffer = image.WriteBuffer(width, height, colours, subpixelorder);
-        if ( directbuffer == NULL ) {
-          Error("Failed requesting writeable buffer for the captured image.");
-          zm_av_packet_unref( &packet );
-          return (-1);
-        }
-        
-        
-        
-        uint8_t* mvect_buffer=NULL;  
-        if  (cfunction == Monitor::MVDECT) {
-	  
-	       mvect_buffer=image.VectBuffer();   
-           if (mvect_buffer ==  NULL ){
-                Error("Failed requesting vector buffer for the captured image.");
-                return (-1); 
-           } //else
-                //memset(mvect_buffer,0,image.mv_size);
-
- 
-        
-           if (!ctype) { //motion vectors from software h264 decoding
-			   
-               //FIXMEC, still need to write this          
-
-           }  
-        
-        
-#ifdef __arm__
-        
-         if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels tile Left to Right and then top to bottom and there are a fixed number covering the entire frame.
-              
-                mmal_encode(&mvect_buffer);
-
-                mmal_resize(&directbuffer);
-                
-           } //if ctype
-        
-         }
-        
-#endif
         
 //This is the software scaler. Directbuffer is packaged into mFrame and processed by swscale to convert to appropriate format and size
 //Need SWScale when Source Type is FFmpeg with Function as Mvdect or Modect
@@ -1653,6 +1667,18 @@ if (((ctype) && (cfunction == Monitor::MODECT)) || (!ctype)) {
       } else {
         Debug( 3, "Not framecomplete after av_read_frame" );
       } // end if frameComplete
+      
+      
+       if ( videoStore ) {
+        //Write the packet to our video store
+        int ret = videoStore->writeVideoFramePacket( &packet );
+        if ( ret < 0 ) { //Less than zero and we skipped a frame
+          zm_av_packet_unref( &packet );
+          return 0;
+        }
+      }
+      
+      
     } else if ( packet.stream_index == mAudioStreamId ) { //FIXME best way to copy all other streams
       if ( videoStore ) {
         if ( record_audio ) {
@@ -1688,4 +1714,7 @@ if (((ctype) && (cfunction == Monitor::MODECT)) || (!ctype)) {
 } // end FfmpegCamera::CaptureAndRecord
 
 #endif // HAVE_LIBAVFORMAT
+
+
+
 

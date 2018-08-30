@@ -121,11 +121,11 @@ void Zone::Setup(
   zone_vector_mask=(uint8_t*)zm_mallocaligned(32,zm_size);
   if(zone_vector_mask == NULL)
 		      Fatal("Memory allocation failed for zone vector mask: %s",strerror(errno));
-  
-  //Set the bits in zone_vector_mask if this is Monitor purpose is analyze and function is mvdect
-  if ((monitor->GetPurpose() == Monitor::ANALYSIS ) && ( monitor->GetFunction() == Monitor::MVDECT ))
+#ifdef __arm__  
+  //Set the bits in zone_vector_mask if this is Monitor purpose is capture and function is mvdect
+  if ((monitor->GetPurpose() == Monitor::CAPTURE ) && ( monitor->GetFunction() == Monitor::MVDECT ))
      SetVectorMask();	   
-  
+#endif  
   
 } // end Zone::Setup
 
@@ -439,7 +439,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer, uint16_t width, uint16_t height
     
     //Info("ANALYSER");
   
-    if (mvect_buffer) {
+  /*  if (mvect_buffer) {
       
       
       //Info("Analysing mvect buffer with numblocks %d", numblocks);
@@ -462,7 +462,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer, uint16_t width, uint16_t height
            res= mask & buff;
            offset=offset+4; 
            //uint8_t rbit=0;
-      /*     while (res) { //this will loop 32 times with each bit of res
+  //         while (res) { //this will loop 32 times with each bit of res
 			  //rbit+=1;
 			  if (res & 1) {
                  vec_count += 1;
@@ -472,8 +472,8 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer, uint16_t width, uint16_t height
            
                  
 		      }
-           }
-*/            
+ //          }
+            
            
            c =  ((res & 0xfff) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
            c += (((res & 0xfff000) >> 12) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
@@ -485,7 +485,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer, uint16_t width, uint16_t height
         
         memset(mvect_buffer,0,4); //Zero it out when we are done. May not be necessary, but there is a check in shutdown of components that waits for this to be zeroed out. 
     }   
-    
+    */
     
     
     //if (vec_count) {

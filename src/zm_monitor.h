@@ -389,6 +389,12 @@ public:
   inline Purpose GetPurpose() const {
     return( purpose );
   }
+  inline Zone** GetZones() const {
+    return( zones );
+  }
+  inline int GetZonesNum() const {
+    return( n_zones );
+  }
   inline bool Enabled() {
     if ( function <= MONITOR )
       return( false );
