@@ -421,7 +421,7 @@ void Image::Initialise()
 }*/	      
 
 
- uint8_t *& Image::VectBuffer() {
+/* uint8_t *& Image::VectBuffer() {
 	   if (mv_buffer ==NULL) {
 		   //Good enough for 1920x1080
 		   mv_size=1024;
@@ -431,7 +431,19 @@ void Image::Initialise()
   	   
 	   }
 	   return mv_buffer;
+}*/
+uint8_t *& Image::VectBuffer() {
+	   if (mv_buffer ==NULL) {
+		   //10 x 4 bytes to hold the score for up to 10 zones
+		   mv_size=40;
+		   mv_buffer = (uint8_t*)zm_mallocaligned(32,mv_size);
+	       if(mv_buffer == NULL)
+		      Fatal("Memory allocation for mvect buffer failed: %s",strerror(errno));
+  	   
+	   }
+	   return mv_buffer;
 }
+
 
 /* Requests a writeable buffer to the image. This is safer than buffer() because this way we can guarantee that a buffer of required size exists */
 uint8_t* Image::WriteBuffer(const unsigned int p_width, const unsigned int p_height, const unsigned int p_colours, const unsigned int p_subpixelorder) {

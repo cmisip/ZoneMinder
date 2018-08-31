@@ -162,7 +162,7 @@ public:
   }
   void RecordStats( const Event *event );
   bool CheckAlarms( const Image *delta_image );
-  bool CheckAlarms( uint8_t *& mvect_buffer, uint16_t width, uint16_t height);
+  bool CheckAlarms( uint8_t *& mvect_buffer, int zone_n);
   bool DumpSettings( char *output, bool verbose );
   void SetVectorMask();
 

@@ -376,7 +376,8 @@ Monitor::Monitor(
        + (image_buffer_count*camera->ImageSize())
        //FIXMEC mv_buffer size is resolution divided by pixel dimension of 16x16 macroblock, assuming up to 80% frame covered as max case, plus 4 bytes for header info (number of vectors and how vector was extracted : hardware or software
        //+ (image_buffer_count*( (((((width * height)/256)*(double)80)/100)*4)+4)  )
-       + (image_buffer_count*1024  )
+       //+ (image_buffer_count*1024  )
+       + (image_buffer_count*40  )
        + 64; /* Padding used to permit aligning the images buffer to 64 byte boundary */
 
   Debug( 1, "mem.size=%d", mem_size );
@@ -564,7 +565,7 @@ bool Monitor::connect() {
 
   //FIXMEC mv_buffer size is resolution divided by pixel dimension of 16x16 macroblock, assuming up to 80% frame covered as max case, plus 4 bytes for header info (number of vectors and how vector was extracted : hardware or software
   //uint16_t mv_buffer_size = ((((((width * height)/256)*(double)80)/100)*4)+4);
-  uint16_t mv_buffer_size = 1024;
+  uint16_t mv_buffer_size = 40;
   for ( int i = 0; i < image_buffer_count; i++ ) {
     image_buffer[i].timestamp = &(shared_timestamps[i]);
     image_buffer[i].image = new Image( width, height, camera->Colours(), camera->SubpixelOrder(), &(shared_images[i*camera->ImageSize()]) );
@@ -3253,7 +3254,8 @@ unsigned int Monitor::DetectMotion( const Image &comp_image, Event::StringSet &z
     Debug( 3, "Checking preclusive zone %s - old score: %d, state: %s", zone->Label(),old_zone_score, zone->Alarmed()?"alarmed":"quiet" );
 
     if (function == MVDECT ) {
-        check_result = zone->CheckAlarms( mvect_buffer, width, height);
+        //check_result = zone->CheckAlarms( mvect_buffer, width, height);
+        check_result = zone->CheckAlarms( mvect_buffer, n_zone);
     }    else 
         check_result = zone->CheckAlarms( &delta_image);
     
@@ -3297,7 +3299,8 @@ unsigned int Monitor::DetectMotion( const Image &comp_image, Event::StringSet &z
       Debug( 3, "Checking active zone %s", zone->Label() );
 
       if (function == MVDECT ) {
-        check_result = zone->CheckAlarms( mvect_buffer, width, height );
+        //check_result = zone->CheckAlarms( mvect_buffer, width, height );
+        check_result = zone->CheckAlarms( mvect_buffer, n_zone);
       } else 
         check_result = zone->CheckAlarms( &delta_image);
     
@@ -3325,7 +3328,8 @@ unsigned int Monitor::DetectMotion( const Image &comp_image, Event::StringSet &z
         Debug( 3, "Checking inclusive zone %s", zone->Label() );
 
         if (function == MVDECT ) {
-          check_result = zone->CheckAlarms( mvect_buffer, width, height );
+          //check_result = zone->CheckAlarms( mvect_buffer, width, height );
+          check_result = zone->CheckAlarms( mvect_buffer, n_zone);
         } else 
           check_result = zone->CheckAlarms( &delta_image);
     
@@ -3354,7 +3358,8 @@ unsigned int Monitor::DetectMotion( const Image &comp_image, Event::StringSet &z
         Debug( 3, "Checking exclusive zone %s", zone->Label() );
 
         if (function == MVDECT ) {
-          check_result = zone->CheckAlarms( mvect_buffer, width, height );
+          //check_result = zone->CheckAlarms( mvect_buffer, width, height );
+          check_result = zone->CheckAlarms( mvect_buffer, n_zone);
         } else 
           check_result = zone->CheckAlarms( &delta_image);
     

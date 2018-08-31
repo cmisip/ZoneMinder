@@ -126,9 +126,9 @@ void Zone::Setup(
   if ((monitor->GetPurpose() == Monitor::CAPTURE ) && ( monitor->GetFunction() == Monitor::MVDECT )) {
      SetVectorMask();
   }   
-  if ((monitor->GetPurpose() == Monitor::ANALYSIS ) && ( monitor->GetFunction() == Monitor::MVDECT )) {
+  /*if ((monitor->GetPurpose() == Monitor::ANALYSIS ) && ( monitor->GetFunction() == Monitor::MVDECT )) {
      SetVectorMask();   
-  }   	   
+  } */  	   
 #endif  
   
 } // end Zone::Setup
@@ -422,7 +422,84 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
 };
 */
 
-bool Zone::CheckAlarms( uint8_t *& mvect_buffer, uint16_t width, uint16_t height) { 
+bool Zone::CheckAlarms( uint8_t *& mvect_buffer, int zone_n) { 
+    ResetStats();  
+    alarm_centre=Coord(0,0);
+    uint16_t minimum_vector_coverage=((double)min_alarm_pixels/polygon.Area())*100; 
+    uint16_t maximum_vector_coverage=((double)max_alarm_pixels/polygon.Area())*100; 
+   
+    if ( overload_count ) {
+    Info( "In overload mode, %d frames of %d remaining", overload_count, overload_frames );
+    Debug( 4, "In overload mode, %d frames of %d remaining", overload_count, overload_frames );
+    overload_count--;
+    return( false );
+  }
+    
+
+    uint32_t vec_count=0;
+    //uint32_t x_sum=0;  //used for computing alarm centre
+    //uint32_t y_sum=0;
+    
+    //Info("ANALYSER");
+  
+    if (mvect_buffer) {
+      
+      uint16_t offset=4*zone_n;
+      memcpy(&vec_count,mvect_buffer,4);
+        
+    }   
+    
+    
+    
+    //if (vec_count) {
+    //      alarm_centre=Coord((uint16_t)(x_sum/vec_count),(uint16_t)(y_sum/vec_count));
+    //}
+  
+    //vec_count is now count of 16x16 macroblocks weighted as x4 each, so shift 10 to the left to convert to pixels
+    alarm_pixels = vec_count<<10 ; 
+    score = ((double) alarm_pixels/(polygon.Area()))*100;   
+    
+    
+    
+    if( score ) {
+      //Info("Motion %d, score %d, min %d, max %d ", vec_count, score, minimum_vector_coverage, maximum_vector_coverage);  
+      if( min_alarm_pixels && (score < minimum_vector_coverage) ) {
+        // Not enough pixels alarmed 
+        return (false);
+      } else if( max_alarm_pixels && (score > maximum_vector_coverage) ) {
+        // Too many pixels alarmed 
+        overload_count = overload_frames;
+        return (false);
+      }
+
+
+
+    } else {
+      // No pixels 
+      return (false);
+    }
+
+
+ 
+    
+    if ( type == INCLUSIVE ) {
+     score >>= 1;
+    } else if ( type == EXCLUSIVE ) {
+     score <<= 1;
+    }
+    
+    //End old scoring system
+     
+    
+    Debug( 5, "Adjusted score is %d", score );
+    
+    
+    
+    return true; 
+};
+
+
+/*bool Zone::CheckAlarms( uint8_t *& mvect_buffer, uint16_t width, uint16_t height) { 
     ResetStats();  
     alarm_centre=Coord(0,0);
     uint16_t numblocks=(width*height)/256;
@@ -466,7 +543,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer, uint16_t width, uint16_t height
            res= mask & buff;
            offset=offset+4; 
            //uint8_t rbit=0;
-  /*         while (res) { //this will loop 32 times with each bit of res
+ //          while (res) { //this will loop 32 times with each bit of res
 			  //rbit+=1;
 			  if (res & 1) {
                  vec_count += 1;
@@ -477,7 +554,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer, uint16_t width, uint16_t height
                  
 		      }
            }
- */           
+ //           
            
            c =  ((res & 0xfff) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
            c += (((res & 0xfff000) >> 12) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
@@ -539,8 +616,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer, uint16_t width, uint16_t height
     
     
     return true; 
-};
-
+};*/
 
 
 bool Zone::CheckAlarms( const Image *delta_image ) {
