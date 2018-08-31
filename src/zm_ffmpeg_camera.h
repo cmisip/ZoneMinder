@@ -169,6 +169,9 @@ class FfmpegCamera : public Camera {
     int OpenMmalResizer(AVCodecContext *mVideoCodecContext);
 
     int CloseMmal();
+    
+    Zone **czones;
+    int czones_n=0;
 #endif
 };
 
