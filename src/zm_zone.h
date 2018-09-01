@@ -140,6 +140,8 @@ public:
   inline bool IsPrivacy() const { return( type == PRIVACY ); }
   inline const Image *AlarmImage() const { return( image ); }
   inline const Polygon &GetPolygon() const { return( polygon ); }
+  inline const int GetMinAlarmPixels() { return (min_alarm_pixels);}
+  inline const int GetMaxAlarmPixels() { return (max_alarm_pixels);}
   inline bool Alarmed() const { return( alarmed ); }
 	inline bool WasAlarmed() const { return( was_alarmed ); }
 	inline void SetAlarm() { was_alarmed = alarmed; alarmed = true; }

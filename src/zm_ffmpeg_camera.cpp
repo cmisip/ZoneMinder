@@ -253,7 +253,9 @@ int FfmpegCamera::Capture( Image &image ) {
         
            if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels tile Left to Right and then top to bottom and there are a fixed number covering the entire frame.
               
-                mmal_encode(&mvect_buffer);
+                if (mmal_encode(&mvect_buffer)) {
+				  Info("MOTION THRESHOLD REACHED");	
+				}	
 
                 mmal_resize(&directbuffer);
                 
@@ -426,6 +428,8 @@ int FfmpegCamera::mmal_decode(AVPacket *pkt) {
 
 int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mRawFrame data 
 	MMAL_BUFFER_HEADER_T *buffer;
+	int motion_detected=false;
+	
 	//Info("encode start");
 	uint16_t numblocks=((encoder->output[0]->format->es->video.width * encoder->output[0]->format->es->video.height)/256);
                
@@ -467,6 +471,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mRawFrame data
                         uint32_t c=0;
                         uint32_t vec_count=0;
                         uint8_t* zone_vector_mask=czones[i]->zone_vector_mask;
+                        uint32_t alarm_pixels=0;
                         
                         for (int j=0;j < numblocks ; j++) {
                         
@@ -503,14 +508,18 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mRawFrame data
                              
                          }  
                          
-                         uint32_t alarm_pixels = vec_count<<10 ; 
-                         uint32_t score = ((double) alarm_pixels/(czones[i]->GetPolygon().Area()))*100;   
+                         alarm_pixels = vec_count<<10 ; //each 16x16 block is 1 shifted to the left 8; each block is further weighted as x4 so we shift <<10. 
+                         //uint32_t score = ((double) alarm_pixels/(czones[i]->GetPolygon().Area()))*100; 
+                         if( (alarm_pixels > (unsigned int)czones[i]->GetMinAlarmPixels()) && (alarm_pixels < (unsigned int)czones[i]->GetMaxAlarmPixels()) ) {
+                             motion_detected=true;
+					     } 
+					     //Info("Capture score %d, min %d, max %d ",  alarm_pixels, (unsigned int)czones[i]->GetMinAlarmPixels(), (unsigned int)czones[i]->GetMaxAlarmPixels() );
     
                          //Info("Capture vec_count %d score %d", vec_count, score);
                          
                          //SAVE this vec count into mvect buffer which becomes a list of zone scores  
                          //memcpy((*mv_buffer)+m_offset ,&vec_count, 4 ) ; 
-                         memcpy((*mv_buffer)+m_offset ,&score, 4 ) ; 
+                         memcpy((*mv_buffer)+m_offset ,&alarm_pixels, 4 ) ; 
                          m_offset+=4;
                         
                      }
@@ -529,7 +538,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mRawFrame data
 		  
       }
      //Info("encode end");
-     return (0);    
+     return (motion_detected);    
 }	
 
 
@@ -589,7 +598,7 @@ void FfmpegCamera::display_format(MMAL_PORT_T **port, MMAL_ES_FORMAT_T **iformat
            (*iformat)->es->video.width, (*iformat)->es->video.height,
            (*iformat)->es->video.crop.x, (*iformat)->es->video.crop.y,
            (*iformat)->es->video.crop.width, (*iformat)->es->video.crop.height);
-   Info("PORT %s BUFFER SIZE %d NUM %d\n", (*port)->name, (*port)->buffer_size,(*port)->buffer_num_recommended);
+   Info("PORT %s BUFFER SIZE %d NUM %d\n", (*port)->name, (*port)->buffer_size,(*port)->buffer_num);
    Info("---------------------------------------------------\n");        
        
 }	
@@ -675,7 +684,8 @@ int FfmpegCamera::OpenMmalDecoder(AVCodecContext *mVideoCodecContext){
 
    /* The format of both ports is now set so we can get their buffer requirements and create
     * our buffer headers. We use the buffer pool API to create these. */
-   decoder->input[0]->buffer_num = decoder->input[0]->buffer_num_recommended;
+   //decoder->input[0]->buffer_num = decoder->input[0]->buffer_num_recommended;
+   decoder->input[0]->buffer_num = 1;
    decoder->input[0]->buffer_size = decoder->input[0]->buffer_size_recommended;
    decoder->output[0]->buffer_num = decoder->output[0]->buffer_num_recommended;
    decoder->output[0]->buffer_size = decoder->output[0]->buffer_size_recommended;
@@ -985,6 +995,8 @@ int FfmpegCamera::OpenMmalResizer(AVCodecContext *mVideoCodecContext){
 
 
 int FfmpegCamera::CloseMmal(){
+	
+   MMAL_BUFFER_HEADER_T *buffer;
 	
    mmal_port_disable(decoder->input[0]);
    mmal_port_disable(decoder->output[0]);
@@ -1321,6 +1333,7 @@ int FfmpegCamera::OpenFfmpeg() {
       //Test to see if zone info could be imported to capture process
     czones_n=monitor->GetZonesNum();
     czones=monitor->GetZones();
+    
     //for (int i=0; i < monitor->GetZonesNum() ; i++) {
 	  //  Info("Polygon test %d",czones[i]->GetPolygon().isInside(Coord(5,5))); 
   //}	  

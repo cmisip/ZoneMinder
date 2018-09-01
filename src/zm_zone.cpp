@@ -425,51 +425,39 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer) {
 bool Zone::CheckAlarms( uint8_t *& mvect_buffer, int zone_n) { 
     ResetStats();  
     alarm_centre=Coord(0,0);
-    uint16_t minimum_vector_coverage=((double)min_alarm_pixels/polygon.Area())*100; 
-    uint16_t maximum_vector_coverage=((double)max_alarm_pixels/polygon.Area())*100; 
-   
+    
     if ( overload_count ) {
     Info( "In overload mode, %d frames of %d remaining", overload_count, overload_frames );
     Debug( 4, "In overload mode, %d frames of %d remaining", overload_count, overload_frames );
     overload_count--;
     return( false );
   }
-    
-
-    //uint32_t vec_count=0;
-    //uint32_t x_sum=0;  //used for computing alarm centre
-    //uint32_t y_sum=0;
-    
-    //Info("ANALYSER");
+   
   
     if (mvect_buffer) {
       
       uint16_t offset=4*zone_n;
       //memcpy(&vec_count,mvect_buffer,4);
-      memcpy(&score,mvect_buffer+offset,4);      
+      memcpy(&alarm_pixels,mvect_buffer+offset,4);      
         
     }   
     
     
     
-    //if (vec_count) {
-    //      alarm_centre=Coord((uint16_t)(x_sum/vec_count),(uint16_t)(y_sum/vec_count));
-    //}
-  
-    //vec_count is now count of 16x16 macroblocks weighted as x4 each, so shift 10 to the left to convert to pixels
-    //alarm_pixels = vec_count<<10 ; 
-    //score = ((double) alarm_pixels/(polygon.Area()))*100;   
+    
+    score = ((double) alarm_pixels/(polygon.Area()))*100;   
     
     
     
     if( score ) {
-      Info("Motion score %d, min %d, max %d ",  score, minimum_vector_coverage, maximum_vector_coverage);  
-  
+		
+	
+      
       //Info("Motion %d, score %d, min %d, max %d ", vec_count, score, minimum_vector_coverage, maximum_vector_coverage);  
-      if( min_alarm_pixels && (score < minimum_vector_coverage) ) {
+     if( min_alarm_pixels && (alarm_pixels < (unsigned int)min_alarm_pixels) ) {
         // Not enough pixels alarmed 
         return (false);
-      } else if( max_alarm_pixels && (score > maximum_vector_coverage) ) {
+	 } else if( max_alarm_pixels && (alarm_pixels > (unsigned int)max_alarm_pixels) ) {
         // Too many pixels alarmed 
         overload_count = overload_frames;
         return (false);
@@ -496,7 +484,8 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer, int zone_n) {
     
     Debug( 5, "Adjusted score is %d", score );
     
-    
+    //Info("Motion score %d, min %d, max %d ",  alarm_pixels, min_alarm_pixels, max_alarm_pixels);  
+  	
     
     return true; 
 };
