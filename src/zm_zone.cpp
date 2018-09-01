@@ -116,20 +116,13 @@ void Zone::Setup(
     }
     pg_image->WriteJpeg( diag_path );
   }
-  //Zone motion vector mask setup
   
+  //Zone motion vector mask setup is now done in zm_ffmpeg_camera.cpp
   zone_vector_mask=(uint8_t*)zm_mallocaligned(32,zm_size);
-  if(zone_vector_mask == NULL)
-		      Fatal("Memory allocation failed for zone vector mask: %s",strerror(errno));
-#ifdef __arm__  
-  //Set the bits in zone_vector_mask if this is Monitor purpose is capture and function is mvdect
-  if ((monitor->GetPurpose() == Monitor::CAPTURE ) && ( monitor->GetFunction() == Monitor::MVDECT )) {
-     SetVectorMask();
-  }   
-  /*if ((monitor->GetPurpose() == Monitor::ANALYSIS ) && ( monitor->GetFunction() == Monitor::MVDECT )) {
-     SetVectorMask();   
-  } */  	   
-#endif  
+      if(zone_vector_mask == NULL)
+		      Fatal("Memory allocation failed for zone vector mask: %s",strerror(errno));	
+  
+  
   
 } // end Zone::Setup
 

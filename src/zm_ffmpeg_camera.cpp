@@ -1318,7 +1318,7 @@ int FfmpegCamera::OpenFfmpeg() {
     OpenMmalEncoder(mVideoCodecContext);
     OpenMmalResizer(mVideoCodecContext);
    
-    av_init_packet(&mRawPacket);
+    /*av_init_packet(&mRawPacket);
     
 	//Send the sps and pps as first packet
 	Info("Sending PPS and SPS");
@@ -1329,14 +1329,16 @@ int FfmpegCamera::OpenFfmpeg() {
     mmal_decode(&mRawPacket);
     zm_av_packet_unref(&mRawPacket);
     Info("Done sending PPS and SPS");
+    */
     
-      //Test to see if zone info could be imported to capture process
+    
+    //Retrieve the zones info and setup the vector mask
     czones_n=monitor->GetZonesNum();
     czones=monitor->GetZones();
     
-    //for (int i=0; i < monitor->GetZonesNum() ; i++) {
-	  //  Info("Polygon test %d",czones[i]->GetPolygon().isInside(Coord(5,5))); 
-  //}	  
+    for (int i=0; i < monitor->GetZonesNum() ; i++) {
+	  czones[i]->SetVectorMask(); 
+    }	  
    
   }  
     
