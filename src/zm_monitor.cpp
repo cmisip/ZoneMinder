@@ -3863,6 +3863,7 @@ bool MonitorStream::sendFrame( Image *image, struct timeval *timestamp ) {
   } else
 #endif // HAVE_LIBAVCODEC
   {
+	
     static unsigned char temp_img_buffer[ZM_MAX_IMAGE_SIZE];
 
     int img_buffer_size = 0;

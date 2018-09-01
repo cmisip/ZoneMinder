@@ -42,6 +42,7 @@
 #define ZM_MAX_IMAGE_COLOURS    4        // The largest image we imagine ever handling
 #define ZM_MAX_IMAGE_DIM    (ZM_MAX_IMAGE_WIDTH*ZM_MAX_IMAGE_HEIGHT)
 #define ZM_MAX_IMAGE_SIZE    (ZM_MAX_IMAGE_DIM*ZM_MAX_IMAGE_COLOURS)
+#define ZM_JPEG_IMAGE_SIZE  (ZM_MAX_IMAGE_DIM>>2)
 
 #define ZM_SCALE_BASE      100          // The factor by which we bump up 'scale' to simulate FP
 #define ZM_RATE_BASE      100          // The factor by which we bump up 'rate' to simulate FP

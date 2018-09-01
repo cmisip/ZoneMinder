@@ -254,6 +254,10 @@ int FfmpegCamera::Capture( Image &image ) {
         uint8_t* jpegbuffer=NULL; 
            if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels tile Left to Right and then top to bottom and there are a fixed number covering the entire frame.
 
+                //Create the RGB buffer for this frame
+                mmal_resize(&directbuffer); 
+
+                //Create the JPEG buffer for this frame if frame is alarmed
                 jpegbuffer=image.JPEGBuffer(width, height);
                 if (jpegbuffer ==  NULL ){
                    Error("Failed requesting jpeg buffer for the captured image.");
@@ -262,18 +266,22 @@ int FfmpegCamera::Capture( Image &image ) {
                 
 		        int *jpeg_size=(int *)jpegbuffer;  
 
-                if (mmal_encode(&mvect_buffer)) {
-				   
+                 
+
+                if (mmal_encode(&mvect_buffer)) //alarmed frame
+                   //jpeg encode the frames between current write frame and frame that analyse is reading
+                   j_encode_count=monitor->GetImageBufferCount(); 
+                   
+                if (j_encode_count){
 				   //first word is jpeg size, rest is jpeg data
 				   image.EncodeJpeg(jpegbuffer+4, jpeg_size );
-				   
-				   	
+				   j_encode_count--;
 				} else { //set the first word as zero
 				   *jpeg_size=0;
 				}	
 					
 
-                mmal_resize(&directbuffer);
+                
                 
            } //if ctype
         
@@ -525,7 +533,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mRawFrame data
                          }  
                          
                          alarm_pixels = vec_count<<10 ; //each 16x16 block is 1 shifted to the left 8; each block is further weighted as x4 so we shift <<10. 
-                         //uint32_t score = ((double) alarm_pixels/(czones[i]->GetPolygon().Area()))*100; 
+                         //if any of the zones trigger an alarm encode a jpeg buffer for the frame
                          if( (alarm_pixels > (unsigned int)czones[i]->GetMinAlarmPixels()) && (alarm_pixels < (unsigned int)czones[i]->GetMaxAlarmPixels()) ) {
                              motion_detected=true;
 					     } 
