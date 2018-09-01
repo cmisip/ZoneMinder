@@ -468,9 +468,9 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mRawFrame data
                         uint32_t vec_count=0;
                         uint8_t* zone_vector_mask=czones[i]->zone_vector_mask;
                         
-                        for (int i=0;i < numblocks ; i++) {
+                        for (int j=0;j < numblocks ; j++) {
                         
-                            if ((abs(mvarray[i].x_vector) + abs(mvarray[i].y_vector)) > 8) 
+                            if ((abs(mvarray[j].x_vector) + abs(mvarray[j].y_vector)) > 8) 
                                registers =registers | (1 << count);
                             
                             count++;
@@ -502,11 +502,15 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mRawFrame data
                             
                              
                          }  
-                         //Info("Capture %d", vec_count);
                          
+                         uint32_t alarm_pixels = vec_count<<10 ; 
+                         uint32_t score = ((double) alarm_pixels/(czones[i]->GetPolygon().Area()))*100;   
+    
+                         //Info("Capture vec_count %d score %d", vec_count, score);
                          
                          //SAVE this vec count into mvect buffer which becomes a list of zone scores  
-                         memcpy((*mv_buffer)+m_offset ,&vec_count, 4 ) ; 
+                         //memcpy((*mv_buffer)+m_offset ,&vec_count, 4 ) ; 
+                         memcpy((*mv_buffer)+m_offset ,&score, 4 ) ; 
                          m_offset+=4;
                         
                      }
@@ -616,7 +620,7 @@ int FfmpegCamera::OpenMmalDecoder(AVCodecContext *mVideoCodecContext){
      Info("Decoder stats: %i, %i", stats.stats.buffer_count, stats.stats.max_delay);
    }
    
-   
+   /*
    // Set the zero-copy parameter on the input port 
    MMAL_PARAMETER_BOOLEAN_T zc = {{MMAL_PARAMETER_ZERO_COPY, sizeof(zc)}, MMAL_TRUE};
    if (mmal_port_parameter_set(decoder->input[0], &zc.hdr) != MMAL_SUCCESS)
@@ -625,7 +629,7 @@ int FfmpegCamera::OpenMmalDecoder(AVCodecContext *mVideoCodecContext){
    // Set the zero-copy parameter on the output port 
    if (mmal_port_parameter_set_boolean(decoder->output[0], MMAL_PARAMETER_ZERO_COPY, MMAL_TRUE) != MMAL_SUCCESS)
      Info("Failed to set zero copy on decoder output");
-    
+   */ 
    /* Set format of video decoder input port */
    MMAL_ES_FORMAT_T *format_in = decoder->input[0]->format;
    format_in->type = MMAL_ES_TYPE_VIDEO;
@@ -675,17 +679,17 @@ int FfmpegCamera::OpenMmalDecoder(AVCodecContext *mVideoCodecContext){
    decoder->input[0]->buffer_size = decoder->input[0]->buffer_size_recommended;
    decoder->output[0]->buffer_num = decoder->output[0]->buffer_num_recommended;
    decoder->output[0]->buffer_size = decoder->output[0]->buffer_size_recommended;
- 
+ /*
    pool_ind = mmal_port_pool_create(decoder->input[0],decoder->input[0]->buffer_num,
                               decoder->input[0]->buffer_size);
    pool_outd = mmal_port_pool_create(decoder->output[0],decoder->output[0]->buffer_num,
                                decoder->output[0]->buffer_size);
-   /*                         
+   */                         
    pool_ind = mmal_pool_create(decoder->input[0]->buffer_num,
                               decoder->input[0]->buffer_size);
    pool_outd = mmal_pool_create(decoder->output[0]->buffer_num,
                                decoder->output[0]->buffer_size);
-   */                             
+                                
                                
    /* Display the input port format */
    display_format(&decoder->input[0],&format_in);
@@ -700,11 +704,6 @@ int FfmpegCamera::OpenMmalDecoder(AVCodecContext *mVideoCodecContext){
    /* Store a reference to our context in each port (will be used during callbacks) */
    decoder->input[0]->userdata = (MMAL_PORT_USERDATA_T *)&context;
    decoder->output[0]->userdata = (MMAL_PORT_USERDATA_T *)&context;
-   
-   mmal_port_flush(decoder->input[0]);
-   mmal_port_flush(decoder->output[0]);
-   mmal_port_flush(decoder->control); 
-   
    
    // Enable all the input port and the output port.
    if ( mmal_port_enable(decoder->input[0], input_callback) != MMAL_SUCCESS ) {
@@ -749,7 +748,7 @@ int FfmpegCamera::OpenMmalEncoder(AVCodecContext *mVideoCodecContext){
    else {
      Info("Encoder stats: %i, %i", stats.stats.buffer_count, stats.stats.max_delay);
    }
-   
+   /*
    // Set the zero-copy parameter on the input port 
    MMAL_PARAMETER_BOOLEAN_T zc = {{MMAL_PARAMETER_ZERO_COPY, sizeof(zc)}, MMAL_TRUE};
    if (mmal_port_parameter_set(encoder->input[0], &zc.hdr) != MMAL_SUCCESS)
@@ -758,7 +757,7 @@ int FfmpegCamera::OpenMmalEncoder(AVCodecContext *mVideoCodecContext){
    // Set the zero-copy parameter on the output port 
    if (mmal_port_parameter_set_boolean(encoder->output[0], MMAL_PARAMETER_ZERO_COPY, MMAL_TRUE) != MMAL_SUCCESS)
      Info("Failed to set zero copy on encoder output");
-    
+    */
    /* Set format of video encoder input port */
    MMAL_ES_FORMAT_T *format_in = encoder->input[0]->format;
    format_in->type = MMAL_ES_TYPE_VIDEO;
@@ -811,17 +810,17 @@ int FfmpegCamera::OpenMmalEncoder(AVCodecContext *mVideoCodecContext){
    encoder->input[0]->buffer_size = encoder->input[0]->buffer_size_min;
    encoder->output[0]->buffer_num = encoder->output[0]->buffer_num_min;
    encoder->output[0]->buffer_size = encoder->output[0]->buffer_size_min;
-   
+   /*
    pool_ine = mmal_port_pool_create(encoder->input[0],encoder->input[0]->buffer_num,
                               encoder->input[0]->buffer_size);
    pool_oute = mmal_port_pool_create(encoder->output[0],encoder->output[0]->buffer_num,
                                encoder->output[0]->buffer_size);
-   /*                            
+   */                           
    pool_ine = mmal_pool_create(encoder->input[0]->buffer_num,
                               encoder->input[0]->buffer_size);
    pool_oute = mmal_pool_create(encoder->output[0]->buffer_num,
                                encoder->output[0]->buffer_size);                            
-   */
+   
    /* Create a queue to store our decoded video frames. The callback we will get when
     * a frame has been decoded will put the frame into this queue. */
    context.equeue = mmal_queue_create();
@@ -829,10 +828,6 @@ int FfmpegCamera::OpenMmalEncoder(AVCodecContext *mVideoCodecContext){
    /* Store a reference to our context in each port (will be used during callbacks) */
    encoder->input[0]->userdata = (MMAL_PORT_USERDATA_T *)&context;
    encoder->output[0]->userdata = (MMAL_PORT_USERDATA_T *)&context;
-   
-   mmal_port_flush(encoder->input[0]);
-   mmal_port_flush(encoder->output[0]);
-   mmal_port_flush(encoder->control); 
    
    // Enable all the input port and the output port.
    if ( mmal_port_enable(encoder->input[0], input_callback) != MMAL_SUCCESS ) {
@@ -876,7 +871,7 @@ int FfmpegCamera::OpenMmalResizer(AVCodecContext *mVideoCodecContext){
    else {
      Info("Resizer stats: %i, %i", stats.stats.buffer_count, stats.stats.max_delay);
    }
-   
+   /*
    // Set the zero-copy parameter on the input port 
    MMAL_PARAMETER_BOOLEAN_T zc = {{MMAL_PARAMETER_ZERO_COPY, sizeof(zc)}, MMAL_TRUE};
    if (mmal_port_parameter_set(resizer->input[0], &zc.hdr) != MMAL_SUCCESS)
@@ -885,7 +880,7 @@ int FfmpegCamera::OpenMmalResizer(AVCodecContext *mVideoCodecContext){
    // Set the zero-copy parameter on the output port 
    if (mmal_port_parameter_set_boolean(resizer->output[0], MMAL_PARAMETER_ZERO_COPY, MMAL_TRUE) != MMAL_SUCCESS)
      Info("Failed to set zero copy on resizer output");
-    
+   */ 
    /* Set format of video resizer input port */
    MMAL_ES_FORMAT_T *format_in = resizer->input[0]->format;
    format_in->type = MMAL_ES_TYPE_VIDEO;
@@ -950,18 +945,18 @@ int FfmpegCamera::OpenMmalResizer(AVCodecContext *mVideoCodecContext){
    resizer->output[0]->buffer_num = resizer->output[0]->buffer_num_min;
    resizer->output[0]->buffer_size = resizer->output[0]->buffer_size_min;
    
-   
+   /*
    pool_inr = mmal_port_pool_create(resizer->input[0],resizer->input[0]->buffer_num,
                               resizer->input[0]->buffer_size);
    pool_outr = mmal_port_pool_create(resizer->output[0],resizer->output[0]->buffer_num,
                                resizer->output[0]->buffer_size);
     
-    /*
+   */
    pool_inr = mmal_pool_create(resizer->input[0]->buffer_num,
                               resizer->input[0]->buffer_size);
    pool_outr = mmal_pool_create(resizer->output[0]->buffer_num,
                                resizer->output[0]->buffer_size);
-    /*
+    
    /* Create a queue to store our decoded video frames. The callback we will get when
     * a frame has been decoded will put the frame into this queue. */
    context.rqueue = mmal_queue_create();
@@ -969,10 +964,6 @@ int FfmpegCamera::OpenMmalResizer(AVCodecContext *mVideoCodecContext){
    /* Store a reference to our context in each port (will be used during callbacks) */
    resizer->input[0]->userdata = (MMAL_PORT_USERDATA_T *)&context;
    resizer->output[0]->userdata = (MMAL_PORT_USERDATA_T *)&context;
-   
-   mmal_port_flush(resizer->input[0]);
-   mmal_port_flush(resizer->output[0]);
-   mmal_port_flush(resizer->control); 
    
    // Enable all the input port and the output port.
    if ( mmal_port_enable(resizer->input[0], input_callback) != MMAL_SUCCESS ) {
@@ -1002,6 +993,9 @@ int FfmpegCamera::CloseMmal(){
    mmal_port_flush(decoder->input[0]);
    mmal_port_flush(decoder->output[0]);
    mmal_port_flush(decoder->control); 
+   
+   while ((buffer = mmal_queue_get(context.dqueue)))
+           mmal_buffer_header_release(buffer);
       
    mmal_port_disable(encoder->input[0]);   
    mmal_port_disable(encoder->output[0]);
@@ -1011,9 +1005,15 @@ int FfmpegCamera::CloseMmal(){
    mmal_port_flush(encoder->output[0]);
    mmal_port_flush(encoder->control); 
    
+   while ((buffer = mmal_queue_get(context.equeue)))
+           mmal_buffer_header_release(buffer);
+   
    mmal_port_disable(resizer->input[0]);
    mmal_port_disable(resizer->output[0]);
    mmal_port_disable(resizer->control); 
+   
+   while ((buffer = mmal_queue_get(context.rqueue)))
+           mmal_buffer_header_release(buffer);
       
    mmal_port_flush(resizer->input[0]);
    mmal_port_flush(resizer->output[0]);

@@ -436,7 +436,7 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer, int zone_n) {
   }
     
 
-    uint32_t vec_count=0;
+    //uint32_t vec_count=0;
     //uint32_t x_sum=0;  //used for computing alarm centre
     //uint32_t y_sum=0;
     
@@ -445,7 +445,8 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer, int zone_n) {
     if (mvect_buffer) {
       
       uint16_t offset=4*zone_n;
-      memcpy(&vec_count,mvect_buffer,4);
+      //memcpy(&vec_count,mvect_buffer,4);
+      memcpy(&score,mvect_buffer+offset,4);      
         
     }   
     
@@ -456,12 +457,14 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer, int zone_n) {
     //}
   
     //vec_count is now count of 16x16 macroblocks weighted as x4 each, so shift 10 to the left to convert to pixels
-    alarm_pixels = vec_count<<10 ; 
-    score = ((double) alarm_pixels/(polygon.Area()))*100;   
+    //alarm_pixels = vec_count<<10 ; 
+    //score = ((double) alarm_pixels/(polygon.Area()))*100;   
     
     
     
     if( score ) {
+      Info("Motion score %d, min %d, max %d ",  score, minimum_vector_coverage, maximum_vector_coverage);  
+  
       //Info("Motion %d, score %d, min %d, max %d ", vec_count, score, minimum_vector_coverage, maximum_vector_coverage);  
       if( min_alarm_pixels && (score < minimum_vector_coverage) ) {
         // Not enough pixels alarmed 

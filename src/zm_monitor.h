@@ -395,6 +395,9 @@ public:
   inline int GetZonesNum() const {
     return( n_zones );
   }
+  inline int GetImageBufferCount() const {
+    return( image_buffer_count );
+  }
   inline bool Enabled() {
     if ( function <= MONITOR )
       return( false );
