@@ -378,6 +378,7 @@ Monitor::Monitor(
        //+ (image_buffer_count*( (((((width * height)/256)*(double)80)/100)*4)+4)  )
        //+ (image_buffer_count*1024  )
        + (image_buffer_count*40  )
+       + (image_buffer_count*((width*height)>>2))
        + 64; /* Padding used to permit aligning the images buffer to 64 byte boundary */
 
   Debug( 1, "mem.size=%d", mem_size );
@@ -548,12 +549,19 @@ bool Monitor::connect() {
     exit( -1 );
   }
 #endif // ZM_MEM_MAPPED
+
+   //FIXMEC mv_buffer size is resolution divided by pixel dimension of 16x16 macroblock, assuming up to 80% frame covered as max case, plus 4 bytes for header info (number of vectors and how vector was extracted : hardware or software
+  //uint16_t mv_buffer_size = ((((((width * height)/256)*(double)80)/100)*4)+4);
+  int mv_buffer_size = 40;
+  int j_buffer_size = (width*height)>>2;
+
   shared_data = (SharedData *)mem_ptr;
   trigger_data = (TriggerData *)((char *)shared_data + sizeof(SharedData));
   video_store_data = (VideoStoreData *)((char *)trigger_data + sizeof(TriggerData));
   struct timeval *shared_timestamps = (struct timeval *)((char *)video_store_data + sizeof(VideoStoreData));
   unsigned char *shared_images = (unsigned char *)((char *)shared_timestamps + (image_buffer_count*sizeof(struct timeval)));
   uint8_t *shared_mbuff = (uint8_t *)((char *)shared_images +  (image_buffer_count*camera->ImageSize()));
+  uint8_t *shared_jbuff = (uint8_t *)((char *)shared_mbuff +  (image_buffer_count*mv_buffer_size));
   
   if(((unsigned long)shared_images % 64) != 0) {
     /* Align images buffer to nearest 64 byte boundary */
@@ -563,13 +571,12 @@ bool Monitor::connect() {
   image_buffer = new Snapshot[image_buffer_count];
 
 
-  //FIXMEC mv_buffer size is resolution divided by pixel dimension of 16x16 macroblock, assuming up to 80% frame covered as max case, plus 4 bytes for header info (number of vectors and how vector was extracted : hardware or software
-  //uint16_t mv_buffer_size = ((((((width * height)/256)*(double)80)/100)*4)+4);
-  uint16_t mv_buffer_size = 40;
+ 
   for ( int i = 0; i < image_buffer_count; i++ ) {
     image_buffer[i].timestamp = &(shared_timestamps[i]);
     image_buffer[i].image = new Image( width, height, camera->Colours(), camera->SubpixelOrder(), &(shared_images[i*camera->ImageSize()]) );
     image_buffer[i].image->VectBuffer() = &(shared_mbuff[ i*mv_buffer_size ]) ; //FIXMEC maybe needs to be a parameter to constructor in line above
+    image_buffer[i].image->JPEGBuffer(width, height) = &(shared_jbuff[ i*j_buffer_size ]) ; //FIXMEC maybe needs to be a parameter to constructor in line above
     image_buffer[i].image->HoldBuffer(true); /* Don't release the internal buffer or replace it with another */
   }
   if ( (deinterlacing & 0xff) == 4) {

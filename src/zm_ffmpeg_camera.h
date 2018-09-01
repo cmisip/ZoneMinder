@@ -173,6 +173,8 @@ class FfmpegCamera : public Camera {
     Zone **czones;
     int czones_n=0;
     
+    
+    
 #endif
 };
 

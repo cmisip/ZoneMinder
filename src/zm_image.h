@@ -132,10 +132,12 @@ public:
 	enum { ZM_CHAR_HEIGHT=11, ZM_CHAR_WIDTH=6 };
 	enum { LINE_HEIGHT=ZM_CHAR_HEIGHT+0 };
         
-        //maximum size bytes required to store at 0 byte the size in uint16_t, and each pair of uint16_t for x, and y values
-        unsigned int mv_size;
+        unsigned int mv_size=0;
+        unsigned int j_size=0;
         
-        struct motion_vector { //SW vectors will be 4x4, HW vectors will be 16x16
+        
+        //FIXME, all the below will need to go. 
+        struct motion_vector { 
         uint16_t xcoord;  //location of top left corner
         uint16_t ycoord;
     
@@ -172,6 +174,7 @@ protected:
 	unsigned long allocation;
 	uint8_t *buffer;
     uint8_t *mv_buffer=NULL;
+    uint8_t *j_buffer=NULL;
 	int buffertype; /* 0=not ours, no need to call free(), 1=malloc() buffer, 2=new buffer */
 	int holdbuffer; /* Hold the buffer instead of replacing it with new one */
 	char text[1024];
@@ -196,8 +199,10 @@ public:
 	/* Internal buffer should not be modified from functions outside of this class */
 	inline const uint8_t* Buffer() const { return( buffer ); }
 	inline const uint8_t* Buffer( unsigned int x, unsigned int y= 0 ) const { return( &buffer[colours*((y*width)+x)] ); }
-        /* Request writeable mv_buffer */
+    /* Request writeable mv_buffer */
     uint8_t*& VectBuffer ();
+    /* Request writeable jpeg buffer */
+    uint8_t*& JPEGBuffer(int width, int height);
 	/* Request writeable image buffer */
 	uint8_t* WriteBuffer(const unsigned int p_width, const unsigned int p_height, const unsigned int p_colours, const unsigned int p_subpixelorder);
 	

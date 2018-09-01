@@ -232,6 +232,7 @@ int FfmpegCamera::Capture( Image &image ) {
         
 
         uint8_t* mvect_buffer=NULL;  
+        
         if  (cfunction == Monitor::MVDECT) {
 	  
 	       mvect_buffer=image.VectBuffer();   
@@ -250,12 +251,27 @@ int FfmpegCamera::Capture( Image &image ) {
            }         
 
 #ifdef __arm__
-        
+        uint8_t* jpegbuffer=NULL; 
            if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels tile Left to Right and then top to bottom and there are a fixed number covering the entire frame.
-              
+
+                jpegbuffer=image.JPEGBuffer(width, height);
+                if (jpegbuffer ==  NULL ){
+                   Error("Failed requesting jpeg buffer for the captured image.");
+                   return (-1); 
+                }
+                
+		        int *jpeg_size=(int *)jpegbuffer;  
+
                 if (mmal_encode(&mvect_buffer)) {
-				  Info("MOTION THRESHOLD REACHED");	
+				   
+				   //first word is jpeg size, rest is jpeg data
+				   image.EncodeJpeg(jpegbuffer+4, jpeg_size );
+				   
+				   	
+				} else { //set the first word as zero
+				   *jpeg_size=0;
 				}	
+					
 
                 mmal_resize(&directbuffer);
                 

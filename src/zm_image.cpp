@@ -156,6 +156,10 @@ Image::Image( const Image &p_image )
      VectBuffer();
      memcpy(mv_buffer,p_image.mv_buffer,mv_size);
   }
+  if (p_image.j_buffer) {
+     JPEGBuffer(width,height);
+     memcpy(j_buffer,p_image.j_buffer,j_size);
+  }
   strncpy( text, p_image.text, sizeof(text) );
 }
 
@@ -164,6 +168,11 @@ Image::~Image() {
   if (mv_buffer) {
 	    zm_freealigned(mv_buffer);
         mv_buffer = NULL;
+  }
+  
+  if (j_buffer) {
+	    zm_freealigned(j_buffer);
+        j_buffer = NULL;
   }
 }
 
@@ -434,7 +443,7 @@ void Image::Initialise()
 }*/
 uint8_t *& Image::VectBuffer() {
 	   if (mv_buffer ==NULL) {
-		   //10 x 4 bytes to hold the score for up to 10 zones
+		   //10 x 4 bytes to hold alarm_pixels for up to 10 zones //FIXME, don't really know the practical limit
 		   mv_size=40;
 		   mv_buffer = (uint8_t*)zm_mallocaligned(32,mv_size);
 	       if(mv_buffer == NULL)
@@ -444,6 +453,20 @@ uint8_t *& Image::VectBuffer() {
 	   return mv_buffer;
 }
 
+
+uint8_t *& Image::JPEGBuffer(int width, int height) {
+	  if (j_buffer ==NULL) {
+		   //25% of widthxheight for now, probably will depend on quality setting //FIXME
+		   //however for now 640x360=230400 produces a jpeg that is 12% size at 28000 when the jpeg quality is set at 70
+		   //25% should be a safe estimate for upper limit
+		   j_size=(width*height)>>2;
+		   j_buffer = (uint8_t*)zm_mallocaligned(32,j_size);
+	       if(j_buffer == NULL)
+		      Fatal("Memory allocation for jpeg buffer failed: %s",strerror(errno));
+  	   
+	  }
+	  return j_buffer;
+}	
 
 /* Requests a writeable buffer to the image. This is safer than buffer() because this way we can guarantee that a buffer of required size exists */
 uint8_t* Image::WriteBuffer(const unsigned int p_width, const unsigned int p_height, const unsigned int p_colours, const unsigned int p_subpixelorder) {
@@ -529,8 +552,9 @@ void Image::AssignDirect( const unsigned int p_width, const unsigned int p_heigh
       if(new_buffer != buffer) {
         (*fptr_imgbufcpy)(buffer, new_buffer, size);
         memset(mv_buffer,0,mv_size);  //FIXMEC just reset the mv_buffer since it is not valid with a new image buffer, 
-      }                               //FIXMEC custom mv_buffer memcpy function pointer ? 
-
+                                     //FIXMEC custom mv_buffer memcpy function pointer ? 
+        memset(j_buffer,0,j_size);                             
+      }
       /* Free the new buffer */
       DumpBuffer(new_buffer, p_buffertype);
     }
@@ -549,6 +573,7 @@ void Image::AssignDirect( const unsigned int p_width, const unsigned int p_heigh
     buffertype = p_buffertype;
     buffer = new_buffer;
     memset(mv_buffer,0,mv_size); //FIXMEC just reset the mv_buffer since it is not valid with a new image buffer
+    memset(j_buffer,0,j_size);
   }
 
 }
@@ -601,6 +626,7 @@ void Image::Assign(const unsigned int p_width, const unsigned int p_height, cons
   if(new_buffer != buffer) {
     (*fptr_imgbufcpy)(buffer, new_buffer, size);
     memset(mv_buffer,0,mv_size);
+    memset(j_buffer,0,j_size);
   }  
 
 }
@@ -952,6 +978,30 @@ bool Image::WriteJpeg( const char *filename, struct timeval timestamp ) const
 
 bool Image::WriteJpeg( const char *filename, int quality_override, struct timeval timestamp  ) const
 {
+
+#ifdef __arm__	
+  if (j_buffer) {
+	 int jpeg_size=0;	 
+     memcpy(&jpeg_size,j_buffer,4);
+     if (jpeg_size > 0 ) {
+       Info("Found preencoded jpeg buffer for writing with size %d", jpeg_size);       
+       FILE *outfile;
+       if ( (outfile = fopen( filename, "wb" )) == NULL ){
+           Error( "Can't open %s: %s", filename, strerror(errno) );
+           
+           return( false );
+       }  
+       fwrite(j_buffer+4, 1, jpeg_size, outfile); 
+       fclose(outfile);
+       return true;    
+		
+     }		 
+  }	
+  
+#endif	
+
+
+	
   if ( config.colour_jpeg_files && colours == ZM_COLOUR_GRAY8 )
   {
     Image temp_image( *this );
@@ -1216,6 +1266,20 @@ cinfo->out_color_space = JCS_RGB;
 
 bool Image::EncodeJpeg( JOCTET *outbuffer, int *outbuffer_size, int quality_override ) const
 {
+#ifdef __arm__	
+  if (j_buffer) {	 
+     memcpy(outbuffer_size,j_buffer,4);
+     if (*outbuffer_size > 0 ) {
+		 Info("Found preencoded jpeg buffer for encoding with size %d", *outbuffer_size); 
+	     memcpy(outbuffer,j_buffer+4,*outbuffer_size);
+	     
+		 return true;
+		
+     }		 
+  }	
+  
+#endif
+  
   if ( config.colour_jpeg_files && colours == ZM_COLOUR_GRAY8 )
   {
     Image temp_image( *this );
