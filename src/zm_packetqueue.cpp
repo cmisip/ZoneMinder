@@ -78,13 +78,24 @@ unsigned int zm_packetqueue::clearQueue( unsigned int frames_to_keep, int stream
     Debug(4, "Looking at packet with stream index (%d) with keyframe (%d), frames_to_keep is (%d)", av_packet->stream_index, ( av_packet->flags & AV_PKT_FLAG_KEY ), frames_to_keep );
     
     // Want frames_to_keep video keyframes.  Otherwise, we may not have enough
-    if ( ( av_packet->stream_index == stream_id) && ( av_packet->flags & AV_PKT_FLAG_KEY ) ) {
-      frames_to_keep --;
-    }
+    //if ( ( av_packet->stream_index == stream_id) && ( av_packet->flags & AV_PKT_FLAG_KEY ) ) {
+    //  frames_to_keep --;
+    //}
+    frames_to_keep--;
   }
-  if ( frames_to_keep ) {
-    Debug(3, "Hit end of queue, still need (%d) video keyframes", frames_to_keep );
+  //if ( frames_to_keep ) {
+  //  Debug(3, "Hit end of queue, still need (%d) video keyframes", frames_to_keep );
+  //}
+  
+  //Move iterator towards the front and point it to a keyframe
+  while ( it != pktQueue.rend() ) {
+	  it++;
+	  ZMPacket *zm_packet = *it;
+      AVPacket *av_packet = &(zm_packet->packet);
+	  if ( ( av_packet->stream_index == stream_id) && ( av_packet->flags & AV_PKT_FLAG_KEY ) )
+	    break; 
   }
+  
   unsigned int delete_count = 0;
   while ( it != pktQueue.rend() ) {
     Debug(4, "Deleting a packet from the front, count is (%d)", delete_count );

@@ -59,7 +59,7 @@ class FfmpegCamera : public Camera {
     AVFrame             *mRawFrame; 
     AVFrame             *mFrame;
     _AVPIXELFORMAT      imagePixFormat;
-    AVPacket mRawPacket;
+    //AVPacket mRawPacket;
 
     // Need to keep track of these because apparently the stream can start with values for pts/dts and then subsequent packets start at zero.
     int64_t audio_last_pts;
@@ -173,6 +173,9 @@ class FfmpegCamera : public Camera {
     Zone **czones;
     int czones_n=0;
     int j_encode_count=0;
+    int video_pre_event_buffer_size=0;
+    struct timeval now;
+    timeval preempt_time=(struct timeval){0};
     
     
     

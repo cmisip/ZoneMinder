@@ -1362,7 +1362,10 @@ int FfmpegCamera::OpenFfmpeg() {
     
     for (int i=0; i < monitor->GetZonesNum() ; i++) {
 	  czones[i]->SetVectorMask(); 
-    }	  
+    }
+    
+    //How many frames should video capture module save
+    video_pre_event_buffer_size=monitor->GetImageBufferCount() + 	monitor->GetPreEventCount();  
    
   }  
     
@@ -1595,6 +1598,7 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
         uint8_t* jpegbuffer=NULL; 
            if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels tile Left to Right and then top to bottom and there are a fixed number covering the entire frame.
 
+
                 //Create the RGB buffer for this frame
                 mmal_resize(&directbuffer); 
 
@@ -1612,15 +1616,22 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
                 if (mmal_encode(&mvect_buffer)) //alarmed frame
                    //jpeg encode the frames between current write frame and frame that analyse is reading
                    j_encode_count=monitor->GetImageBufferCount(); 
+                   //record start of preemptive buffering
+                   
+                   gettimeofday( &now, NULL );
+                   preempt_time= now;
                    
                 if (j_encode_count){
 				   //first word is jpeg size, rest is jpeg data
 				   image.EncodeJpeg(jpegbuffer+4, jpeg_size );
 				   j_encode_count--;
-				} else { //set the first word as zero
+				} else {  //imagebuffercount frames passed by with no other alarm frame detected 
+				   //set the first word as zero
 				   *jpeg_size=0;
+				   preempt_time=(struct timeval){0};
 				}	
 					
+
 
                 
                 
@@ -1698,7 +1709,9 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
         ZMPacket *queued_packet;
 
         // Clear all packets that predate the moment when the recording began
-        packetqueue.clear_unwanted_packets( &recording, mVideoStreamId );
+        // however, the recording time is in the past because of image_buffer_count
+        // so recording should start at the earlier preempt_time
+        packetqueue.clear_unwanted_packets( &preempt_time, mVideoStreamId );
 
         while ( ( queued_packet = packetqueue.popPacket() ) ) {
           AVPacket *avp = queued_packet->av_packet();
@@ -1731,12 +1744,14 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
         monitor->SetVideoWriterEventId( 0 );
       }
 
+      if (preempt_time.tv_sec) {  //only buffer if we detected an alarm in capture frame
+
       // Buffer video packets, since we are not recording.
       // All audio packets are keyframes, so only if it's a video keyframe
       if ( packet.stream_index == mVideoStreamId ) {
         if ( key_frame ) {
           Debug(3, "Clearing queue");
-          packetqueue.clearQueue( monitor->GetPreEventCount(), mVideoStreamId );
+          packetqueue.clearQueue( video_pre_event_buffer_size, mVideoStreamId );
         } 
 #if 0
 // Not sure this is valid.  While a camera will PROBABLY always have an increasing pts... it doesn't have to.
@@ -1760,6 +1775,7 @@ else if ( packet.pts && video_last_pts > packet.pts ) {
         if ( key_frame || packetqueue.size() ) // it's a keyframe or we already have something in the queue
           packetqueue.queuePacket( &packet );
       }
+    }  //if preempt_time
     } // end if recording or not
         
       
