@@ -710,7 +710,7 @@ int FfmpegCamera::OpenMmalDecoder(AVCodecContext *mVideoCodecContext){
     * our buffer headers. We use the buffer pool API to create these. */
    //decoder->input[0]->buffer_num = decoder->input[0]->buffer_num_recommended;
    decoder->input[0]->buffer_num = 1;
-   decoder->input[0]->buffer_size = decoder->input[0]->buffer_size_recommended;
+   decoder->input[0]->buffer_size = 512*1024;
    decoder->output[0]->buffer_num = decoder->output[0]->buffer_num_recommended;
    decoder->output[0]->buffer_size = decoder->output[0]->buffer_size_recommended;
  /*
