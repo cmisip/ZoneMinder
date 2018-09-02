@@ -1592,12 +1592,37 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
         
         
 #ifdef __arm__
-        
-         if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels tile Left to Right and then top to bottom and there are a fixed number covering the entire frame.
-              
-                mmal_encode(&mvect_buffer);
+        uint8_t* jpegbuffer=NULL; 
+           if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels tile Left to Right and then top to bottom and there are a fixed number covering the entire frame.
 
-                mmal_resize(&directbuffer);
+                //Create the RGB buffer for this frame
+                mmal_resize(&directbuffer); 
+
+                //Create the JPEG buffer for this frame if frame is alarmed
+                jpegbuffer=image.JPEGBuffer(width, height);
+                if (jpegbuffer ==  NULL ){
+                   Error("Failed requesting jpeg buffer for the captured image.");
+                   return (-1); 
+                }
+                
+		        int *jpeg_size=(int *)jpegbuffer;  
+
+                 
+
+                if (mmal_encode(&mvect_buffer)) //alarmed frame
+                   //jpeg encode the frames between current write frame and frame that analyse is reading
+                   j_encode_count=monitor->GetImageBufferCount(); 
+                   
+                if (j_encode_count){
+				   //first word is jpeg size, rest is jpeg data
+				   image.EncodeJpeg(jpegbuffer+4, jpeg_size );
+				   j_encode_count--;
+				} else { //set the first word as zero
+				   *jpeg_size=0;
+				}	
+					
+
+                
                 
            } //if ctype
         
