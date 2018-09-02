@@ -1608,7 +1608,7 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
        
         
     //Video recording
- /*   int key_frame = packet.flags & AV_PKT_FLAG_KEY;
+    int key_frame = packet.flags & AV_PKT_FLAG_KEY;
     if ( recording.tv_sec ) {
 
       uint32_t last_event_id = monitor->GetLastEventId() ;
@@ -1737,7 +1737,7 @@ else if ( packet.pts && video_last_pts > packet.pts ) {
       }
     } // end if recording or not
         
- */     
+      
 
         
 //This is the software scaler. Directbuffer is packaged into mFrame and processed by swscale to convert to appropriate format and size
