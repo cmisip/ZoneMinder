@@ -398,6 +398,9 @@ public:
   inline int GetImageBufferCount() const {
     return( image_buffer_count );
   }
+  inline int GetPostEventCount() const {
+    return( post_event_count );
+  }
   inline bool Enabled() {
     if ( function <= MONITOR )
       return( false );

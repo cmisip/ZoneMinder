@@ -269,8 +269,8 @@ int FfmpegCamera::Capture( Image &image ) {
                  
 
                 if (mmal_encode(&mvect_buffer)) //alarmed frame
-                   //jpeg encode the frames between current write frame and frame that analyse is reading
-                   j_encode_count=monitor->GetImageBufferCount(); 
+                   //jpeg encode the frames between current alarmed write frame and frame that analyse is reading up to the post event count frames
+                   j_encode_count=monitor->GetImageBufferCount()+monitor->GetPostEventCount(); 
                    
                 if (j_encode_count){
 				   //first word is jpeg size, rest is jpeg data
