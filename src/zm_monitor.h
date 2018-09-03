@@ -225,6 +225,12 @@ protected:
   bool            enabled;            // Whether the monitor is enabled or asleep
   unsigned int    width;              // Normally the same as the camera, but not if partly rotated
   unsigned int    height;             // Normally the same as the camera, but not if partly rotated
+  
+#ifdef __arm__ 
+  unsigned int    s_width;
+  unsigned int    s_height;
+#endif
+
   bool            v4l_multi_buffer;
   unsigned int    v4l_captures_per_frame;
   Orientation     orientation;        // Whether the image has to be rotated at all
@@ -364,8 +370,11 @@ public:
     Rgb p_signal_check_colour,
     bool p_embed_exif,
     Purpose p_purpose,
+    unsigned int s_width,
+    unsigned int s_height,
     int p_n_zones=0,
     Zone *p_zones[]=0
+    
   );
   ~Monitor();
 
@@ -426,6 +435,10 @@ public:
 
   unsigned int Width() const { return width; }
   unsigned int Height() const { return height; }
+ 
+  unsigned int S_Width() const { return s_width; }
+  unsigned int S_Height() const { return s_height; }
+
   unsigned int Colours() const;
   unsigned int SubpixelOrder() const;
     

@@ -553,7 +553,8 @@ void Image::AssignDirect( const unsigned int p_width, const unsigned int p_heigh
         (*fptr_imgbufcpy)(buffer, new_buffer, size);
         memset(mv_buffer,0,mv_size);  //FIXMEC just reset the mv_buffer since it is not valid with a new image buffer, 
                                      //FIXMEC custom mv_buffer memcpy function pointer ? 
-        memset(j_buffer,0,j_size);                             
+        memset(j_buffer,0,j_size);  
+                                   
       }
       /* Free the new buffer */
       DumpBuffer(new_buffer, p_buffertype);
@@ -627,6 +628,7 @@ void Image::Assign(const unsigned int p_width, const unsigned int p_height, cons
     (*fptr_imgbufcpy)(buffer, new_buffer, size);
     memset(mv_buffer,0,mv_size);
     memset(j_buffer,0,j_size);
+    
   }  
 
 }
@@ -1270,13 +1272,13 @@ bool Image::EncodeJpeg( JOCTET *outbuffer, int *outbuffer_size, int quality_over
   if (j_buffer) {	 
      memcpy(outbuffer_size,j_buffer,4);
      if (*outbuffer_size > 0 ) {
-		 //Info("Found preencoded jpeg buffer for encoding with size %d", *outbuffer_size); 
 	     memcpy(outbuffer,j_buffer+4,*outbuffer_size);
 	     
 		 return true;
 		
      }		 
   }	
+  
   
 #endif
   

@@ -268,7 +268,7 @@ int FfmpegCamera::Capture( Image &image ) {
 
                  
 
-                if (mmal_encode(&mvect_buffer)) //alarmed frame
+               /* if (mmal_encode(&mvect_buffer)) //alarmed frame
                    //jpeg encode the frames between current alarmed write frame and frame that analyse is reading up to the post event count frames
                    j_encode_count=monitor->GetImageBufferCount()+monitor->GetPostEventCount(); 
                    
@@ -278,7 +278,9 @@ int FfmpegCamera::Capture( Image &image ) {
 				   j_encode_count--;
 				} else { //set the first word as zero
 				   *jpeg_size=0;
-				}	
+				}*/
+				
+				image.EncodeJpeg(jpegbuffer+4, jpeg_size );	
 					
 
                 
@@ -432,7 +434,7 @@ int FfmpegCamera::mmal_decode(AVPacket *pkt) {
       
       while ((buffer = mmal_queue_get(context.dqueue)) != NULL)
       {
-         //save it as AVFrame holding an I420 buffer
+         //save it as AVFrame holding an I420 buffer with original video source resolution
          av_image_fill_arrays(mRawFrame->data, mRawFrame->linesize, buffer->data, AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 1);
          got_frame=true;
          
@@ -499,7 +501,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mRawFrame data
                         
                         for (int j=0;j < numblocks ; j++) {
                         
-                            if ((abs(mvarray[j].x_vector) + abs(mvarray[j].y_vector)) > 8) 
+                            if ((abs(mvarray[j].x_vector) + abs(mvarray[j].y_vector)) > 1) 
                                registers =registers | (1 << count);
                             
                             count++;
@@ -668,8 +670,8 @@ int FfmpegCamera::OpenMmalDecoder(AVCodecContext *mVideoCodecContext){
    format_in->type = MMAL_ES_TYPE_VIDEO;
    format_in->encoding = MMAL_ENCODING_H264;
    
-   format_in->es->video.width = VCOS_ALIGN_UP(width, 32);
-   format_in->es->video.height = VCOS_ALIGN_UP(height,16);
+   format_in->es->video.width = VCOS_ALIGN_UP(mVideoCodecContext->width, 32);
+   format_in->es->video.height = VCOS_ALIGN_UP(mVideoCodecContext->height,16);
    format_in->es->video.crop.width = mVideoCodecContext->width;
    format_in->es->video.crop.height = mVideoCodecContext->height;
    
@@ -797,8 +799,8 @@ int FfmpegCamera::OpenMmalEncoder(AVCodecContext *mVideoCodecContext){
    format_in->type = MMAL_ES_TYPE_VIDEO;
    format_in->encoding = MMAL_ENCODING_I420;
    
-   format_in->es->video.width = VCOS_ALIGN_UP(width, 32);
-   format_in->es->video.height = VCOS_ALIGN_UP(height,16);
+   format_in->es->video.width = VCOS_ALIGN_UP(mVideoCodecContext->width, 32);
+   format_in->es->video.height = VCOS_ALIGN_UP(mVideoCodecContext->height,16);
    format_in->es->video.crop.width = mVideoCodecContext->width;
    format_in->es->video.crop.height = mVideoCodecContext->height;
    
@@ -818,8 +820,8 @@ int FfmpegCamera::OpenMmalEncoder(AVCodecContext *mVideoCodecContext){
    format_out->type = MMAL_ES_TYPE_VIDEO;
    format_out->encoding = MMAL_ENCODING_H264;
    
-   format_out->es->video.width = VCOS_ALIGN_UP(width, 32);
-   format_out->es->video.height = VCOS_ALIGN_UP(height,16);
+   format_out->es->video.width = VCOS_ALIGN_UP(mVideoCodecContext->width, 32);
+   format_out->es->video.height = VCOS_ALIGN_UP(mVideoCodecContext->height,16);
    format_out->es->video.crop.width = mVideoCodecContext->width;
    format_out->es->video.crop.height = mVideoCodecContext->height;
    
@@ -921,8 +923,8 @@ int FfmpegCamera::OpenMmalResizer(AVCodecContext *mVideoCodecContext){
    format_in->encoding = MMAL_ENCODING_I420;
    format_in->encoding_variant = MMAL_ENCODING_I420;
    
-   format_in->es->video.width = VCOS_ALIGN_UP(width, 32);
-   format_in->es->video.height = VCOS_ALIGN_UP(height,16);
+   format_in->es->video.width = VCOS_ALIGN_UP(mVideoCodecContext->width, 32);
+   format_in->es->video.height = VCOS_ALIGN_UP(mVideoCodecContext->height,16);
    format_in->es->video.crop.width = mVideoCodecContext->width;
    format_in->es->video.crop.height = mVideoCodecContext->height;
    
@@ -942,11 +944,10 @@ int FfmpegCamera::OpenMmalResizer(AVCodecContext *mVideoCodecContext){
    
    
    MMAL_ES_FORMAT_T *format_out = resizer->output[0]->format;
-   
    format_out->es->video.width = VCOS_ALIGN_UP(width, 32);
    format_out->es->video.height = VCOS_ALIGN_UP(height,16);
-   format_out->es->video.crop.width = mVideoCodecContext->width;
-   format_out->es->video.crop.height = mVideoCodecContext->height;
+   format_out->es->video.crop.width = width;
+   format_out->es->video.crop.height = height;
    
   
    
@@ -1279,10 +1280,12 @@ int FfmpegCamera::OpenFfmpeg() {
   mRawFrame = zm_av_frame_alloc();
 
   // Allocate space for the converted video frame
+  // Decoder will output mVideoCodecContext->width * mVideoCodecContext->height
+  // So need mRawFrame to hold original video resolution.
   mFrame = zm_av_frame_alloc();
   
-  mRawFrame->width = VCOS_ALIGN_UP(width,32);
-  mRawFrame->height = VCOS_ALIGN_UP(height,16);  
+  mRawFrame->width = VCOS_ALIGN_UP(mVideoCodecContext->width,32);
+  mRawFrame->height = VCOS_ALIGN_UP(mVideoCodecContext->height,16);  
 
   if(mRawFrame == NULL || mFrame == NULL)
     Fatal( "Unable to allocate frame for %s", mPath.c_str() );
@@ -1326,9 +1329,15 @@ int FfmpegCamera::OpenFfmpeg() {
   Fatal( "You must compile ffmpeg with the --enable-swscale option to use ffmpeg cameras" );
 #endif // HAVE_LIBSWSCALE
 
+#ifdef __arm__ 
+  if ( (unsigned int)mVideoCodecContext->width != width || (unsigned int)mVideoCodecContext->height != height ) {
+    Info( "Monitor dimensions adusted to %dx%d from camera %dx%d", width, height, mVideoCodecContext->width, mVideoCodecContext->height );
+  }
+#else
   if ( (unsigned int)mVideoCodecContext->width != width || (unsigned int)mVideoCodecContext->height != height ) {
     Warning( "Monitor dimensions are %dx%d but camera is sending %dx%d", width, height, mVideoCodecContext->width, mVideoCodecContext->height );
   }
+#endif  
   
   Info("Width %d, Height %d, Codec->width %d, Codec->height %d",width, height, mVideoCodecContext->width, mVideoCodecContext->height);
 
@@ -1564,6 +1573,7 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
 
         /* Request a writeable buffer of the target image */
         directbuffer = image.WriteBuffer(width, height, colours, subpixelorder);
+                   
         if ( directbuffer == NULL ) {
           Error("Failed requesting writeable buffer for the captured image.");
           zm_av_packet_unref( &packet );
@@ -1600,15 +1610,16 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
 
                 //Create the JPEG buffer for this frame if frame is alarmed
                 jpegbuffer=image.JPEGBuffer(width, height);
+                Error("Failed requesting jpeg buffer for the captured image.");
+                   
                 if (jpegbuffer ==  NULL ){
-                   Error("Failed requesting jpeg buffer for the captured image.");
                    return (-1); 
                 }
                 
 		        int *jpeg_size=(int *)jpegbuffer;  
 
                  
-
+/*
                 if (mmal_encode(&mvect_buffer)) //alarmed frame
                    //jpeg encode the frames between current write frame and frame that analyse is reading
                    j_encode_count=monitor->GetImageBufferCount(); 
@@ -1621,6 +1632,8 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
 				   *jpeg_size=0;
 				}	
 					
+*/
+                image.EncodeJpeg(jpegbuffer+4, jpeg_size );
 
                 
                 

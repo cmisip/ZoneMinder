@@ -1291,9 +1291,32 @@ int Zone::Load( Monitor *monitor, Zone **&zones ) {
       continue;
     }
 
+#ifdef __arm__  
+  Info("Adjusting zone polygons");
+  float x_rfactor = (float) monitor->S_Width() /640;
+  float y_rfactor = (float) monitor->S_Height()/360;
+  
+     Polygon *ppolygon=&polygon; 
+     for (int p = 0; p< polygon.getNumCoords(); p++) {
+           const_cast<Coord*>(&ppolygon->getCoord(p))->X()/=x_rfactor;
+           const_cast<Coord*>(&ppolygon->getCoord(p))->Y()/=y_rfactor;
+           
+     }
+     Box *bextent = const_cast<Box*>(&polygon.Extent());
+     
+     Coord *HI=const_cast<Coord*>(&bextent->Hi());
+     HI->X()/=x_rfactor;
+     HI->Y()/=y_rfactor;
+     
+     Coord *LO=const_cast<Coord*>(&bextent->Lo());
+     LO->X()/=x_rfactor;
+     LO->Y()/=y_rfactor;
+     
+#endif  
+
     if ( polygon.LoX() < 0 || polygon.HiX() >= (int)monitor->Width() 
         || polygon.LoY() < 0 || polygon.HiY() >= (int)monitor->Height() ) {
-      Error( "Zone %d/%s for monitor %s extends outside of image dimensions, (%d,%d), (%d,%d), ignoring", Id, Name, monitor->Name(), polygon.LoX(), polygon.LoY(), polygon.HiX(), polygon.HiY() );
+      Error( "Zone %d/%s for monitor %s extends outside of image dimensions (%d,%d), at LOW (%d,%d), HI (%d,%d), ignoring", Id, Name, monitor->Name(), (int)monitor->Width(), (int)monitor->Height(), polygon.LoX(), polygon.LoY(), polygon.HiX(), polygon.HiY() );
       n_zones -= 1;
       continue;
     }

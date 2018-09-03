@@ -277,8 +277,11 @@ Monitor::Monitor(
   Rgb p_signal_check_colour,
   bool p_embed_exif,
   Purpose p_purpose,
+  unsigned int ps_width,
+  unsigned int ps_height,
   int p_n_zones,
   Zone *p_zones[]
+  
 ) : id( p_id ),
   server_id( p_server_id ),
   function( (Function)p_function ),
@@ -319,9 +322,12 @@ Monitor::Monitor(
   camera( p_camera ),
   n_zones( p_n_zones ),
   zones( p_zones ),
+  s_width( ps_width ),
+  s_height( ps_height), 
   timestamps( 0 ),
   images( 0 ),
   privacy_bitmask( NULL )
+  
 {
   strncpy( name, p_name, sizeof(name)-1 );
 
@@ -2537,6 +2543,9 @@ int Monitor::LoadFfmpegMonitorsHW( const char *file, Monitor **&monitors, Purpos
 
     int width = atoi(dbrow[col]); col++;
     int height = atoi(dbrow[col]); col++;
+    
+
+
     int colours = atoi(dbrow[col]); col++;
     /* int palette = atoi(dbrow[col]); */ col++;
     Orientation orientation = (Orientation)atoi(dbrow[col]); col++;
@@ -2712,6 +2721,10 @@ Monitor *Monitor::Load( unsigned int p_id, bool load_zones, Purpose purpose ) {
 
   int width = atoi(dbrow[col]); col++;
   int height = atoi(dbrow[col]); col++;
+  
+  unsigned int    s_width=width;
+  unsigned int    s_height=height;
+  
   int colours = atoi(dbrow[col]); col++;
   int palette = atoi(dbrow[col]); col++;
   Orientation orientation = (Orientation)atoi(dbrow[col]); col++;
@@ -2868,11 +2881,16 @@ Monitor *Monitor::Load( unsigned int p_id, bool load_zones, Purpose purpose ) {
     Fatal( "You must have ffmpeg libraries installed to use ffmpeg cameras for monitor %d", id );
 #endif    
   } else if ( type == "Ffmpeghw" ) {
-#if HAVE_LIBAVFORMAT      
-     
-    // Allows to adjust directbuffer to accomodate alignment required by mmal
-    //width=VCOS_ALIGN_UP(width,32);
-    //height=VCOS_ALIGN_UP(height,16);
+#if HAVE_LIBAVFORMAT    
+  
+ #ifdef __arm__  
+    // Adjust the input resolution to 360. 
+    s_width=width;
+    s_height=height;
+    width=640;
+    height=360;
+#endif        
+
     
     camera = new FfmpegCamera(
       id,
@@ -2937,6 +2955,7 @@ Monitor *Monitor::Load( unsigned int p_id, bool load_zones, Purpose purpose ) {
   } else {
     Fatal( "Bogus monitor type '%s' for monitor %d", type.c_str(), id );
   }
+  
   monitor = new Monitor(
     id,
     name.c_str(),
@@ -2975,9 +2994,10 @@ Monitor *Monitor::Load( unsigned int p_id, bool load_zones, Purpose purpose ) {
     signal_check_colour,
     embed_exif,
     purpose,
+    s_width,
+    s_height, 
     0,
     0
-
   );
 
   camera->setMonitor( monitor );
@@ -2989,6 +3009,22 @@ Monitor *Monitor::Load( unsigned int p_id, bool load_zones, Purpose purpose ) {
     monitor->AddPrivacyBitmask( zones );
   }
   Debug( 1, "Loaded monitor %d(%s), %d zones", id, name.c_str(), n_zones );
+/*  
+#ifdef __arm__  
+  Info("Adjusting zone polygons");
+  int x_rfactor = width/640;
+  int y_rfactor = height/360;
+      
+  for (int o = 0; o < n_zones ; o++) {
+	 Polygon *polygon=const_cast<Polygon*>(&monitor->zones[o]->GetPolygon());
+     for (int p = 0; p< polygon->getNumCoords(); p++) {
+           const_cast<Coord*>(&polygon->getCoord(p))->X()/=x_rfactor;
+           const_cast<Coord*>(&polygon->getCoord(p))->Y()/=y_rfactor;
+     }
+  }
+#endif  
+*/  
+  
   return( monitor );
 }
 
