@@ -1266,6 +1266,9 @@ cinfo->out_color_space = JCS_RGB;
   return( true );
 }
 
+
+
+
 bool Image::EncodeJpeg( JOCTET *outbuffer, int *outbuffer_size, int quality_override ) const
 {
 #ifdef __arm__	

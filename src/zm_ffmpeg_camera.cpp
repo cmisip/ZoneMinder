@@ -612,8 +612,8 @@ int  FfmpegCamera::mmal_resize(uint8_t** dbuffer) {   //uses mRawFrame data, bui
         
          memcpy((*dbuffer),buffer->data,width*height*colours);
          //save it as AVFrame holding a buffer with original video source resolution
+         av_image_fill_arrays(mFrame->data, mFrame->linesize, *dbuffer, encoderPixFormat, mFrame->width, mFrame->height, 1);
          //av_image_fill_arrays(mFrame->data, mFrame->linesize, buffer->data, encoderPixFormat, mFrame->width, mFrame->height, 1);
-         av_image_fill_arrays(mFrame->data, mFrame->linesize, (*dbuffer), encoderPixFormat, mFrame->width, mFrame->height, 1);
          
          mmal_buffer_header_release(buffer);
       }
