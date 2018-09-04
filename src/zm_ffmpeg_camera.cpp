@@ -254,8 +254,26 @@ int FfmpegCamera::Capture( Image &image ) {
         uint8_t* jpegbuffer=NULL; 
            if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels tile Left to Right and then top to bottom and there are a fixed number covering the entire frame.
 
+                //MRawFrame is filled with the decoded frame by this point
+
+                //Associate mFrame with directbuffer
+                //mmal_encode will read mRawFrame and fill mFrame 
+#endif                
+                
+#if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
+                av_image_fill_arrays(mFrame->data, mFrame->linesize,
+                     directbuffer, imagePixFormat, width, height, 1);
+#else
+                avpicture_fill( (AVPicture *)mFrame, directbuffer,
+                     imagePixFormat, width, height);
+#endif
+
+#ifdef __arm__
+ 
                 //Create the RGB buffer for this frame
                 mmal_resize(&directbuffer); 
+                
+                //mFrame is filled with the resized frame by this point
 
                 //Create the JPEG buffer for this frame if frame is alarmed
                 jpegbuffer=image.JPEGBuffer(width, height);
@@ -268,7 +286,7 @@ int FfmpegCamera::Capture( Image &image ) {
 
                  
 
-               /* if (mmal_encode(&mvect_buffer)) //alarmed frame
+                if (mmal_encode(&mvect_buffer)) //alarmed frame
                    //jpeg encode the frames between current alarmed write frame and frame that analyse is reading up to the post event count frames
                    j_encode_count=monitor->GetImageBufferCount()+monitor->GetPostEventCount(); 
                    
@@ -278,9 +296,9 @@ int FfmpegCamera::Capture( Image &image ) {
 				   j_encode_count--;
 				} else { //set the first word as zero
 				   *jpeg_size=0;
-				}*/
+				}
 				
-				image.EncodeJpeg(jpegbuffer+4, jpeg_size );	
+				//image.EncodeJpeg(jpegbuffer+4, jpeg_size );	
 					
 
                 
@@ -452,7 +470,7 @@ int FfmpegCamera::mmal_decode(AVPacket *pkt) {
      return (got_frame);    
 }	
 
-int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mRawFrame data 
+int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled frame) data 
 	MMAL_BUFFER_HEADER_T *buffer;
 	int motion_detected=false;
 	
@@ -461,9 +479,9 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mRawFrame data
                
 	if ((buffer = mmal_queue_get(pool_ine->queue)) != NULL) {  
          
-         av_image_copy_to_buffer(buffer->data, bufsize, (const uint8_t **)mRawFrame->data, mRawFrame->linesize,
-                                 AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 1);
-         buffer->length=bufsize;
+         av_image_copy_to_buffer(buffer->data, bufsize_r, (const uint8_t **)mFrame->data, mFrame->linesize,
+                                 encoderPixFormat, mFrame->width, mFrame->height, 1);
+         buffer->length=bufsize_r;
          
          buffer->pts = buffer->dts = MMAL_TIME_UNKNOWN;
          
@@ -569,14 +587,14 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mRawFrame data
 
 
 
-int  FfmpegCamera::mmal_resize(uint8_t** dbuffer) {   //uses mRawFrame data
+int  FfmpegCamera::mmal_resize(uint8_t** dbuffer) {   //uses mRawFrame data, builds mFrame
 	MMAL_BUFFER_HEADER_T *buffer;
 	//Info("resize start");
 	if ((buffer = mmal_queue_get(pool_inr->queue)) != NULL) { 
 		 
-         av_image_copy_to_buffer(buffer->data, bufsize, (const uint8_t **)mRawFrame->data, mRawFrame->linesize,
+         av_image_copy_to_buffer(buffer->data, bufsize_d, (const uint8_t **)mRawFrame->data, mRawFrame->linesize,
                                  AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 1);
-         buffer->length=bufsize;
+         buffer->length=bufsize_d;
          
          buffer->pts = buffer->dts = MMAL_TIME_UNKNOWN;
          //buffer->flags=packet->flags;
@@ -593,6 +611,9 @@ int  FfmpegCamera::mmal_resize(uint8_t** dbuffer) {   //uses mRawFrame data
       while ((buffer = mmal_queue_get(context.rqueue)) != NULL){
         
          memcpy((*dbuffer),buffer->data,width*height*colours);
+         //save it as AVFrame holding a buffer with original video source resolution
+         //av_image_fill_arrays(mFrame->data, mFrame->linesize, buffer->data, encoderPixFormat, mFrame->width, mFrame->height, 1);
+         av_image_fill_arrays(mFrame->data, mFrame->linesize, (*dbuffer), encoderPixFormat, mFrame->width, mFrame->height, 1);
          
          mmal_buffer_header_release(buffer);
       }
@@ -795,14 +816,30 @@ int FfmpegCamera::OpenMmalEncoder(AVCodecContext *mVideoCodecContext){
      Info("Failed to set zero copy on encoder output");
     */
    /* Set format of video encoder input port */
+   
+   
+   
    MMAL_ES_FORMAT_T *format_in = encoder->input[0]->format;
    format_in->type = MMAL_ES_TYPE_VIDEO;
-   format_in->encoding = MMAL_ENCODING_I420;
    
-   format_in->es->video.width = VCOS_ALIGN_UP(mVideoCodecContext->width, 32);
-   format_in->es->video.height = VCOS_ALIGN_UP(mVideoCodecContext->height,16);
-   format_in->es->video.crop.width = mVideoCodecContext->width;
-   format_in->es->video.crop.height = mVideoCodecContext->height;
+   if ( colours == ZM_COLOUR_RGB32 ) {
+       format_in->encoding = MMAL_ENCODING_RGBA;
+   } else if ( colours == ZM_COLOUR_RGB24 ) {
+       format_in->encoding = MMAL_ENCODING_RGB24;
+   } else if(colours == ZM_COLOUR_GRAY8) { 
+       format_in->encoding = MMAL_ENCODING_I420;
+   }
+   
+   //format_in->encoding = MMAL_ENCODING_I420;
+   
+   //format_in->es->video.width = VCOS_ALIGN_UP(mVideoCodecContext->width, 32);
+   //format_in->es->video.height = VCOS_ALIGN_UP(mVideoCodecContext->height,16);
+   format_in->es->video.width = VCOS_ALIGN_UP(width, 32);
+   format_in->es->video.height = VCOS_ALIGN_UP(height,16);
+   //format_in->es->video.crop.width = mVideoCodecContext->width;
+   //format_in->es->video.crop.height = mVideoCodecContext->height;
+   format_in->es->video.crop.width = width;
+   format_in->es->video.crop.height = height;
    
    format_in->es->video.frame_rate.num = 24000;
    format_in->es->video.frame_rate.den = 1001;
@@ -820,10 +857,14 @@ int FfmpegCamera::OpenMmalEncoder(AVCodecContext *mVideoCodecContext){
    format_out->type = MMAL_ES_TYPE_VIDEO;
    format_out->encoding = MMAL_ENCODING_H264;
    
-   format_out->es->video.width = VCOS_ALIGN_UP(mVideoCodecContext->width, 32);
-   format_out->es->video.height = VCOS_ALIGN_UP(mVideoCodecContext->height,16);
-   format_out->es->video.crop.width = mVideoCodecContext->width;
-   format_out->es->video.crop.height = mVideoCodecContext->height;
+   //format_out->es->video.width = VCOS_ALIGN_UP(mVideoCodecContext->width, 32);
+   //format_out->es->video.height = VCOS_ALIGN_UP(mVideoCodecContext->height,16);
+   format_out->es->video.width = VCOS_ALIGN_UP(width, 32);
+   format_out->es->video.height = VCOS_ALIGN_UP(height,16);
+   //format_out->es->video.crop.width = mVideoCodecContext->width;
+   //format_out->es->video.crop.height = mVideoCodecContext->height;
+   format_out->es->video.crop.width = width;
+   format_out->es->video.crop.height = height;
    
    
    if ( mmal_port_format_commit(encoder->output[0]) != MMAL_SUCCESS ) {
@@ -953,14 +994,22 @@ int FfmpegCamera::OpenMmalResizer(AVCodecContext *mVideoCodecContext){
    
    if ( colours == ZM_COLOUR_RGB32 ) {
        format_out->encoding = MMAL_ENCODING_RGBA;
+       encoderPixFormat=AV_PIX_FMT_RGBA;
    } else if ( colours == ZM_COLOUR_RGB24 ) {
        format_out->encoding = MMAL_ENCODING_RGB24;
+       encoderPixFormat=AV_PIX_FMT_RGB24;
    } else if(colours == ZM_COLOUR_GRAY8) { 
        format_out->encoding = MMAL_ENCODING_I420;
+       encoderPixFormat=AV_PIX_FMT_GRAY8 ;
    }
    
    
-   
+#if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
+  bufsize_r = av_image_get_buffer_size(encoderPixFormat , mFrame->width, mFrame->height,1 );
+  
+#else
+  bufsize_r = avpicture_get_size(encoderPixFormat, mFrame->width, mFrame->height );
+#endif
    
    if ( mmal_port_format_commit(resizer->output[0]) != MMAL_SUCCESS ) {
      Fatal("failed to commit mmal resizer output format");
@@ -1282,10 +1331,15 @@ int FfmpegCamera::OpenFfmpeg() {
   // Allocate space for the converted video frame
   // Decoder will output mVideoCodecContext->width * mVideoCodecContext->height
   // So need mRawFrame to hold original video resolution.
-  mFrame = zm_av_frame_alloc();
-  
   mRawFrame->width = VCOS_ALIGN_UP(mVideoCodecContext->width,32);
-  mRawFrame->height = VCOS_ALIGN_UP(mVideoCodecContext->height,16);  
+  mRawFrame->height = VCOS_ALIGN_UP(mVideoCodecContext->height,16); 
+  
+  //Final output frame used by swscale and mmal_encode
+  mFrame = zm_av_frame_alloc(); 
+  
+  mFrame->width = VCOS_ALIGN_UP(width,32);
+  mFrame->height = VCOS_ALIGN_UP(height,16); 
+  
 
   if(mRawFrame == NULL || mFrame == NULL)
     Fatal( "Unable to allocate frame for %s", mPath.c_str() );
@@ -1294,11 +1348,13 @@ int FfmpegCamera::OpenFfmpeg() {
 
 #if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
   int pSize = av_image_get_buffer_size( imagePixFormat, width, height,1 );
-  bufsize = av_image_get_buffer_size(AV_PIX_FMT_YUV420P , mRawFrame->width, mRawFrame->height,1 );
+  bufsize_d = av_image_get_buffer_size(AV_PIX_FMT_YUV420P , mRawFrame->width, mRawFrame->height,1 );
+  //bufsize_r = av_image_get_buffer_size(AV_PIX_FMT_YUV420P , mFrame->width, mFrame->height,1 );
   
 #else
   int pSize = avpicture_get_size( imagePixFormat, width, height );
-  bufsize = avpicture_get_size(AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height );
+  bufsize_d = avpicture_get_size(AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height );
+  //bufsize_r = avpicture_get_size(AV_PIX_FMT_YUV420P, mFrame->width, mFrame->height );
 #endif
 
   if( (unsigned int)pSize != imagesize) {
@@ -1605,35 +1661,49 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
         uint8_t* jpegbuffer=NULL; 
            if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels tile Left to Right and then top to bottom and there are a fixed number covering the entire frame.
 
+                //MRawFrame is filled with the decoded frame by this point
+
+                //Associate mFrame with directbuffer
+                //mmal_encode will read mRawFrame and fill mFrame 
+#endif
+                
+#if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
+                av_image_fill_arrays(mFrame->data, mFrame->linesize,
+                     directbuffer, imagePixFormat, width, height, 1);
+#else
+                avpicture_fill( (AVPicture *)mFrame, directbuffer,
+                     imagePixFormat, width, height);
+#endif
+
+#ifdef __arm__ 
                 //Create the RGB buffer for this frame
                 mmal_resize(&directbuffer); 
+                
+                //mFrame is filled with the resized frame by this point
 
                 //Create the JPEG buffer for this frame if frame is alarmed
                 jpegbuffer=image.JPEGBuffer(width, height);
-                Error("Failed requesting jpeg buffer for the captured image.");
-                   
                 if (jpegbuffer ==  NULL ){
+                   Error("Failed requesting jpeg buffer for the captured image.");
                    return (-1); 
                 }
                 
 		        int *jpeg_size=(int *)jpegbuffer;  
 
                  
-/*
                 if (mmal_encode(&mvect_buffer)) //alarmed frame
-                   //jpeg encode the frames between current write frame and frame that analyse is reading
-                   j_encode_count=monitor->GetImageBufferCount(); 
-                   
+                   //jpeg encode the frames between current alarmed write frame and frame that analyse is reading up to the post event count frames
+                   j_encode_count=monitor->GetImageBufferCount()+monitor->GetPostEventCount(); 
                 if (j_encode_count){
 				   //first word is jpeg size, rest is jpeg data
 				   image.EncodeJpeg(jpegbuffer+4, jpeg_size );
 				   j_encode_count--;
 				} else { //set the first word as zero
 				   *jpeg_size=0;
-				}	
+				}
+				
+				//image.EncodeJpeg(jpegbuffer+4, jpeg_size );	
 					
-*/
-                image.EncodeJpeg(jpegbuffer+4, jpeg_size );
 
                 
                 
@@ -1643,7 +1713,6 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
         
 #endif
 
-       
         
     //Video recording
     int key_frame = packet.flags & AV_PKT_FLAG_KEY;
@@ -1775,7 +1844,6 @@ else if ( packet.pts && video_last_pts > packet.pts ) {
       }
     } // end if recording or not
         
-      
 
         
 //This is the software scaler. Directbuffer is packaged into mFrame and processed by swscale to convert to appropriate format and size
@@ -1785,13 +1853,13 @@ else if ( packet.pts && video_last_pts > packet.pts ) {
 if (((ctype) && (cfunction == Monitor::MODECT)) || (!ctype)) {   
 	
          
-        
+/*        
 #if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
         av_image_fill_arrays(mFrame->data, mFrame->linesize, directbuffer, imagePixFormat, width, height, 1);
 #else
         avpicture_fill( (AVPicture *)mFrame, directbuffer, imagePixFormat, width, height);
 #endif
-
+*/
 
         if (sws_scale(mConvertContext, mRawFrame->data, mRawFrame->linesize,
                       0, mVideoCodecContext->height, mFrame->data, mFrame->linesize) < 0) {

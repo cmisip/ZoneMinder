@@ -46,7 +46,8 @@ class FfmpegCamera : public Camera {
     std::string         mOptions;
 
     int frameCount; 
-    int bufsize=0;   
+    int bufsize_d=0;
+    int bufsize_r=0;   
 
 #if HAVE_LIBAVFORMAT
     AVFormatContext     *mFormatContext;
@@ -57,8 +58,12 @@ class FfmpegCamera : public Camera {
     AVCodec             *mVideoCodec;
     AVCodec             *mAudioCodec;
     AVFrame             *mRawFrame; 
+
     AVFrame             *mFrame;
     _AVPIXELFORMAT      imagePixFormat;
+#ifdef __arm__    
+    _AVPIXELFORMAT      encoderPixFormat;
+#endif
     AVPacket mRawPacket;
 
     // Need to keep track of these because apparently the stream can start with values for pts/dts and then subsequent packets start at zero.
