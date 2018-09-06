@@ -395,6 +395,11 @@ void FfmpegCamera::output_callbackd(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf
    mmal_queue_put(ctx->dqueue, buffer);
 }
 
+void FfmpegCamera::output_callbackj(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer) {
+   CONTEXT_T *ctx = (struct CONTEXT_T *)port->userdata;
+   mmal_queue_put(ctx->jqueue, buffer);
+}
+
 
 
 /** Callback from the control port.
@@ -469,6 +474,8 @@ int FfmpegCamera::mmal_decode(AVPacket *pkt) {
      //Info("decode end");
      return (got_frame);    
 }	
+
+
 
 int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled frame) data 
 	MMAL_BUFFER_HEADER_T *buffer;
@@ -627,6 +634,50 @@ int  FfmpegCamera::mmal_resize(uint8_t** dbuffer) {   //uses mRawFrame data, bui
 		  
       }
       //Info("resize end");
+     return (0);    
+}	
+
+
+int  FfmpegCamera::mmal_jpeg(uint8_t** jbuffer) {   //uses mFrame data
+	MMAL_BUFFER_HEADER_T *buffer;
+	if ((buffer = mmal_queue_get(pool_inj->queue)) != NULL) { 
+		 
+         av_image_copy_to_buffer(buffer->data, bufsize_r, (const uint8_t **)mFrame->data, mFrame->linesize,
+                                 encoderPixFormat, mFrame->width, mFrame->height, 1);
+         buffer->length=bufsize_r;
+         
+         buffer->pts = buffer->dts = MMAL_TIME_UNKNOWN;
+         //buffer->flags=packet->flags;
+         
+         buffer->alloc_size = jcoder->input[0]->buffer_size;
+            
+         if (mmal_port_send_buffer(jcoder->input[0], buffer) != MMAL_SUCCESS) {
+                 Warning("failed to send RGB buffer to jpeg encoder for frame %d\n", frameCount);
+                  
+         }
+         
+      }
+      
+      while ((buffer = mmal_queue_get(context.jqueue)) != NULL){
+        
+         if (buffer->length < jpeg_limit) {
+           memcpy((*jbuffer),&buffer->length,4);
+           memcpy((*jbuffer)+4,buffer->data,buffer->length);
+         } else {
+	       int zero_size=0;
+           memcpy((*jbuffer),&zero_size,4);
+	     }
+         mmal_buffer_header_release(buffer);
+      }
+
+     
+      //if ((buffer = mmal_queue_get(pool_outr->queue)) != NULL) {
+      while ((buffer = mmal_queue_get(pool_outj->queue)) != NULL) {
+                   if (mmal_port_send_buffer(jcoder->output[0], buffer) != MMAL_SUCCESS) {
+                      Warning("failed to send buffer to jpeg encoder output for frame %d\n", frameCount);
+                   }
+		  
+      }
      return (0);    
 }	
 
@@ -1067,6 +1118,149 @@ int FfmpegCamera::OpenMmalResizer(AVCodecContext *mVideoCodecContext){
 
 }
 
+int FfmpegCamera::OpenMmalJPEG(AVCodecContext *mVideoCodecContext){  
+   
+
+   // Create the jcoder component.
+   if ( mmal_component_create(MMAL_COMPONENT_DEFAULT_IMAGE_ENCODER, &jcoder)  != MMAL_SUCCESS) {
+      Fatal("failed to create mmal jpeg encoder");
+   }   
+   
+   // CONTROL PORT SETTINGS
+   jcoder->control->userdata = (MMAL_PORT_USERDATA_T *)&context;
+   if ( mmal_port_enable(jcoder->control, control_callback) != MMAL_SUCCESS ) {
+     Fatal("failed to enable mmal jpeg encoder control port");
+   }  
+   
+   /* Get statistics on the input port */
+   MMAL_PARAMETER_CORE_STATISTICS_T stats = {{0}};
+   stats.hdr.id = MMAL_PARAMETER_CORE_STATISTICS;
+   stats.hdr.size = sizeof(MMAL_PARAMETER_CORE_STATISTICS_T);
+   if (mmal_port_parameter_get(jcoder->input[0], &stats.hdr) != MMAL_SUCCESS) {
+     Info("failed to get jpeg encoder port statistics");
+   }
+   else {
+     Info("JPEG encoder stats: %i, %i", stats.stats.buffer_count, stats.stats.max_delay);
+   }
+   /*
+   // Set the zero-copy parameter on the input port 
+   MMAL_PARAMETER_BOOLEAN_T zc = {{MMAL_PARAMETER_ZERO_COPY, sizeof(zc)}, MMAL_TRUE};
+   if (mmal_port_parameter_set(jcoder->input[0], &zc.hdr) != MMAL_SUCCESS)
+     Info("Failed to set zero copy on jpeg encoder input");
+   // Set the zero-copy parameter on the output port 
+   if (mmal_port_parameter_set_boolean(jcoder->output[0], MMAL_PARAMETER_ZERO_COPY, MMAL_TRUE) != MMAL_SUCCESS)
+     Info("Failed to set zero copy on jpeg encoder output");
+    */
+   /* Set format of jpeg encoder input port */
+   
+   
+   
+   MMAL_ES_FORMAT_T *format_in = jcoder->input[0]->format;
+   format_in->type = MMAL_ES_TYPE_VIDEO;
+   
+   //format_in->encoding = MMAL_ENCODING_I420;
+   if ( colours == ZM_COLOUR_RGB32 ) {
+       format_in->encoding = MMAL_ENCODING_RGBA;
+   } else if ( colours == ZM_COLOUR_RGB24 ) {
+       format_in->encoding = MMAL_ENCODING_RGB24;
+   } else if(colours == ZM_COLOUR_GRAY8) { 
+       format_in->encoding = MMAL_ENCODING_I420;
+   }
+   
+   
+   //format_in->es->video.width = VCOS_ALIGN_UP(mVideoCodecContext->width, 32);
+   //format_in->es->video.height = VCOS_ALIGN_UP(mVideoCodecContext->height,16);
+   format_in->es->video.width = VCOS_ALIGN_UP(width, 32);
+   format_in->es->video.height = VCOS_ALIGN_UP(height,16);
+   //format_in->es->video.crop.width = mVideoCodecContext->width;
+   //format_in->es->video.crop.height = mVideoCodecContext->height;
+   format_in->es->video.crop.width = width;
+   format_in->es->video.crop.height = height;
+   
+   format_in->es->video.frame_rate.num = 24000;
+   format_in->es->video.frame_rate.den = 1001;
+   format_in->es->video.par.num = mVideoCodecContext->sample_aspect_ratio.num;
+   format_in->es->video.par.den = mVideoCodecContext->sample_aspect_ratio.den;
+   //format_in->flags = MMAL_ES_FORMAT_FLAG_FRAMED;
+ 
+
+   
+   if ( mmal_port_format_commit(jcoder->input[0]) != MMAL_SUCCESS ) {
+      Fatal("failed to commit mmal jpeg encoder input format");
+   }   
+
+   MMAL_ES_FORMAT_T *format_out = jcoder->output[0]->format;
+   format_out->type = MMAL_ES_TYPE_VIDEO;
+   format_out->encoding = MMAL_ENCODING_JPEG;
+   
+   //format_out->es->video.width = VCOS_ALIGN_UP(mVideoCodecContext->width, 32);
+   //format_out->es->video.height = VCOS_ALIGN_UP(mVideoCodecContext->height,16);
+   format_out->es->video.width = VCOS_ALIGN_UP(width, 32);
+   format_out->es->video.height = VCOS_ALIGN_UP(height,16);
+   //format_out->es->video.crop.width = mVideoCodecContext->width;
+   //format_out->es->video.crop.height = mVideoCodecContext->height;
+   format_out->es->video.crop.width = width;
+   format_out->es->video.crop.height = height;
+   
+   
+   if ( mmal_port_format_commit(jcoder->output[0]) != MMAL_SUCCESS ) {
+     Fatal("failed to commit jpeg encoder output format");
+   }
+   
+   //FIXME, should get from config
+   if (mmal_port_parameter_set_uint32(jcoder->output[0], MMAL_PARAMETER_JPEG_Q_FACTOR, 100) != MMAL_SUCCESS) {
+   Fatal("failed to set jpeg quality for mmal jpeg encoder");
+   }   
+
+   /* Display the input port format */
+   display_format(&jcoder->input[0],&format_in);
+   
+   display_format(&jcoder->output[0],&format_out);
+   
+
+   /* The format of both ports is now set so we can get their buffer requirements and create
+    * our buffer headers. We use the buffer pool API to create these. */
+   jcoder->input[0]->buffer_num = jcoder->input[0]->buffer_num_min;
+   jcoder->input[0]->buffer_size = jcoder->input[0]->buffer_size_min;
+   jcoder->output[0]->buffer_num = jcoder->output[0]->buffer_num_min;
+   jcoder->output[0]->buffer_size = jcoder->output[0]->buffer_size_min;
+   /*
+   pool_ine = mmal_port_pool_create(jcoder->input[0],jcoder->input[0]->buffer_num,
+                              jcoder->input[0]->buffer_size);
+   pool_oute = mmal_port_pool_create(jcoder->output[0],jcoder->output[0]->buffer_num,
+                               jcoder->output[0]->buffer_size);
+   */                           
+   pool_inj = mmal_pool_create(jcoder->input[0]->buffer_num,
+                              jcoder->input[0]->buffer_size);
+   pool_outj = mmal_pool_create(jcoder->output[0]->buffer_num,
+                               jcoder->output[0]->buffer_size);                            
+   
+   /* Create a queue to store our decoded video frames. The callback we will get when
+    * a frame has been decoded will put the frame into this queue. */
+   context.jqueue = mmal_queue_create();
+
+   /* Store a reference to our context in each port (will be used during callbacks) */
+   jcoder->input[0]->userdata = (MMAL_PORT_USERDATA_T *)&context;
+   jcoder->output[0]->userdata = (MMAL_PORT_USERDATA_T *)&context;
+   
+   // Enable all the input port and the output port.
+   if ( mmal_port_enable(jcoder->input[0], input_callback) != MMAL_SUCCESS ) {
+     Fatal("failed to enable mmal jpeg encoder input port");
+   }  
+   
+   if ( mmal_port_enable(jcoder->output[0], output_callbackj) != MMAL_SUCCESS ) {
+     Fatal("failed to enable mmal jpeg encoder output port");
+   }
+   
+   /* Component won't start processing data until it is enabled. */
+   if ( mmal_component_enable(jcoder) != MMAL_SUCCESS ) {
+     Fatal("failed to enable mmal jpeg encoder component");
+   }  
+
+   return 0;
+
+}
+
 
 int FfmpegCamera::CloseMmal(){
 	
@@ -1098,12 +1292,25 @@ int FfmpegCamera::CloseMmal(){
    mmal_port_disable(resizer->output[0]);
    mmal_port_disable(resizer->control); 
    
+   mmal_port_flush(resizer->input[0]);
+   mmal_port_flush(resizer->output[0]);
+   mmal_port_flush(resizer->control); 
+   
    while ((buffer = mmal_queue_get(context.rqueue)))
            mmal_buffer_header_release(buffer);
       
-   mmal_port_flush(resizer->input[0]);
-   mmal_port_flush(resizer->output[0]);
-   mmal_port_flush(resizer->control); 	
+   
+   mmal_port_disable(jcoder->input[0]);
+   mmal_port_disable(jcoder->output[0]);
+   mmal_port_disable(jcoder->control); 
+   
+   mmal_port_flush(jcoder->input[0]);
+   mmal_port_flush(jcoder->output[0]);
+   mmal_port_flush(jcoder->control); 	
+   
+   while ((buffer = mmal_queue_get(context.rqueue)))
+           mmal_buffer_header_release(buffer);        
+	
 	
    if (decoder)
       mmal_component_destroy(decoder);
@@ -1111,6 +1318,10 @@ int FfmpegCamera::CloseMmal(){
       mmal_component_destroy(resizer);
    if (encoder)
       mmal_component_destroy(encoder);
+   if (jcoder)
+      mmal_component_destroy(jcoder);      
+      
+      
    if (pool_ind)
       mmal_pool_destroy(pool_ind);
    if (pool_outd)
@@ -1123,13 +1334,20 @@ int FfmpegCamera::CloseMmal(){
       mmal_pool_destroy(pool_ine);
    if (pool_oute)
       mmal_pool_destroy(pool_oute);
+   if (pool_inj)
+      mmal_pool_destroy(pool_inj);
+   if (pool_outj)
+      mmal_pool_destroy(pool_outj);
+      
+      
    if (context.equeue)
       mmal_queue_destroy(context.equeue);
    if (context.rqueue)
       mmal_queue_destroy(context.rqueue);
    if (context.dqueue)
       mmal_queue_destroy(context.dqueue);  
-	 
+   if (context.jqueue)
+      mmal_queue_destroy(context.jqueue);  	 
    
    
    return 0;
@@ -1406,19 +1624,10 @@ int FfmpegCamera::OpenFfmpeg() {
 	OpenMmalDecoder(mVideoCodecContext);
     OpenMmalEncoder(mVideoCodecContext);
     OpenMmalResizer(mVideoCodecContext);
-   
-    /*av_init_packet(&mRawPacket);
+    OpenMmalJPEG(mVideoCodecContext); 
     
-	//Send the sps and pps as first packet
-	Info("Sending PPS and SPS");
-    mRawPacket.data=(uint8_t*)av_mallocz(mVideoCodecContext->extradata_size);
-    memcpy(mRawPacket.data,mVideoCodecContext->extradata,mVideoCodecContext->extradata_size);
-    mRawPacket.size=mVideoCodecContext->extradata_size;
-    mRawPacket.pts=AV_NOPTS_VALUE;
-    mmal_decode(&mRawPacket);
-    zm_av_packet_unref(&mRawPacket);
-    Info("Done sending PPS and SPS");
-    */
+    jpeg_limit=(width*height)>>1;
+    
     
     
     //Retrieve the zones info and setup the vector mask
@@ -1681,7 +1890,7 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
                 
                 //mFrame is filled with the resized frame by this point
 
-                //Create the JPEG buffer for this frame if frame is alarmed
+                //Create the JPEG buffer for this frame if frame is alarmed, using downscaled resolution
                 jpegbuffer=image.JPEGBuffer(width, height);
                 if (jpegbuffer ==  NULL ){
                    Error("Failed requesting jpeg buffer for the captured image.");
@@ -1696,8 +1905,13 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
                    j_encode_count=monitor->GetImageBufferCount()+monitor->GetPostEventCount(); 
                 if (j_encode_count){
 				   //first word is jpeg size, rest is jpeg data
-				   image.EncodeJpeg(jpegbuffer+4, jpeg_size );
-				   j_encode_count--;
+				   //Option 1. use the image EncodeJpeg function.
+				   //image.EncodeJpeg(jpegbuffer+4, jpeg_size );
+				   //Option 2. use hardware mmal.
+				   mmal_jpeg(&jpegbuffer);
+				   
+				   if (j_encode_count >0) 
+				     j_encode_count--;
 				} else { //set the first word as zero
 				   *jpeg_size=0;
 				}

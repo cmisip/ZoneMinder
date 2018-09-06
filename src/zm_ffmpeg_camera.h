@@ -64,7 +64,6 @@ class FfmpegCamera : public Camera {
 #ifdef __arm__    
     _AVPIXELFORMAT      encoderPixFormat;
 #endif
-    AVPacket mRawPacket;
 
     // Need to keep track of these because apparently the stream can start with values for pts/dts and then subsequent packets start at zero.
     int64_t audio_last_pts;
@@ -102,12 +101,15 @@ class FfmpegCamera : public Camera {
       
 #ifdef __arm__
 
-    MMAL_COMPONENT_T *encoder, *decoder, *resizer=NULL;
-    MMAL_POOL_T *pool_ind, *pool_outd, *pool_ine, *pool_oute, *pool_inr, *pool_outr;
+    MMAL_COMPONENT_T *encoder, *decoder, *resizer, *jcoder;
+    MMAL_POOL_T *pool_ind, *pool_outd, 
+                *pool_ine, *pool_oute, 
+                *pool_inr, *pool_outr,
+                *pool_inj, *pool_outj;
 
 
     struct CONTEXT_T {
-    MMAL_QUEUE_T *rqueue,*equeue,*dqueue;
+    MMAL_QUEUE_T *rqueue,*equeue,*dqueue,*jqueue;
     MMAL_STATUS_T status;
     } context;
     
@@ -160,6 +162,7 @@ class FfmpegCamera : public Camera {
     static void output_callbackr(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
     static void output_callbacke(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
     static void output_callbackd(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
+    static void output_callbackj(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
     
     static void control_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
     
@@ -168,16 +171,19 @@ class FfmpegCamera : public Camera {
     int mmal_decode(AVPacket *packet);
     int mmal_encode(uint8_t **mv_buffer);
     int mmal_resize(uint8_t **dbuffer);
+    int  mmal_jpeg(uint8_t** jbuffer);
     
     int OpenMmalDecoder(AVCodecContext *mVideoCodecContext);
     int OpenMmalEncoder(AVCodecContext *mVideoCodecContext);
     int OpenMmalResizer(AVCodecContext *mVideoCodecContext);
+    int OpenMmalJPEG(AVCodecContext *mVideoCodecContext);
 
     int CloseMmal();
     
     Zone **czones;
     int czones_n=0;
     int j_encode_count=0;
+    int jpeg_limit=0;
     
     
     

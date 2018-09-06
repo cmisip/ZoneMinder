@@ -459,7 +459,7 @@ uint8_t *& Image::JPEGBuffer(int width, int height) {
 		   //25% of widthxheight for now, probably will depend on quality setting //FIXME
 		   //however for now 640x360=230400 produces a jpeg that is 12% size at 28000 when the jpeg quality is set at 70
 		   //25% should be a safe estimate for upper limit
-		   j_size=(width*height)>>2;
+		   j_size=(width*height)>>1;
 		   j_buffer = (uint8_t*)zm_mallocaligned(32,j_size);
 	       if(j_buffer == NULL)
 		      Fatal("Memory allocation for jpeg buffer failed: %s",strerror(errno));
