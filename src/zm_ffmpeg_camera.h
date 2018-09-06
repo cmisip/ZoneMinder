@@ -63,8 +63,13 @@ class FfmpegCamera : public Camera {
     _AVPIXELFORMAT      imagePixFormat;
 #ifdef __arm__    
     _AVPIXELFORMAT      encoderPixFormat;
+    uint8_t *yuv_buffer=NULL;
+    JSAMPROW *rpY=NULL, *rpV=NULL, *rpU=NULL;
+    
+    
+    //struct jpeg_compress_struct *cinfo=NULL;
 #endif
-    AVPacket mRawPacket;
+    
 
     // Need to keep track of these because apparently the stream can start with values for pts/dts and then subsequent packets start at zero.
     int64_t audio_last_pts;
@@ -102,12 +107,15 @@ class FfmpegCamera : public Camera {
       
 #ifdef __arm__
 
-    MMAL_COMPONENT_T *encoder, *decoder, *resizer=NULL;
-    MMAL_POOL_T *pool_ind, *pool_outd, *pool_ine, *pool_oute, *pool_inr, *pool_outr;
+    MMAL_COMPONENT_T *encoder=NULL, *decoder=NULL, *resizer=NULL, *jcoder=NULL;
+    MMAL_POOL_T *pool_ind=NULL, *pool_outd=NULL, 
+                *pool_ine=NULL, *pool_oute=NULL, 
+                *pool_inr=NULL, *pool_outr=NULL,
+                *pool_inj=NULL, *pool_outj=NULL;
 
 
     struct CONTEXT_T {
-    MMAL_QUEUE_T *rqueue,*equeue,*dqueue;
+    MMAL_QUEUE_T *rqueue=NULL,*equeue=NULL,*dqueue=NULL, *jqueue=NULL;
     MMAL_STATUS_T status;
     } context;
     
@@ -160,24 +168,37 @@ class FfmpegCamera : public Camera {
     static void output_callbackr(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
     static void output_callbacke(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
     static void output_callbackd(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
+    static void output_callbackj(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
     
     static void control_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
     
     static void display_format(MMAL_PORT_T **port, MMAL_ES_FORMAT_T **iformat);
     
+    bool YUV2JPEG( JOCTET *outbuffer, int *outbuffer_size, int quality_override=70 );
+    
     int mmal_decode(AVPacket *packet);
     int mmal_encode(uint8_t **mv_buffer);
     int mmal_resize(uint8_t **dbuffer);
+    int mmal_jpeg(uint8_t** jbuffer);
     
     int OpenMmalDecoder(AVCodecContext *mVideoCodecContext);
     int OpenMmalEncoder(AVCodecContext *mVideoCodecContext);
     int OpenMmalResizer(AVCodecContext *mVideoCodecContext);
+    int OpenMmalJPEG(AVCodecContext *mVideoCodecContext);
 
     int CloseMmal();
     
     Zone **czones;
     int czones_n=0;
     int j_encode_count=0;
+    
+    typedef enum {
+      capture_encoder=1,
+      image_encoder,
+      mmal_encoder
+    } JPEG_enc;
+    
+    int jpeg_limit=0;
     
     
     

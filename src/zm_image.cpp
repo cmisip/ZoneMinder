@@ -458,7 +458,11 @@ uint8_t *& Image::JPEGBuffer(int width, int height) {
 	  if (j_buffer ==NULL) {
 		   //25% of widthxheight for now, probably will depend on quality setting //FIXME
 		   //however for now 640x360=230400 produces a jpeg that is 12% size at 28000 when the jpeg quality is set at 70
-		   //25% should be a safe estimate for upper limit
+		   //50% should be a safe estimate for upper limit
+		   //Recommended sizes:
+		   //ZM EncodeJPeg : width*height>>2
+		   //Libjpeg from net : width*height *6 +2048
+		   //MMAL : width*height
 		   j_size=(width*height)>>2;
 		   j_buffer = (uint8_t*)zm_mallocaligned(32,j_size);
 	       if(j_buffer == NULL)
