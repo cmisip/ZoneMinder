@@ -137,21 +137,14 @@ public:
         
         
         //FIXME, all the below will need to go. 
-        struct motion_vector { 
-        uint16_t xcoord;  //location of top left corner
-        uint16_t ycoord;
+       // struct motion_vector { 
+       // uint16_t xcoord;  //location of top left corner
+       // uint16_t ycoord;
     
-        //Future expansion
-        //int16_t x_vector;  //magnitude of displacement could be a negative number       
-        //int16_t y_vector;
-        };
         
-        struct vector_package { //package will be 32 bit wide to optimize memory transfers
-	      uint8_t xcoord1=0;
-	      uint8_t ycoord1=0;
-	      uint8_t xcoord2=0;
-	      uint8_t ycoord2=0;
-	    };	
+       // };
+        
+        
         
 protected:
 	static bool initialised;

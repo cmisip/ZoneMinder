@@ -206,7 +206,7 @@ int FfmpegCamera::Capture( Image &image ) {
       Debug( 4, "Decoded video packet at frame %d", frameCount );
 
 }  else { //if ctype
-    //the mmal decoder loop is here 	
+    //the mmal decoder builds mRawFrame here with an I420 buffer	
       frameComplete=mmal_decode(&packet);
       Debug( 4, "Decoded video packet at frame %d", frameCount );
 }  //if cytpe
@@ -225,10 +225,6 @@ int FfmpegCamera::Capture( Image &image ) {
           return (-1);
         }
         
-
-         
- 
-      
         
 
         uint8_t* mvect_buffer=NULL;  
@@ -239,26 +235,23 @@ int FfmpegCamera::Capture( Image &image ) {
            if (mvect_buffer ==  NULL ){
                 Error("Failed requesting vector buffer for the captured image.");
                 return (-1); 
-           } //else
-                //memset(mvect_buffer,0,image.mv_size);
-
+           } 
  
         
            if (!ctype) { //motion vectors from software h264 decoding
 			   
-               //FIXMEC, still need to write this          
+               //FIXMEC, still need to rewrite this          
 
            }         
 
 #ifdef __arm__
-        uint8_t* jpegbuffer=NULL; 
-           if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels tile Left to Right and then top to bottom and there are a fixed number covering the entire frame.
+        uint8_t* jpegbuffer=NULL;
+        //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels tile Left to Right and then top to bottom and there are a fixed number covering the entire frame.
+ 
+           if (ctype) { 
+                //mmal_decode has filled MRawFrame with I420 buffer at this point
 
-                //MRawFrame is filled with the decoded frame by this point
-
-                //Associate mFrame with directbuffer
-                //mmal_encode will read mRawFrame and fill mFrame 
-#endif                
+#endif
                 
 #if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
                 av_image_fill_arrays(mFrame->data, mFrame->linesize,
@@ -268,14 +261,12 @@ int FfmpegCamera::Capture( Image &image ) {
                      imagePixFormat, width, height);
 #endif
 
-#ifdef __arm__
- 
-                //Create the RGB buffer for this frame
+#ifdef __arm__ 
+
+                //mmal_resize will read mRawFrame and fill mFrame with RGB data with downscaled resolution
                 mmal_resize(&directbuffer); 
                 
-                //mFrame is filled with the resized frame by this point
-
-                //Create the JPEG buffer for this frame if frame is alarmed
+                //Create the JPEG buffer for this frame if frame is alarmed, using downscaled resolution
                 jpegbuffer=image.JPEGBuffer(width, height);
                 if (jpegbuffer ==  NULL ){
                    Error("Failed requesting jpeg buffer for the captured image.");
@@ -284,21 +275,24 @@ int FfmpegCamera::Capture( Image &image ) {
                 
 		        int *jpeg_size=(int *)jpegbuffer;  
 
-                 
-
+                //mmal_encode will read mFrame and create an RGB buffer and put it in directbuffer
                 if (mmal_encode(&mvect_buffer)) //alarmed frame
                    //jpeg encode the frames between current alarmed write frame and frame that analyse is reading up to the post event count frames
                    j_encode_count=monitor->GetImageBufferCount()+monitor->GetPostEventCount(); 
-                   
                 if (j_encode_count){
 				   //first word is jpeg size, rest is jpeg data
-				   image.EncodeJpeg(jpegbuffer+4, jpeg_size );
-				   j_encode_count--;
+				   //Option 1. use the image EncodeJpeg function.
+				   //image.EncodeJpeg(jpegbuffer+4, jpeg_size );
+				   //Option 2. use hardware mmal.
+				   mmal_jpeg(&jpegbuffer);
+				   
+				   if (j_encode_count >0) 
+				     j_encode_count--;
 				} else { //set the first word as zero
 				   *jpeg_size=0;
 				}
 				
-				//image.EncodeJpeg(jpegbuffer+4, jpeg_size );	
+				
 					
 
                 
@@ -307,6 +301,7 @@ int FfmpegCamera::Capture( Image &image ) {
         
          }
         
+
 #endif
         
       
@@ -431,7 +426,6 @@ void FfmpegCamera::control_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf
 int FfmpegCamera::mmal_decode(AVPacket *pkt) {   
 	MMAL_BUFFER_HEADER_T *buffer;
 	int got_frame=false;
-	//Info("decode start");
 	
 	if ((buffer = mmal_queue_get(pool_ind->queue)) != NULL) {  
          
@@ -471,7 +465,6 @@ int FfmpegCamera::mmal_decode(AVPacket *pkt) {
          } 
       }
       
-     //Info("decode end");
      return (got_frame);    
 }	
 
@@ -481,7 +474,6 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 	MMAL_BUFFER_HEADER_T *buffer;
 	int motion_detected=false;
 	
-	//Info("encode start");
 	uint16_t numblocks=((encoder->output[0]->format->es->video.width * encoder->output[0]->format->es->video.height)/256);
                
 	if ((buffer = mmal_queue_get(pool_ine->queue)) != NULL) {  
@@ -509,7 +501,6 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
          if(buffer->flags & MMAL_BUFFER_HEADER_FLAG_CODECSIDEINFO) {
 			      uint16_t m_offset=0; 
                   for (int i=0; i < czones_n ; i++) {
-	                  //  Info("Polygon test %d",czones[i]->GetPolygon().isInside(Coord(5,5))); 
                         mmal_motion_vector *mvarray=(mmal_motion_vector *)buffer->data;
                         
 						
@@ -549,14 +540,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                              
                              
                              
-                             
-                             /*
-                             v = v - ((v >> 1) & 0x55555555);                    // reuse input as temporary
-                             v = (v & 0x33333333) + ((v >> 2) & 0x33333333);     // temp
-                             c = ((v + (v >> 4) & 0xF0F0F0F) * 0x1010101) >> 24; // count
- */ 
-                            
-                             
+
                          }  
                          
                          alarm_pixels = vec_count<<10 ; //each 16x16 block is 1 shifted to the left 8; each block is further weighted as x4 so we shift <<10. 
@@ -564,12 +548,8 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                          if( (alarm_pixels > (unsigned int)czones[i]->GetMinAlarmPixels()) && (alarm_pixels < (unsigned int)czones[i]->GetMaxAlarmPixels()) ) {
                              motion_detected=true;
 					     } 
-					     //Info("Capture score %d, min %d, max %d ",  alarm_pixels, (unsigned int)czones[i]->GetMinAlarmPixels(), (unsigned int)czones[i]->GetMaxAlarmPixels() );
-    
-                         //Info("Capture vec_count %d score %d", vec_count, score);
                          
                          //SAVE this vec count into mvect buffer which becomes a list of zone scores  
-                         //memcpy((*mv_buffer)+m_offset ,&vec_count, 4 ) ; 
                          memcpy((*mv_buffer)+m_offset ,&alarm_pixels, 4 ) ; 
                          m_offset+=4;
                         
@@ -588,7 +568,6 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                    }
 		  
       }
-     //Info("encode end");
      return (motion_detected);    
 }	
 
@@ -596,7 +575,6 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 
 int  FfmpegCamera::mmal_resize(uint8_t** dbuffer) {   //uses mRawFrame data, builds mFrame
 	MMAL_BUFFER_HEADER_T *buffer;
-	//Info("resize start");
 	if ((buffer = mmal_queue_get(pool_inr->queue)) != NULL) { 
 		 
          av_image_copy_to_buffer(buffer->data, bufsize_d, (const uint8_t **)mRawFrame->data, mRawFrame->linesize,
@@ -620,7 +598,6 @@ int  FfmpegCamera::mmal_resize(uint8_t** dbuffer) {   //uses mRawFrame data, bui
          memcpy((*dbuffer),buffer->data,width*height*colours);
          //save it as AVFrame holding a buffer with original video source resolution
          av_image_fill_arrays(mFrame->data, mFrame->linesize, *dbuffer, encoderPixFormat, mFrame->width, mFrame->height, 1);
-         //av_image_fill_arrays(mFrame->data, mFrame->linesize, buffer->data, encoderPixFormat, mFrame->width, mFrame->height, 1);
          
          mmal_buffer_header_release(buffer);
       }
@@ -633,7 +610,6 @@ int  FfmpegCamera::mmal_resize(uint8_t** dbuffer) {   //uses mRawFrame data, bui
                    }
 		  
       }
-      //Info("resize end");
      return (0);    
 }	
 
@@ -659,7 +635,7 @@ int  FfmpegCamera::mmal_jpeg(uint8_t** jbuffer) {   //uses mFrame data
       }
       
       while ((buffer = mmal_queue_get(context.jqueue)) != NULL){
-        
+         //Info("JPEG buffer is %d, while jpeg_limit is %d for quality %d",buffer->length, jpeg_limit, config.jpeg_file_quality);
          if (buffer->length < jpeg_limit) {
            memcpy((*jbuffer),&buffer->length,4);
            memcpy((*jbuffer)+4,buffer->data,buffer->length);
@@ -737,6 +713,7 @@ int FfmpegCamera::OpenMmalDecoder(AVCodecContext *mVideoCodecContext){
    if (mmal_port_parameter_set_boolean(decoder->output[0], MMAL_PARAMETER_ZERO_COPY, MMAL_TRUE) != MMAL_SUCCESS)
      Info("Failed to set zero copy on decoder output");
    */ 
+   
    /* Set format of video decoder input port */
    MMAL_ES_FORMAT_T *format_in = decoder->input[0]->format;
    format_in->type = MMAL_ES_TYPE_VIDEO;
@@ -866,10 +843,8 @@ int FfmpegCamera::OpenMmalEncoder(AVCodecContext *mVideoCodecContext){
    if (mmal_port_parameter_set_boolean(encoder->output[0], MMAL_PARAMETER_ZERO_COPY, MMAL_TRUE) != MMAL_SUCCESS)
      Info("Failed to set zero copy on encoder output");
     */
+    
    /* Set format of video encoder input port */
-   
-   
-   
    MMAL_ES_FORMAT_T *format_in = encoder->input[0]->format;
    format_in->type = MMAL_ES_TYPE_VIDEO;
    
@@ -881,14 +856,9 @@ int FfmpegCamera::OpenMmalEncoder(AVCodecContext *mVideoCodecContext){
        format_in->encoding = MMAL_ENCODING_I420;
    }
    
-   //format_in->encoding = MMAL_ENCODING_I420;
    
-   //format_in->es->video.width = VCOS_ALIGN_UP(mVideoCodecContext->width, 32);
-   //format_in->es->video.height = VCOS_ALIGN_UP(mVideoCodecContext->height,16);
    format_in->es->video.width = VCOS_ALIGN_UP(width, 32);
    format_in->es->video.height = VCOS_ALIGN_UP(height,16);
-   //format_in->es->video.crop.width = mVideoCodecContext->width;
-   //format_in->es->video.crop.height = mVideoCodecContext->height;
    format_in->es->video.crop.width = width;
    format_in->es->video.crop.height = height;
    
@@ -908,12 +878,8 @@ int FfmpegCamera::OpenMmalEncoder(AVCodecContext *mVideoCodecContext){
    format_out->type = MMAL_ES_TYPE_VIDEO;
    format_out->encoding = MMAL_ENCODING_H264;
    
-   //format_out->es->video.width = VCOS_ALIGN_UP(mVideoCodecContext->width, 32);
-   //format_out->es->video.height = VCOS_ALIGN_UP(mVideoCodecContext->height,16);
    format_out->es->video.width = VCOS_ALIGN_UP(width, 32);
    format_out->es->video.height = VCOS_ALIGN_UP(height,16);
-   //format_out->es->video.crop.width = mVideoCodecContext->width;
-   //format_out->es->video.crop.height = mVideoCodecContext->height;
    format_out->es->video.crop.width = width;
    format_out->es->video.crop.height = height;
    
@@ -1009,6 +975,7 @@ int FfmpegCamera::OpenMmalResizer(AVCodecContext *mVideoCodecContext){
    if (mmal_port_parameter_set_boolean(resizer->output[0], MMAL_PARAMETER_ZERO_COPY, MMAL_TRUE) != MMAL_SUCCESS)
      Info("Failed to set zero copy on resizer output");
    */ 
+   
    /* Set format of video resizer input port */
    MMAL_ES_FORMAT_T *format_in = resizer->input[0]->format;
    format_in->type = MMAL_ES_TYPE_VIDEO;
@@ -1151,14 +1118,11 @@ int FfmpegCamera::OpenMmalJPEG(AVCodecContext *mVideoCodecContext){
    if (mmal_port_parameter_set_boolean(jcoder->output[0], MMAL_PARAMETER_ZERO_COPY, MMAL_TRUE) != MMAL_SUCCESS)
      Info("Failed to set zero copy on jpeg encoder output");
     */
+    
    /* Set format of jpeg encoder input port */
-   
-   
-   
    MMAL_ES_FORMAT_T *format_in = jcoder->input[0]->format;
    format_in->type = MMAL_ES_TYPE_VIDEO;
    
-   //format_in->encoding = MMAL_ENCODING_I420;
    if ( colours == ZM_COLOUR_RGB32 ) {
        format_in->encoding = MMAL_ENCODING_RGBA;
    } else if ( colours == ZM_COLOUR_RGB24 ) {
@@ -1168,12 +1132,8 @@ int FfmpegCamera::OpenMmalJPEG(AVCodecContext *mVideoCodecContext){
    }
    
    
-   //format_in->es->video.width = VCOS_ALIGN_UP(mVideoCodecContext->width, 32);
-   //format_in->es->video.height = VCOS_ALIGN_UP(mVideoCodecContext->height,16);
    format_in->es->video.width = VCOS_ALIGN_UP(width, 32);
    format_in->es->video.height = VCOS_ALIGN_UP(height,16);
-   //format_in->es->video.crop.width = mVideoCodecContext->width;
-   //format_in->es->video.crop.height = mVideoCodecContext->height;
    format_in->es->video.crop.width = width;
    format_in->es->video.crop.height = height;
    
@@ -1181,7 +1141,6 @@ int FfmpegCamera::OpenMmalJPEG(AVCodecContext *mVideoCodecContext){
    format_in->es->video.frame_rate.den = 1001;
    format_in->es->video.par.num = mVideoCodecContext->sample_aspect_ratio.num;
    format_in->es->video.par.den = mVideoCodecContext->sample_aspect_ratio.den;
-   //format_in->flags = MMAL_ES_FORMAT_FLAG_FRAMED;
  
 
    
@@ -1193,12 +1152,8 @@ int FfmpegCamera::OpenMmalJPEG(AVCodecContext *mVideoCodecContext){
    format_out->type = MMAL_ES_TYPE_VIDEO;
    format_out->encoding = MMAL_ENCODING_JPEG;
    
-   //format_out->es->video.width = VCOS_ALIGN_UP(mVideoCodecContext->width, 32);
-   //format_out->es->video.height = VCOS_ALIGN_UP(mVideoCodecContext->height,16);
    format_out->es->video.width = VCOS_ALIGN_UP(width, 32);
    format_out->es->video.height = VCOS_ALIGN_UP(height,16);
-   //format_out->es->video.crop.width = mVideoCodecContext->width;
-   //format_out->es->video.crop.height = mVideoCodecContext->height;
    format_out->es->video.crop.width = width;
    format_out->es->video.crop.height = height;
    
@@ -1208,8 +1163,8 @@ int FfmpegCamera::OpenMmalJPEG(AVCodecContext *mVideoCodecContext){
    }
    
    //FIXME, should get from config
-   if (mmal_port_parameter_set_uint32(jcoder->output[0], MMAL_PARAMETER_JPEG_Q_FACTOR, 100) != MMAL_SUCCESS) {
-   Fatal("failed to set jpeg quality for mmal jpeg encoder");
+   if (mmal_port_parameter_set_uint32(jcoder->output[0], MMAL_PARAMETER_JPEG_Q_FACTOR, config.jpeg_file_quality) != MMAL_SUCCESS) {
+   Fatal("failed to set jpeg quality for mmal jpeg encoder to %d",config.jpeg_file_quality);
    }   
 
    /* Display the input port format */
@@ -1567,12 +1522,10 @@ int FfmpegCamera::OpenFfmpeg() {
 #if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
   int pSize = av_image_get_buffer_size( imagePixFormat, width, height,1 );
   bufsize_d = av_image_get_buffer_size(AV_PIX_FMT_YUV420P , mRawFrame->width, mRawFrame->height,1 );
-  //bufsize_r = av_image_get_buffer_size(AV_PIX_FMT_YUV420P , mFrame->width, mFrame->height,1 );
   
 #else
   int pSize = avpicture_get_size( imagePixFormat, width, height );
   bufsize_d = avpicture_get_size(AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height );
-  //bufsize_r = avpicture_get_size(AV_PIX_FMT_YUV420P, mFrame->width, mFrame->height );
 #endif
 
   if( (unsigned int)pSize != imagesize) {
@@ -1626,8 +1579,7 @@ int FfmpegCamera::OpenFfmpeg() {
     OpenMmalResizer(mVideoCodecContext);
     OpenMmalJPEG(mVideoCodecContext); 
     
-    jpeg_limit=(width*height)>>1;
-    
+    jpeg_limit=(width*height)>>1;  //Avoid segfault in case jpeg is bigger than the buffer.
     
     
     //Retrieve the zones info and setup the vector mask
@@ -1826,7 +1778,7 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
       Debug( 4, "Decoded video packet at frame %d", frameCount );
       
    }  else { //if ctype
-    //the mmal decoder loop is here 	
+    //the mmal decoder builds mRawFrame here with an I420 buffer	
       frameComplete=mmal_decode(&packet);
       Debug( 4, "Decoded video packet at frame %d", frameCount );
 }  //if cytpe   
@@ -1854,10 +1806,7 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
            if (mvect_buffer ==  NULL ){
                 Error("Failed requesting vector buffer for the captured image.");
                 return (-1); 
-           } //else
-                //memset(mvect_buffer,0,image.mv_size);
-
- 
+           } 
         
            if (!ctype) { //motion vectors from software h264 decoding
 			   
@@ -1867,13 +1816,12 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
         
         
 #ifdef __arm__
-        uint8_t* jpegbuffer=NULL; 
-           if (ctype) { //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels tile Left to Right and then top to bottom and there are a fixed number covering the entire frame.
+        uint8_t* jpegbuffer=NULL;
+        //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels tile Left to Right and then top to bottom and there are a fixed number covering the entire frame.
+ 
+           if (ctype) { 
+                //mmal_decode has filled MRawFrame with I420 buffer at this point
 
-                //MRawFrame is filled with the decoded frame by this point
-
-                //Associate mFrame with directbuffer
-                //mmal_encode will read mRawFrame and fill mFrame 
 #endif
                 
 #if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
@@ -1885,11 +1833,10 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
 #endif
 
 #ifdef __arm__ 
-                //Create the RGB buffer for this frame
+
+                //mmal_resize will read mRawFrame and fill mFrame with RGB data with downscaled resolution
                 mmal_resize(&directbuffer); 
                 
-                //mFrame is filled with the resized frame by this point
-
                 //Create the JPEG buffer for this frame if frame is alarmed, using downscaled resolution
                 jpegbuffer=image.JPEGBuffer(width, height);
                 if (jpegbuffer ==  NULL ){
@@ -1899,7 +1846,7 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
                 
 		        int *jpeg_size=(int *)jpegbuffer;  
 
-                 
+                //mmal_encode will read mFrame and create an RGB buffer and put it in directbuffer
                 if (mmal_encode(&mvect_buffer)) //alarmed frame
                    //jpeg encode the frames between current alarmed write frame and frame that analyse is reading up to the post event count frames
                    j_encode_count=monitor->GetImageBufferCount()+monitor->GetPostEventCount(); 
@@ -1916,7 +1863,7 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
 				   *jpeg_size=0;
 				}
 				
-				//image.EncodeJpeg(jpegbuffer+4, jpeg_size );	
+				
 					
 
                 
@@ -2067,13 +2014,7 @@ else if ( packet.pts && video_last_pts > packet.pts ) {
 if (((ctype) && (cfunction == Monitor::MODECT)) || (!ctype)) {   
 	
          
-/*        
-#if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
-        av_image_fill_arrays(mFrame->data, mFrame->linesize, directbuffer, imagePixFormat, width, height, 1);
-#else
-        avpicture_fill( (AVPicture *)mFrame, directbuffer, imagePixFormat, width, height);
-#endif
-*/
+
 
         if (sws_scale(mConvertContext, mRawFrame->data, mRawFrame->linesize,
                       0, mVideoCodecContext->height, mFrame->data, mFrame->linesize) < 0) {

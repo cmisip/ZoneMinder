@@ -114,9 +114,6 @@ class FfmpegCamera : public Camera {
     } context;
     
     
-    
-
-    
 
     struct mmal_motion_vector {
      char x_vector;
@@ -136,7 +133,6 @@ class FfmpegCamera : public Camera {
     
     
     typedef Image::motion_vector motion_vector;
-    typedef Image::vector_package vector_package;
   
   
   
@@ -171,7 +167,7 @@ class FfmpegCamera : public Camera {
     int mmal_decode(AVPacket *packet);
     int mmal_encode(uint8_t **mv_buffer);
     int mmal_resize(uint8_t **dbuffer);
-    int  mmal_jpeg(uint8_t** jbuffer);
+    int mmal_jpeg(uint8_t** jbuffer);
     
     int OpenMmalDecoder(AVCodecContext *mVideoCodecContext);
     int OpenMmalEncoder(AVCodecContext *mVideoCodecContext);

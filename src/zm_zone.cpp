@@ -217,22 +217,14 @@ void Zone::SetVectorMask() {
     
     if (polygon.isInside(Coord(xcoord,ycoord))) {//coordinates inside polygon 
            registers =registers | (1 << count);
-           //thisbit=1;
-    } //else
-    //thisbit=0;      
-           
+    } 
     
-    //std::cout << "Count out "<< count << " BIT " << thisbit << " Block num " << i << " Total blocks " << numblocks  << std::endl;
     count++;
     if (( count == 32) || (i == numblocks-1)) {
       memcpy(zone_vector_mask+offset , &registers, 4 ) ;  
-      //std::cout << "Count in "<< count << std::endl;
       count=0;
       wcount+=1;
       offset+=4;
-      //std::cout << "Word " << wcount;
-      //print( " register", registers );
-      
       registers=0;
 
     }
@@ -244,176 +236,7 @@ void Zone::SetVectorMask() {
 
   
 }	
-/*
-bool Zone::CheckAlarms( uint8_t *& mvect_buffer) { 
-    ResetStats();  
-    alarm_centre=Coord(0,0);
-   
-    if ( overload_count ) {
-    Info( "In overload mode, %d frames of %d remaining", overload_count, overload_frames );
-    Debug( 4, "In overload mode, %d frames of %d remaining", overload_count, overload_frames );
-    overload_count--;
-    return( false );
-  }
-    
-    //uint16_t maximum_vector_threshold=(polygon.Area()/16); //16 is the size of a 4x4 macroblock
-    
-    //CONFIG section
-    //USE the AlarmedPixels Method and Percent Units to set the Min/Max Alarmed Area
-    
-    
-    uint32_t vec_count=0;
-    //uint32_t x_sum=0;  //used for computing alarm centre
-    //uint32_t y_sum=0;
-    uint16_t size;
-    uint16_t vec_type;
-    
-    uint16_t minimum_vector_threshold;
-    uint32_t available_vectors=0;
-    
-  
-    if (mvect_buffer) {
-      //first 16bit value is size
-      memcpy(&size,mvect_buffer,sizeof(size));
-      //second 16 bit value is source type of macroblock : 0 hardware, 1 software.  //FIXME, could be 8 bit value but probably better to keep things even
-      memcpy(&vec_type,mvect_buffer+sizeof(size),sizeof(vec_type));    
-      //sizeof would be safer in the long run if we decide to make changes to these types
-        
-      //uint16_t minimum_vector_coverage=((double)min_alarm_pixels/polygon.Area())*100; 
-      //uint16_t maximum_vector_coverage=((double)max_alarm_pixels/polygon.Area())*100; 
-      
-      
-      //size contains the number of 16x16 macroblocks or equivalent to 256 pixels  per macroblock or <<8
-      //we consider each macroblock to be 4x its value so <<2
-      //minimum_vector_threshold is the minimum number of vectors needed to generate min_alarm_pixels
-      //min_alarm_pixels is from the config Min_Alarmed_Area in AlarmPixels. It is the number of pixels that
-      //is equivalent to the percentage number. So 20 means number of pixels that will cover 20% of the Polygon area. 
-      minimum_vector_threshold=min_alarm_pixels>>10;
-      
-      
-      if (size > minimum_vector_threshold) {  //Don't bother if we don't have enough vectors to satisfy Min_Alarmed_Area
-        
-        
-        //Each hardware macroblock is 16x16 and each software macroblock has been rounded to this size as well.
-        //So there is no need to differentiate between the two at this point.  They will be bit shifted to the Left equal amounts to restore the original values. 
-        
-        uint16_t offset=4;
-        vector_package ups;
-        for (int i = 0; i < size; i++) {
-               
-                
-                if (!(i & 1)) { //only read from the buffer when iterator is an even number  
-				   //Info("ZMA index is even < %d >  reading", vec_count);  
-                   memcpy(&ups,mvect_buffer+offset,sizeof(vector_package));//4 byte read
-                   offset+=sizeof(vector_package);
-                   //Are the vectors inside the zone polygon?
-                   if (!polygon.isInside(Coord(ups.xcoord1<<4,ups.ycoord1<<4)))      
-                      continue;
-                } else {
-				   //Info("ZMA index is odd < %d >  just checking", vec_count);  
-                   //Are the vectors inside the zone polygon?
-                   if (!polygon.isInside(Coord(ups.xcoord2<<4,ups.ycoord2<<4)))      
-                      continue; 
-                }   
-                
-                vec_count++;
-                            
 
-                //Old code, just keep here in case, this was when software macroblocks were split into equivalent 4x4 blocks and had to be treated differently         
-                //if (vec_type == 0 ) {//software macroblock with size of 4x4
-                  //  vec_count++;  
-                  //  x_sum+=mv.xcoord;
-                  //  y_sum+=mv.ycoord;
-                  
-                //} else {//hardware macroblock with size of 16x16, there are 16 4x4 blocks in each one
-                  //vec_count=vec_count + 16;
-                  //x_sum=x_sum+(16*mv.xcoord);  
-                  //y_sum=y_sum+(16*mv.ycoord); 
-                  //x_sum=x_sum+(mv.xcoord<<4);  
-                  //y_sum=y_sum+(mv.ycoord<<4);
-                  
-                //}   
-             
-                //quit if we have enough to satisfy the minimum score so that zma will not be overrun
-                //This is a performance decision so that zma quits as soon as possible.
-                //May have to restore full frame analysis and come up with reasonable scores for studying frames
-                //if there is room to grow. 
-                if (vec_count > minimum_vector_threshold)    
-                    break;   
-        }
-        
-	    //}
-	    //Info("vec_type %d, min_alarm_pixels %d, size %d,  minimum vector threshold %d, vec_count %d,  polygon area %d ", 
-	     //     vec_type,    min_alarm_pixels   ,    size,  minimum_vector_threshold   , vec_count   , polygon.Area());
-    
-	    }
-        
-        memset(mvect_buffer,0,4); //Zero it out when we are done. May not be necessary, but there is a check in shutdown of components that waits for this to be zeroed out. 
-    }   
-    
-    
-    
-    //if (vec_count) {
-    //      alarm_centre=Coord((uint16_t)(x_sum/vec_count),(uint16_t)(y_sum/vec_count));
-    //}
-  
-    //vec_count is now count of 16x16 macroblocks weighted as x4 each, so shift 10 to the left to convert to pixels
-    //alarm_pixels = vec_count<<10 ; 
-    //score = ((double) alarm_pixels/(polygon.Area()))*100;   
-    
-    
-    
-    //Old scoring system
-    //if( score ) {
-
-//      if( min_alarm_pixels && (score < minimum_vector_coverage) ) {
-        // Not enough pixels alarmed 
-//        return (false);
-//      } else if( max_alarm_pixels && (score > maximum_vector_coverage) ) {
-        // Too many pixels alarmed 
-//        overload_count = overload_frames;
-//        return (false);
-//      }
-
-
-
-//    } else {
-      // No pixels 
-//      return (false);
-//    }
-
-
- 
-    
-//    if ( type == INCLUSIVE ) {
-//     score >>= 1;
-//    } else if ( type == EXCLUSIVE ) {
-//     score <<= 1;
-//    }
-    
-    //End old scoring system
-     
-    
-    //Debug( 5, "Adjusted score is %d", score );
-    //Info("vec_type %d, min_alarm_pixels %d, size %d,  MVT %d, vec_count %d, AP %d, score %d, polygon area %d ", 
-	  //    vec_type,    min_alarm_pixels   ,    size,  minimum_vector_threshold   , vec_count ,alarm_pixels  , score,    polygon.Area());
-        
-        
-    //All or None    
-    if (vec_count < minimum_vector_threshold ) {
-		score=0;
-        return false;
-    }   
-    else {
-        score=100;
-        Info("Motion %d of %d ", vec_count, size);  
-    }    
-    
-    
-    
-    return true; 
-};
-*/
 
 bool Zone::CheckAlarms( uint8_t *& mvect_buffer, int zone_n) { 
     ResetStats();  
@@ -430,21 +253,13 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer, int zone_n) {
     if (mvect_buffer) {
       
       uint16_t offset=4*zone_n;
-      //memcpy(&vec_count,mvect_buffer,4);
       memcpy(&alarm_pixels,mvect_buffer+offset,4);      
         
     }   
     
-    
-    
-    
     score = ((double) alarm_pixels/(polygon.Area()))*100;   
     
-    
-    
     if( score ) {
-		
-	
       
       //Info("Motion %d, score %d, min %d, max %d ", vec_count, score, minimum_vector_coverage, maximum_vector_coverage);  
      if( min_alarm_pixels && (alarm_pixels < (unsigned int)min_alarm_pixels) ) {
@@ -472,7 +287,6 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer, int zone_n) {
      score <<= 1;
     }
     
-    //End old scoring system
      
     
     Debug( 5, "Adjusted score is %d", score );
@@ -484,124 +298,6 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer, int zone_n) {
 };
 
 
-/*bool Zone::CheckAlarms( uint8_t *& mvect_buffer, uint16_t width, uint16_t height) { 
-    ResetStats();  
-    alarm_centre=Coord(0,0);
-    uint16_t numblocks=(width*height)/256;
-    uint16_t minimum_vector_coverage=((double)min_alarm_pixels/polygon.Area())*100; 
-    uint16_t maximum_vector_coverage=((double)max_alarm_pixels/polygon.Area())*100; 
-   
-    if ( overload_count ) {
-    Info( "In overload mode, %d frames of %d remaining", overload_count, overload_frames );
-    Debug( 4, "In overload mode, %d frames of %d remaining", overload_count, overload_frames );
-    overload_count--;
-    return( false );
-  }
-    
-
-    uint32_t vec_count=0;
-    //uint32_t x_sum=0;  //used for computing alarm centre
-    //uint32_t y_sum=0;
-    
-    //Info("ANALYSER");
-  
-    if (mvect_buffer) {
-      
-      
-      //Info("Analysing mvect buffer with numblocks %d", numblocks);
-      
-      uint16_t offset=4;
-      
-      uint16_t wcount=0;
-      
-      uint32_t mask=0;
-      uint32_t buff=0;
-      uint32_t res=0;
-      uint16_t c=0;
-      for (int i = 0; i < numblocks/4; i++) {
-               
-           
-           //wcount+=1;
-           
-           memcpy(&mask, zone_vector_mask+offset, sizeof(mask));
-           memcpy(&buff, mvect_buffer+offset, sizeof(mask));
-           res= mask & buff;
-           offset=offset+4; 
-           //uint8_t rbit=0;
- //          while (res) { //this will loop 32 times with each bit of res
-			  //rbit+=1;
-			  if (res & 1) {
-                 vec_count += 1;
-                 res >>= 1;
-                // uint16_t xcoord = (i*wcount*16) % (width + 16);  //these blocks are tiled to cover the entire frame and are 16x16 size
-                // uint16_t ycoord = ((i*wcount*16)/(width +16))*16;
-           
-                 
-		      }
-           }
- //           
-           
-           c =  ((res & 0xfff) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
-           c += (((res & 0xfff000) >> 12) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
-           c += ((res >> 24) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
-           vec_count+=c;
-           Info("ANALYZE score %d",vec_count);
-                            
-
-      }
-        
-        memset(mvect_buffer,0,4); //Zero it out when we are done. May not be necessary, but there is a check in shutdown of components that waits for this to be zeroed out. 
-    }   
-    
-    
-    
-    //if (vec_count) {
-    //      alarm_centre=Coord((uint16_t)(x_sum/vec_count),(uint16_t)(y_sum/vec_count));
-    //}
-  
-    //vec_count is now count of 16x16 macroblocks weighted as x4 each, so shift 10 to the left to convert to pixels
-    alarm_pixels = vec_count<<10 ; 
-    score = ((double) alarm_pixels/(polygon.Area()))*100;   
-    
-    
-    
-    //Old scoring system
-    if( score ) {
-      //Info("Motion %d of %d, score %d, min %d, max %d ", vec_count, numblocks, score, minimum_vector_coverage, maximum_vector_coverage);  
-      if( min_alarm_pixels && (score < minimum_vector_coverage) ) {
-        // Not enough pixels alarmed 
-        return (false);
-      } else if( max_alarm_pixels && (score > maximum_vector_coverage) ) {
-        // Too many pixels alarmed 
-        overload_count = overload_frames;
-        return (false);
-      }
-
-
-
-    } else {
-      // No pixels 
-      return (false);
-    }
-
-
- 
-    
-    if ( type == INCLUSIVE ) {
-     score >>= 1;
-    } else if ( type == EXCLUSIVE ) {
-     score <<= 1;
-    }
-    
-    //End old scoring system
-     
-    
-    Debug( 5, "Adjusted score is %d", score );
-    
-    
-    
-    return true; 
-};*/
 
 
 bool Zone::CheckAlarms( const Image *delta_image ) {
