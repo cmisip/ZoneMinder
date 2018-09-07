@@ -132,7 +132,7 @@ class FfmpegCamera : public Camera {
     Monitor::Function cfunction;
     
     
-    typedef Image::motion_vector motion_vector;
+    //typedef Image::motion_vector motion_vector;
   
   
   

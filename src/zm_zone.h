@@ -48,7 +48,6 @@ public:
 
   
   //typedef Image::motion_vector motion_vector;
-  typedef Image::vector_package vector_package;
   uint8_t *zone_vector_mask=NULL;
 
 protected:

@@ -635,11 +635,11 @@ int  FfmpegCamera::mmal_jpeg(uint8_t** jbuffer) {   //uses mFrame data
       }
       
       while ((buffer = mmal_queue_get(context.jqueue)) != NULL){
-         //Info("JPEG buffer is %d, while jpeg_limit is %d for quality %d",buffer->length, jpeg_limit, config.jpeg_file_quality);
          if (buffer->length < jpeg_limit) {
            memcpy((*jbuffer),&buffer->length,4);
            memcpy((*jbuffer)+4,buffer->data,buffer->length);
          } else {
+		   Info("JPEG buffer is too small at %d, while actual jpeg size is %d for quality %d", jpeg_limit, buffer->length, config.jpeg_file_quality);
 	       int zero_size=0;
            memcpy((*jbuffer),&zero_size,4);
 	     }
