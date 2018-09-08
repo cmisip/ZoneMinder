@@ -375,15 +375,22 @@ Monitor::Monitor(
 
   Debug( 1, "monitor purpose=%d", purpose );
   
+  if ( function == MVDECT ) {
+  mem_size = sizeof(SharedData)
+       + sizeof(TriggerData)
+       + sizeof(VideoStoreData) //Information to pass back to the capture process
+       + (image_buffer_count*sizeof(struct timeval))
+       + (image_buffer_count*40  ) //mvect buffer size, only holds alarm_pixels now
+       + (image_buffer_count*((width*height)>>1)) //JPEG buffer size
+       + 64; /* Padding used to permit aligning the images buffer to 64 byte boundary */
+  } else {
   mem_size = sizeof(SharedData)
        + sizeof(TriggerData)
        + sizeof(VideoStoreData) //Information to pass back to the capture process
        + (image_buffer_count*sizeof(struct timeval))
        + (image_buffer_count*camera->ImageSize())
-       + (image_buffer_count*40  ) //mvect buffer size, only holds alarm_pixels now
-       + (image_buffer_count*((width*height)>>1)) //JPEG buffer size
-       + 64; /* Padding used to permit aligning the images buffer to 64 byte boundary */
-
+       + 64; /* Padding used to permit aligning the images buffer to 64 byte boundary */	  
+  }	  
   Debug( 1, "mem.size=%d", mem_size );
   mem_ptr = NULL;
 
@@ -492,7 +499,8 @@ Monitor::Monitor(
       Warning( "Waiting for capture daemon" );
       sleep( 1 );
     }
-    ref_image.Assign( width, height, camera->Colours(), camera->SubpixelOrder(), image_buffer[shared_data->last_write_index].image->Buffer(), camera->ImageSize());
+    if (function != MVDECT) 
+     ref_image.Assign( width, height, camera->Colours(), camera->SubpixelOrder(), image_buffer[shared_data->last_write_index].image->Buffer(), camera->ImageSize());
 
     n_linked_monitors = 0;
     linked_monitors = 0;
@@ -555,15 +563,23 @@ bool Monitor::connect() {
 
   int mv_buffer_size = 40;
   int j_buffer_size = (width*height)>>1;
+  unsigned char *shared_images=NULL;
 
   shared_data = (SharedData *)mem_ptr;
   trigger_data = (TriggerData *)((char *)shared_data + sizeof(SharedData));
   video_store_data = (VideoStoreData *)((char *)trigger_data + sizeof(TriggerData));
   struct timeval *shared_timestamps = (struct timeval *)((char *)video_store_data + sizeof(VideoStoreData));
-  unsigned char *shared_images = (unsigned char *)((char *)shared_timestamps + (image_buffer_count*sizeof(struct timeval)));
-  uint8_t *shared_mbuff = (uint8_t *)((char *)shared_images +  (image_buffer_count*camera->ImageSize()));
-  uint8_t *shared_jbuff = (uint8_t *)((char *)shared_mbuff +  (image_buffer_count*mv_buffer_size));
+  uint8_t *shared_mbuff=NULL;
+  uint8_t *shared_jbuff=NULL;
   
+  if (function == MVDECT )  {
+    //uint8_t *shared_mbuff = (uint8_t *)((char *)shared_images +  (image_buffer_count*camera->ImageSize()));
+    shared_mbuff = (uint8_t *)((char *)shared_timestamps + (image_buffer_count*sizeof(struct timeval)));
+    shared_jbuff = (uint8_t *)((char *)shared_mbuff +  (image_buffer_count*mv_buffer_size));
+  }   else {
+    shared_images = (unsigned char *)((char *)shared_timestamps + (image_buffer_count*sizeof(struct timeval)));
+
+  } 
   if(((unsigned long)shared_images % 64) != 0) {
     /* Align images buffer to nearest 64 byte boundary */
     Debug(3,"Aligning shared memory images to the next 64 byte boundary");
@@ -735,7 +751,10 @@ int Monitor::GetImage( int index, int scale ) {
       Snapshot *snap = &image_buffer[index];
       Image *snap_image = snap->image;
 
-      alarm_image.Assign( *snap_image );
+      if ( function == MVDECT )
+        alarm_image.Assign2( *snap_image );
+      else
+        alarm_image.Assign( *snap_image );
 
 
       //write_image.Assign( *snap_image );
@@ -1557,7 +1576,10 @@ bool Monitor::Analyse() {
           if ( state == PREALARM || state == ALARM ) {
             if ( config.create_analysis_images ) {
               bool got_anal_image = false;
-              alarm_image.Assign( *snap_image );
+              if ( function == MVDECT )
+                alarm_image.Assign2( *snap_image );
+              else 
+                alarm_image.Assign( *snap_image );
               for( int i = 0; i < n_zones; i++ ) {
                 if ( zones[i]->Alarmed() ) {
                   if ( zones[i]->AlarmImage() ) {
@@ -1644,7 +1666,10 @@ bool Monitor::Analyse() {
   if ( analysis_fps ) {
     // If analysis fps is set, add analysed image to dedicated pre event buffer
     int pre_index = image_count%pre_event_buffer_count;
-    pre_event_buffer[pre_index].image->Assign(*snap->image);
+    if (function == MVDECT )
+      pre_event_buffer[pre_index].image->Assign2(*snap->image);
+    else 
+      pre_event_buffer[pre_index].image->Assign(*snap->image);
     memcpy( pre_event_buffer[pre_index].timestamp, snap->timestamp, sizeof(struct timeval) );
   }
 
@@ -4219,7 +4244,10 @@ void Monitor::SingleImage( int scale) {
   Image *snap_image = snap->image;
 
   if ( scale != ZM_SCALE_BASE ) {
-    scaled_image.Assign( *snap_image );
+	if ( function == MVDECT )
+      scaled_image.Assign2( *snap_image );
+    else
+      scaled_image.Assign( *snap_image );
     scaled_image.Scale( scale );
     snap_image = &scaled_image;
   }
@@ -4240,7 +4268,10 @@ void Monitor::SingleImageRaw( int scale) {
   Image *snap_image = snap->image;
 
   if ( scale != ZM_SCALE_BASE ) {
-    scaled_image.Assign( *snap_image );
+	if ( function == MVDECT )
+      scaled_image.Assign2( *snap_image );
+    else
+      scaled_image.Assign( *snap_image );
     scaled_image.Scale( scale );
     snap_image = &scaled_image;
   }
@@ -4262,7 +4293,10 @@ void Monitor::SingleImageZip( int scale) {
   Image *snap_image = snap->image;
 
   if ( scale != ZM_SCALE_BASE ) {
-    scaled_image.Assign( *snap_image );
+	if ( function == MVDECT )
+      scaled_image.Assign2( *snap_image );
+    else
+      scaled_image.Assign( *snap_image );
     scaled_image.Scale( scale );
     snap_image = &scaled_image;
   }

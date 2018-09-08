@@ -181,6 +181,8 @@ class FfmpegCamera : public Camera {
     int j_encode_count=0;
     int jpeg_limit=0;
     
+    uint8_t *ddbuffer=NULL;
+    
     
     
 #endif

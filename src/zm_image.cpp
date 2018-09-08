@@ -672,6 +672,30 @@ void Image::Assign( const Image &image ) {
   }  
 }
 
+void Image::Assign2( const Image &image ) {
+  unsigned int new_size = (image.width * image.height) * image.colours;
+
+  
+
+  if(image.colours != ZM_COLOUR_GRAY8 && image.colours != ZM_COLOUR_RGB24 && image.colours != ZM_COLOUR_RGB32) {
+    Error("Attempt to assign image with unexpected colours per pixel: %d",image.colours);
+    return;
+  }
+
+  if ( image.width != width || image.height != height || image.colours != colours || image.subpixelorder != subpixelorder) {
+
+    
+    width = image.width;
+    height = image.height;
+    pixels = width*height;
+    colours = image.colours;
+    subpixelorder = image.subpixelorder;
+    size = new_size;
+  }
+
+  
+}
+
 Image *Image::HighlightEdges( Rgb colour, unsigned int p_colours, unsigned int p_subpixelorder, const Box *limits )
 {
   if ( colours != ZM_COLOUR_GRAY8 )
