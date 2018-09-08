@@ -703,7 +703,7 @@ int FfmpegCamera::OpenMmalDecoder(AVCodecContext *mVideoCodecContext){
      Info("Decoder stats: %i, %i", stats.stats.buffer_count, stats.stats.max_delay);
    }
    
-   /*
+   
    // Set the zero-copy parameter on the input port 
    MMAL_PARAMETER_BOOLEAN_T zc = {{MMAL_PARAMETER_ZERO_COPY, sizeof(zc)}, MMAL_TRUE};
    if (mmal_port_parameter_set(decoder->input[0], &zc.hdr) != MMAL_SUCCESS)
@@ -712,7 +712,7 @@ int FfmpegCamera::OpenMmalDecoder(AVCodecContext *mVideoCodecContext){
    // Set the zero-copy parameter on the output port 
    if (mmal_port_parameter_set_boolean(decoder->output[0], MMAL_PARAMETER_ZERO_COPY, MMAL_TRUE) != MMAL_SUCCESS)
      Info("Failed to set zero copy on decoder output");
-   */ 
+    
    
    /* Set format of video decoder input port */
    MMAL_ES_FORMAT_T *format_in = decoder->input[0]->format;
@@ -764,16 +764,16 @@ int FfmpegCamera::OpenMmalDecoder(AVCodecContext *mVideoCodecContext){
    decoder->input[0]->buffer_size = 512*1024;
    decoder->output[0]->buffer_num = decoder->output[0]->buffer_num_recommended;
    decoder->output[0]->buffer_size = decoder->output[0]->buffer_size_recommended;
- /*
+ 
    pool_ind = mmal_port_pool_create(decoder->input[0],decoder->input[0]->buffer_num,
                               decoder->input[0]->buffer_size);
    pool_outd = mmal_port_pool_create(decoder->output[0],decoder->output[0]->buffer_num,
                                decoder->output[0]->buffer_size);
-   */                         
+   /*                            
    pool_ind = mmal_pool_create(decoder->input[0]->buffer_num,
                               decoder->input[0]->buffer_size);
    pool_outd = mmal_pool_create(decoder->output[0]->buffer_num,
-                               decoder->output[0]->buffer_size);
+   */                            decoder->output[0]->buffer_size);
                                 
                                
    /* Display the input port format */
@@ -833,7 +833,7 @@ int FfmpegCamera::OpenMmalEncoder(AVCodecContext *mVideoCodecContext){
    else {
      Info("Encoder stats: %i, %i", stats.stats.buffer_count, stats.stats.max_delay);
    }
-   /*
+   
    // Set the zero-copy parameter on the input port 
    MMAL_PARAMETER_BOOLEAN_T zc = {{MMAL_PARAMETER_ZERO_COPY, sizeof(zc)}, MMAL_TRUE};
    if (mmal_port_parameter_set(encoder->input[0], &zc.hdr) != MMAL_SUCCESS)
@@ -842,7 +842,7 @@ int FfmpegCamera::OpenMmalEncoder(AVCodecContext *mVideoCodecContext){
    // Set the zero-copy parameter on the output port 
    if (mmal_port_parameter_set_boolean(encoder->output[0], MMAL_PARAMETER_ZERO_COPY, MMAL_TRUE) != MMAL_SUCCESS)
      Info("Failed to set zero copy on encoder output");
-    */
+    
     
    /* Set format of video encoder input port */
    MMAL_ES_FORMAT_T *format_in = encoder->input[0]->format;
@@ -904,17 +904,17 @@ int FfmpegCamera::OpenMmalEncoder(AVCodecContext *mVideoCodecContext){
    encoder->input[0]->buffer_size = encoder->input[0]->buffer_size_min;
    encoder->output[0]->buffer_num = encoder->output[0]->buffer_num_min;
    encoder->output[0]->buffer_size = encoder->output[0]->buffer_size_min;
-   /*
+   
    pool_ine = mmal_port_pool_create(encoder->input[0],encoder->input[0]->buffer_num,
                               encoder->input[0]->buffer_size);
    pool_oute = mmal_port_pool_create(encoder->output[0],encoder->output[0]->buffer_num,
                                encoder->output[0]->buffer_size);
-   */                           
+   /*                           
    pool_ine = mmal_pool_create(encoder->input[0]->buffer_num,
                               encoder->input[0]->buffer_size);
    pool_oute = mmal_pool_create(encoder->output[0]->buffer_num,
                                encoder->output[0]->buffer_size);                            
-   
+   */
    /* Create a queue to store our decoded video frames. The callback we will get when
     * a frame has been decoded will put the frame into this queue. */
    context.equeue = mmal_queue_create();
@@ -965,7 +965,7 @@ int FfmpegCamera::OpenMmalResizer(AVCodecContext *mVideoCodecContext){
    else {
      Info("Resizer stats: %i, %i", stats.stats.buffer_count, stats.stats.max_delay);
    }
-   /*
+   
    // Set the zero-copy parameter on the input port 
    MMAL_PARAMETER_BOOLEAN_T zc = {{MMAL_PARAMETER_ZERO_COPY, sizeof(zc)}, MMAL_TRUE};
    if (mmal_port_parameter_set(resizer->input[0], &zc.hdr) != MMAL_SUCCESS)
@@ -974,7 +974,7 @@ int FfmpegCamera::OpenMmalResizer(AVCodecContext *mVideoCodecContext){
    // Set the zero-copy parameter on the output port 
    if (mmal_port_parameter_set_boolean(resizer->output[0], MMAL_PARAMETER_ZERO_COPY, MMAL_TRUE) != MMAL_SUCCESS)
      Info("Failed to set zero copy on resizer output");
-   */ 
+    
    
    /* Set format of video resizer input port */
    MMAL_ES_FORMAT_T *format_in = resizer->input[0]->format;
@@ -1047,18 +1047,18 @@ int FfmpegCamera::OpenMmalResizer(AVCodecContext *mVideoCodecContext){
    resizer->output[0]->buffer_num = resizer->output[0]->buffer_num_min;
    resizer->output[0]->buffer_size = resizer->output[0]->buffer_size_min;
    
-   /*
+   
    pool_inr = mmal_port_pool_create(resizer->input[0],resizer->input[0]->buffer_num,
                               resizer->input[0]->buffer_size);
    pool_outr = mmal_port_pool_create(resizer->output[0],resizer->output[0]->buffer_num,
                                resizer->output[0]->buffer_size);
     
-   */
+   /*
    pool_inr = mmal_pool_create(resizer->input[0]->buffer_num,
                               resizer->input[0]->buffer_size);
    pool_outr = mmal_pool_create(resizer->output[0]->buffer_num,
                                resizer->output[0]->buffer_size);
-    
+   */ 
    /* Create a queue to store our decoded video frames. The callback we will get when
     * a frame has been decoded will put the frame into this queue. */
    context.rqueue = mmal_queue_create();
@@ -1109,7 +1109,7 @@ int FfmpegCamera::OpenMmalJPEG(AVCodecContext *mVideoCodecContext){
    else {
      Info("JPEG encoder stats: %i, %i", stats.stats.buffer_count, stats.stats.max_delay);
    }
-   /*
+   
    // Set the zero-copy parameter on the input port 
    MMAL_PARAMETER_BOOLEAN_T zc = {{MMAL_PARAMETER_ZERO_COPY, sizeof(zc)}, MMAL_TRUE};
    if (mmal_port_parameter_set(jcoder->input[0], &zc.hdr) != MMAL_SUCCESS)
@@ -1117,7 +1117,7 @@ int FfmpegCamera::OpenMmalJPEG(AVCodecContext *mVideoCodecContext){
    // Set the zero-copy parameter on the output port 
    if (mmal_port_parameter_set_boolean(jcoder->output[0], MMAL_PARAMETER_ZERO_COPY, MMAL_TRUE) != MMAL_SUCCESS)
      Info("Failed to set zero copy on jpeg encoder output");
-    */
+    
     
    /* Set format of jpeg encoder input port */
    MMAL_ES_FORMAT_T *format_in = jcoder->input[0]->format;
@@ -1179,17 +1179,17 @@ int FfmpegCamera::OpenMmalJPEG(AVCodecContext *mVideoCodecContext){
    jcoder->input[0]->buffer_size = jcoder->input[0]->buffer_size_min;
    jcoder->output[0]->buffer_num = jcoder->output[0]->buffer_num_min;
    jcoder->output[0]->buffer_size = jcoder->output[0]->buffer_size_min;
-   /*
-   pool_ine = mmal_port_pool_create(jcoder->input[0],jcoder->input[0]->buffer_num,
+   
+   pool_inj = mmal_port_pool_create(jcoder->input[0],jcoder->input[0]->buffer_num,
                               jcoder->input[0]->buffer_size);
-   pool_oute = mmal_port_pool_create(jcoder->output[0],jcoder->output[0]->buffer_num,
+   pool_outj = mmal_port_pool_create(jcoder->output[0],jcoder->output[0]->buffer_num,
                                jcoder->output[0]->buffer_size);
-   */                           
+   /*                           
    pool_inj = mmal_pool_create(jcoder->input[0]->buffer_num,
                               jcoder->input[0]->buffer_size);
    pool_outj = mmal_pool_create(jcoder->output[0]->buffer_num,
                                jcoder->output[0]->buffer_size);                            
-   
+   */
    /* Create a queue to store our decoded video frames. The callback we will get when
     * a frame has been decoded will put the frame into this queue. */
    context.jqueue = mmal_queue_create();
