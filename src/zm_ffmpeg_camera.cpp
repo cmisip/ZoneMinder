@@ -773,8 +773,8 @@ int FfmpegCamera::OpenMmalDecoder(AVCodecContext *mVideoCodecContext){
    pool_ind = mmal_pool_create(decoder->input[0]->buffer_num,
                               decoder->input[0]->buffer_size);
    pool_outd = mmal_pool_create(decoder->output[0]->buffer_num,
-   */                            decoder->output[0]->buffer_size);
-                                
+                               decoder->output[0]->buffer_size);
+   */                             
                                
    /* Display the input port format */
    display_format(&decoder->input[0],&format_in);
