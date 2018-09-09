@@ -273,8 +273,10 @@ int FfmpegCamera::Capture( Image &image ) {
                    return (-1); 
                 }
                 
-		        int *jpeg_size=(int *)jpegbuffer;  
-
+		        int *jpeg_size=(int *)jpegbuffer; 
+		        mmal_encode(&mvect_buffer); 
+		        mmal_jpeg(&jpegbuffer);
+/*
                 //mmal_encode will read mFrame and create an RGB buffer and put it in directbuffer
                 if (mmal_encode(&mvect_buffer)) //alarmed frame
                    //jpeg encode the frames between current alarmed write frame and frame that analyse is reading up to the post event count frames
@@ -291,7 +293,7 @@ int FfmpegCamera::Capture( Image &image ) {
 				} else { //set the first word as zero
 				   *jpeg_size=0;
 				}
-				
+*/				
 				
 					
 
@@ -624,6 +626,7 @@ int  FfmpegCamera::mmal_jpeg(uint8_t** jbuffer) {   //uses mFrame data
          
          buffer->pts = buffer->dts = MMAL_TIME_UNKNOWN;
          //buffer->flags=packet->flags;
+         buffer->flags|=MMAL_BUFFER_HEADER_FLAG_FRAME_END;
          
          buffer->alloc_size = jcoder->input[0]->buffer_size;
             
@@ -1141,6 +1144,7 @@ int FfmpegCamera::OpenMmalJPEG(AVCodecContext *mVideoCodecContext){
    format_in->es->video.frame_rate.den = 1001;
    format_in->es->video.par.num = mVideoCodecContext->sample_aspect_ratio.num;
    format_in->es->video.par.den = mVideoCodecContext->sample_aspect_ratio.den;
+   format_in->flags = MMAL_ES_FORMAT_FLAG_FRAMED;
  
 
    
@@ -1579,7 +1583,7 @@ int FfmpegCamera::OpenFfmpeg() {
     OpenMmalResizer(mVideoCodecContext);
     OpenMmalJPEG(mVideoCodecContext); 
     
-    jpeg_limit=(width*height)>>1;  //Avoid segfault in case jpeg is bigger than the buffer.
+    jpeg_limit=(width*height);  //Avoid segfault in case jpeg is bigger than the buffer.
     
     
     //Retrieve the zones info and setup the vector mask
@@ -1845,8 +1849,10 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
                 }
                 
 		        int *jpeg_size=(int *)jpegbuffer;  
+		        mmal_encode(&mvect_buffer);
+		        mmal_jpeg(&jpegbuffer);
 
-                //mmal_encode will read mFrame and create an RGB buffer and put it in directbuffer
+/*                //mmal_encode will read mFrame and create an RGB buffer and put it in directbuffer
                 if (mmal_encode(&mvect_buffer)) //alarmed frame
                    //jpeg encode the frames between current alarmed write frame and frame that analyse is reading up to the post event count frames
                    j_encode_count=monitor->GetImageBufferCount()+monitor->GetPostEventCount(); 
@@ -1863,7 +1869,7 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
 				   *jpeg_size=0;
 				}
 				
-				
+*/				
 					
 
                 

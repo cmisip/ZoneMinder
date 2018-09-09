@@ -381,7 +381,7 @@ Monitor::Monitor(
        + (image_buffer_count*sizeof(struct timeval))
        + (image_buffer_count*camera->ImageSize())
        + (image_buffer_count*40  ) //mvect buffer size, only holds alarm_pixels now
-       + (image_buffer_count*((width*height)>>1)) //JPEG buffer size
+       + (image_buffer_count*((width*height))) //JPEG buffer size
        + 64; /* Padding used to permit aligning the images buffer to 64 byte boundary */
 
   Debug( 1, "mem.size=%d", mem_size );
@@ -554,7 +554,7 @@ bool Monitor::connect() {
 #endif // ZM_MEM_MAPPED
 
   int mv_buffer_size = 40;
-  int j_buffer_size = (width*height)>>1;
+  int j_buffer_size = (width*height);
 
   shared_data = (SharedData *)mem_ptr;
   trigger_data = (TriggerData *)((char *)shared_data + sizeof(SharedData));
@@ -1626,7 +1626,8 @@ bool Monitor::Analyse() {
       last_section_mod = 0;
     } // end if ( trigger_data->trigger_state != TRIGGER_OFF )
 
-    if ( (!signal_change && signal) && (function == MODECT || function == MOCORD || function == MVDECT ) ) {
+    //if ( (!signal_change && signal) && (function == MODECT || function == MOCORD || function == MVDECT ) ) {
+    if ( (!signal_change && signal) && (function == MODECT || function == MOCORD ) ) {
 
       if ( state == ALARM ) {
          ref_image.Blend( *snap_image, alarm_ref_blend_perc );
