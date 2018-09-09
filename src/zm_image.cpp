@@ -1019,7 +1019,7 @@ bool Image::WriteJpeg( const char *filename, int quality_override, struct timeva
 	 int jpeg_size=0;	 
      memcpy(&jpeg_size,j_buffer,4);
      if (jpeg_size > 0 ) {
-       Info("Writejpeg Found preencoded jpeg buffer for writing with size %d", jpeg_size);       
+       //Info("Writejpeg Found preencoded jpeg buffer for writing with size %d", jpeg_size);       
        FILE *outfile;
        if ( (outfile = fopen( filename, "wb" )) == NULL ){
            Error( "Can't open %s: %s", filename, strerror(errno) );
@@ -1032,9 +1032,9 @@ bool Image::WriteJpeg( const char *filename, int quality_override, struct timeva
 		
      } else
        Info("Write jpeg Did NOT find preencoded jpeg ");		 
-  }	
+  }	else
+    return false;
   
-  return ("false");
   
 #endif	
 
@@ -1312,14 +1312,15 @@ bool Image::EncodeJpeg( JOCTET *outbuffer, int *outbuffer_size, int quality_over
      memcpy(outbuffer_size,j_buffer,4);
      if (*outbuffer_size > 0 ) {
 	     memcpy(outbuffer,j_buffer+4,*outbuffer_size);
-	     Info("Encodejpeg with preencoded buffer size %d", *outbuffer_size);
+	     //Info("Encodejpeg with preencoded buffer size %d", *outbuffer_size);
 		 return true;
 		
      } else
          Info("Encodejpeg with no preencoded buffer");		 
          
      return true;      
-  }	
+  }	else
+    return false;
   
   
 #endif

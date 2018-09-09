@@ -3101,21 +3101,22 @@ int Monitor::Capture() {
     //video_store_data->frameNumber = captureResult;
     captureResult = 0;
   }
- 
+ //
   if ( captureResult != 0 ) {
+	  Info("Capture REsult is not zero");
     // Unable to capture image for temporary reason
     // Fake a signal loss image
-    Rgb signalcolor;
-    signalcolor = rgb_convert(signal_check_colour, ZM_SUBPIX_ORDER_BGR); /* HTML colour code is actually BGR in memory, we want RGB */
-    capture_image->Fill(signalcolor);
+    //Rgb signalcolor;
+    // = rgb_convert(signal_check_colour, ZM_SUBPIX_ORDER_BGR); // HTML colour code is actually BGR in memory, we want RGB 
+    //capture_image->Fill(signalcolor);
     captureResult = 0;
   } else { 
     captureResult = 1;
   }
   
   if ( captureResult == 1 ) {
-    
-    /* Deinterlacing */
+/*   
+    // Deinterlacing 
     if ( deinterlacing_value == 1 ) {
       capture_image->Deinterlace_Discard();
     } else if ( deinterlacing_value == 2 ) {
@@ -3151,7 +3152,7 @@ int Monitor::Capture() {
         }
       }
     }
-
+//
     if ( capture_image->Size() > camera->ImageSize() ) {
       Error( "Captured image %d does not match expected size %d check width, height and colour depth",capture_image->Size(),camera->ImageSize() );
       return( -1 );
@@ -3168,9 +3169,9 @@ int Monitor::Capture() {
       }
     }
 
-    if ( privacy_bitmask )
+   /* if ( privacy_bitmask )
       capture_image->MaskPrivacy( privacy_bitmask );
-
+*/
     gettimeofday( image_buffer[index].timestamp, NULL );
     if ( config.timestamp_on_capture ) {
       TimestampImage( capture_image, image_buffer[index].timestamp );
@@ -3211,6 +3212,9 @@ int Monitor::Capture() {
 }
 
 void Monitor::TimestampImage( Image *ts_image, const struct timeval *ts_time ) const {
+  if ( function == MVDECT )
+     return;	
+	
   if ( label_format[0] ) {
     // Expand the strftime macros first
     char label_time_text[256];
