@@ -267,6 +267,9 @@ bool Event::WriteFrameImage( Image *image, struct timeval timestamp, const char 
     ImgToWrite=image;
 
   int thisquality = ( alarm_frame && (config.jpeg_alarm_file_quality > config.jpeg_file_quality) ) ? config.jpeg_alarm_file_quality : 0 ;   // quality to use, zero is default
+  uint8_t* j_buff=ImgToWrite->JPEGBuffer(640,360);
+  int *jpeg_size=(int *)j_buff;
+  //Info("Event Writer with jpeg size at %d", *jpeg_size);
   ImgToWrite->WriteJpeg( event_file, thisquality, (monitor->Exif() ? timestamp : (timeval){0,0}) ); // exif is only timestamp at present this switches on or off for write
 
   if(ts_image) delete(ts_image); // clean up if used.
@@ -408,6 +411,7 @@ void Event::updateNotes( const StringSetMap &newNoteSetMap ) {
 }
 
 void Event::AddFrames( int n_frames, Image **images, struct timeval **timestamps ) {
+	//Info("AddFrames was called with frames %d", n_frames);
   for (int i = 0; i < n_frames; i += ZM_SQL_BATCH_SIZE) {
     AddFramesInternal(n_frames, i, images, timestamps);
   }
@@ -417,6 +421,7 @@ void Event::AddFramesInternal( int n_frames, int start_frame, Image **images, st
   static char sql[ZM_SQL_LGE_BUFSIZ];
   strncpy( sql, "insert into Frames ( EventId, FrameId, TimeStamp, Delta ) values ", sizeof(sql) );
   int frameCount = 0;
+  //Info("Add Frames Internal was called with frames %d", n_frames);
   for ( int i = start_frame; i < n_frames && i - start_frame < ZM_SQL_BATCH_SIZE; i++ ) {
     if ( !timestamps[i]->tv_sec ) {
       Debug( 1, "Not adding pre-capture frame %d, zero timestamp", i );

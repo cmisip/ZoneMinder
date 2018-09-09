@@ -381,7 +381,7 @@ Monitor::Monitor(
        + sizeof(VideoStoreData) //Information to pass back to the capture process
        + (image_buffer_count*sizeof(struct timeval))
        + (image_buffer_count*40  ) //mvect buffer size, only holds alarm_pixels now
-       + (image_buffer_count*((width*height)>>1)) //JPEG buffer size
+       + (image_buffer_count*((width*height))) //JPEG buffer size
        + 64; /* Padding used to permit aligning the images buffer to 64 byte boundary */
   } else {
   mem_size = sizeof(SharedData)
@@ -530,7 +530,7 @@ bool Monitor::connect() {
     Error( "Got empty memory map file size %ld, is the zmc process for this monitor running?", map_stat.st_size, mem_size );
     return false;
   } else if ( map_stat.st_size != mem_size ) {
-    Error( "Got unexpected memory map file size %ld, expected %d", map_stat.st_size, mem_size );
+    Info( "Got unexpected memory map file size %ld, expected %d", map_stat.st_size, mem_size );
     return false;
   } else {
 #ifdef MAP_LOCKED
@@ -562,7 +562,7 @@ bool Monitor::connect() {
 #endif // ZM_MEM_MAPPED
 
   int mv_buffer_size = 40;
-  int j_buffer_size = (width*height)>>1;
+  int j_buffer_size = (width*height);
   unsigned char *shared_images=NULL;
 
   shared_data = (SharedData *)mem_ptr;
@@ -1648,7 +1648,8 @@ bool Monitor::Analyse() {
       last_section_mod = 0;
     } // end if ( trigger_data->trigger_state != TRIGGER_OFF )
 
-    if ( (!signal_change && signal) && (function == MODECT || function == MOCORD || function == MVDECT ) ) {
+    //if ( (!signal_change && signal) && (function == MODECT || function == MOCORD || function == MVDECT ) ) {
+    if ( (!signal_change && signal) && (function == MODECT || function == MOCORD  ) ) {
 
       if ( state == ALARM ) {
          ref_image.Blend( *snap_image, alarm_ref_blend_perc );

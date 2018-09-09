@@ -154,10 +154,12 @@ Image::Image( const Image &p_image )
   (*fptr_imgbufcpy)(buffer, p_image.buffer, size);
   if (p_image.mv_buffer) {
      VectBuffer();
+     mv_size=p_image.mv_size;
      memcpy(mv_buffer,p_image.mv_buffer,mv_size);
   }
   if (p_image.j_buffer) {
-     JPEGBuffer(width,height);
+     JPEGBuffer(p_image.width,p_image.height);
+     j_size=p_image.j_size;
      memcpy(j_buffer,p_image.j_buffer,j_size);
   }
   strncpy( text, p_image.text, sizeof(text) );
@@ -457,7 +459,7 @@ uint8_t *& Image::VectBuffer() {
 uint8_t *& Image::JPEGBuffer(int width, int height) {
 	  if (j_buffer ==NULL) {
 		   //Half width*height should be adequate jpeg buffer size. 
-		   j_size=(width*height)>>1;
+		   j_size=(width*height);
 		   j_buffer = (uint8_t*)zm_mallocaligned(32,j_size);
 	       if(j_buffer == NULL)
 		      Fatal("Memory allocation for jpeg buffer failed: %s",strerror(errno));
@@ -673,7 +675,7 @@ void Image::Assign( const Image &image ) {
 }
 
 void Image::Assign2( const Image &image ) {
-  unsigned int new_size = (image.width * image.height) * image.colours;
+  //unsigned int new_size = (image.width * image.height) * image.colours;
 
   
 
@@ -690,7 +692,16 @@ void Image::Assign2( const Image &image ) {
     pixels = width*height;
     colours = image.colours;
     subpixelorder = image.subpixelorder;
-    size = new_size;
+    size = 0;
+  }  
+    
+    if (!j_buffer)
+      JPEGBuffer(width,height);
+    j_size=width*height;  
+      
+    if(image.j_buffer != j_buffer) {  
+		memcpy(j_buffer, image.j_buffer, j_size);
+        memcpy(mv_buffer,image.mv_buffer,mv_size);
   }
 
   
@@ -1008,7 +1019,7 @@ bool Image::WriteJpeg( const char *filename, int quality_override, struct timeva
 	 int jpeg_size=0;	 
      memcpy(&jpeg_size,j_buffer,4);
      if (jpeg_size > 0 ) {
-       //Info("Found preencoded jpeg buffer for writing with size %d", jpeg_size);       
+       Info("Writejpeg Found preencoded jpeg buffer for writing with size %d", jpeg_size);       
        FILE *outfile;
        if ( (outfile = fopen( filename, "wb" )) == NULL ){
            Error( "Can't open %s: %s", filename, strerror(errno) );
@@ -1019,8 +1030,11 @@ bool Image::WriteJpeg( const char *filename, int quality_override, struct timeva
        fclose(outfile);
        return true;    
 		
-     }		 
+     } else
+       Info("Write jpeg Did NOT find preencoded jpeg ");		 
   }	
+  
+  return ("false");
   
 #endif	
 
@@ -1298,10 +1312,13 @@ bool Image::EncodeJpeg( JOCTET *outbuffer, int *outbuffer_size, int quality_over
      memcpy(outbuffer_size,j_buffer,4);
      if (*outbuffer_size > 0 ) {
 	     memcpy(outbuffer,j_buffer+4,*outbuffer_size);
-	     
+	     Info("Encodejpeg with preencoded buffer size %d", *outbuffer_size);
 		 return true;
 		
-     }		 
+     } else
+         Info("Encodejpeg with no preencoded buffer");		 
+         
+     return true;      
   }	
   
   

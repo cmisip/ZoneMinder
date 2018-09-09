@@ -228,7 +228,6 @@ int FfmpegCamera::Capture( Image &image ) {
 	   } else
 	      directbuffer=ddbuffer;
         
-        Info("Got here 0");
         uint8_t* mvect_buffer=NULL;  
         
         if  (cfunction == Monitor::MVDECT) {
@@ -264,7 +263,6 @@ int FfmpegCamera::Capture( Image &image ) {
 #endif
 
 #ifdef __arm__ 
-                Info("Got here 2");
                 //mmal_resize will read mRawFrame and fill mFrame with RGB data with downscaled resolution
                 mmal_resize(&directbuffer); 
                 //mmal_resize(); 
@@ -276,13 +274,10 @@ int FfmpegCamera::Capture( Image &image ) {
                    return (-1); 
                 }
                 
-		        int *jpeg_size=(int *)jpegbuffer; 
-		        Info("Got here 3"); 
+		        //int *jpeg_size=(int *)jpegbuffer; 
                 mmal_encode(&mvect_buffer);
-                Info("Got here 4");
                 mmal_jpeg(&jpegbuffer);
                 
-                Info("Got here 5");
                 //memset(directbuffer,0,width*height*colours);
 
 /*
@@ -306,7 +301,6 @@ int FfmpegCamera::Capture( Image &image ) {
 				
 					
 
-                Info("Got here 6");
                 
            } //if ctype
         
@@ -315,7 +309,6 @@ int FfmpegCamera::Capture( Image &image ) {
 
 #endif
         
-      Info("Got here 7");
 
 //This is the software scaler. Directbuffer is packaged into mFrame and processed by swscale to convert to appropriate format and size
 //Need SWScale when Source Type is FFmpeg with Function as Mvdect or Modect
@@ -356,7 +349,7 @@ if (((ctype) && (cfunction == Monitor::MODECT)) || (!ctype)) {
 } // closing bracket for "if (((ctype) && (cfunction == Monitor::MODECT)) || (!ctype))"
  
         frameCount++;
-        Info("Got here 8");
+        Info("Framecount is %d", frameCount);
         //av_frame_unref(mFrame);
         
         
@@ -367,14 +360,12 @@ if (((ctype) && (cfunction == Monitor::MODECT)) || (!ctype)) {
       Debug( 4, "Different stream_index %d", packet.stream_index );
     } // end if packet.stream_index == mVideoStreamId
     zm_av_packet_unref( &packet );
-    Info("Got here 9");
   } // end while ! frameComplete
   
   
   
 	
 
-  Info("Got here 10");
   
   return (0);
 } // FfmpegCamera::Capture
@@ -440,7 +431,7 @@ void FfmpegCamera::control_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf
 }
 
 int FfmpegCamera::mmal_decode(AVPacket *pkt) {  
-	Info("start decode"); 
+	//Info("start decode"); 
 	MMAL_BUFFER_HEADER_T *buffer;
 	int got_frame=false;
 	
@@ -481,14 +472,14 @@ int FfmpegCamera::mmal_decode(AVPacket *pkt) {
 			   Warning("failed to send empty buffer to decoder output for frame %d\n", frameCount);
          } 
       }
-     Info("end decode");
+     //Info("end decode");
      return (got_frame);    
 }	
 
 
 
 int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled frame) data 
-	Info("start encode");
+	//Info("start encode");
 	MMAL_BUFFER_HEADER_T *buffer;
 	int motion_detected=false;
 	
@@ -586,14 +577,14 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                    }
 		  
       }
-      Info("end encode");
+      //Info("end encode");
      return (motion_detected);    
 }	
 
 
 
 int  FfmpegCamera::mmal_resize(uint8_t **dbuffer) {   //uses mRawFrame data, builds mFrame
-	Info("start resize");
+	//Info("start resize");
 	MMAL_BUFFER_HEADER_T *buffer;
 	if ((buffer = mmal_queue_get(pool_inr->queue)) != NULL) { 
 		 
@@ -630,13 +621,13 @@ int  FfmpegCamera::mmal_resize(uint8_t **dbuffer) {   //uses mRawFrame data, bui
                    }
 		  
       }
-      Info("end resize");
+      //Info("end resize");
      return (0);    
 }	
 
 
 int  FfmpegCamera::mmal_jpeg(uint8_t** jbuffer) {   //uses mFrame data
-	Info("start jpeg");
+	//Info("start jpeg");
 	MMAL_BUFFER_HEADER_T *buffer;
 	if ((buffer = mmal_queue_get(pool_inj->queue)) != NULL) { 
 		 
@@ -660,8 +651,9 @@ int  FfmpegCamera::mmal_jpeg(uint8_t** jbuffer) {   //uses mFrame data
          if (buffer->length < jpeg_limit) {
            memcpy((*jbuffer),&buffer->length,4);
            memcpy((*jbuffer)+4,buffer->data,buffer->length);
+           //Info("JPEG buffer created with size %d", buffer->length);
          } else {
-		   Info("JPEG buffer is too small at %d, while actual jpeg size is %d for quality %d", jpeg_limit, buffer->length, config.jpeg_file_quality);
+		   //Info("JPEG buffer is too small at %d, while actual jpeg size is %d for quality %d", jpeg_limit, buffer->length, config.jpeg_file_quality);
 	       int zero_size=0;
            memcpy((*jbuffer),&zero_size,4);
 	     }
@@ -676,7 +668,7 @@ int  FfmpegCamera::mmal_jpeg(uint8_t** jbuffer) {   //uses mFrame data
                    }
 		  
       }
-      Info("End jpeg");
+      //Info("End jpeg");
      return (0);    
 }	
 
@@ -1602,7 +1594,7 @@ int FfmpegCamera::OpenFfmpeg() {
     OpenMmalResizer(mVideoCodecContext);
     OpenMmalJPEG(mVideoCodecContext); 
     
-    jpeg_limit=(width*height)>>1;  //Avoid segfault in case jpeg is bigger than the buffer.
+    jpeg_limit=(width*height);  //Avoid segfault in case jpeg is bigger than the buffer.
     ddbuffer=(uint8_t*)zm_mallocaligned(32,width*height*colours);
     
     //Retrieve the zones info and setup the vector mask
@@ -1859,9 +1851,11 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
 #endif
 
 #ifdef __arm__ 
+ 
 
                 //mmal_resize will read mRawFrame and fill mFrame with RGB data with downscaled resolution
                 mmal_resize(&directbuffer); 
+                
                 //mmal_resize(); 
                 
                 
@@ -1872,8 +1866,11 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
                    return (-1); 
                 }
                 
-		        int *jpeg_size=(int *)jpegbuffer;  
-
+		        int *jpeg_size=(int *)jpegbuffer; 
+		        mmal_encode(&mvect_buffer); 
+                mmal_jpeg(&jpegbuffer);
+ 
+/*
                 //mmal_encode will read mFrame and create an RGB buffer and put it in directbuffer
                 if (mmal_encode(&mvect_buffer)) //alarmed frame
                    //jpeg encode the frames between current alarmed write frame and frame that analyse is reading up to the post event count frames
@@ -1890,7 +1887,7 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
 				} else { //set the first word as zero
 				   *jpeg_size=0;
 				}
-				
+*/				
 				
 					
 
