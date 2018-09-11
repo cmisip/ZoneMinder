@@ -135,6 +135,14 @@ public:
         unsigned int mv_size=0;
         unsigned int j_size=0;
         
+        struct vector_package{ //28 bytes
+			int alarm_pixels;  //4
+			Coord alarm_centre=Coord(0,0); //8
+			int lo_X=0; //4
+			int lo_Y=0; //4
+			int hi_X=0; //4
+			int hi_Y=0; //4
+		};	
         
         //FIXME, all the below will need to go. 
        // struct motion_vector { 

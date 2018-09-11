@@ -91,6 +91,7 @@ public:
 
 protected:
   typedef std::set<Zone *> ZoneSet;
+  typedef Image::vector_package vector_package;
 
   typedef enum { GET_SETTINGS=0x1, SET_SETTINGS=0x2, RELOAD=0x4, SUSPEND=0x10, RESUME=0x20 } Action;
 

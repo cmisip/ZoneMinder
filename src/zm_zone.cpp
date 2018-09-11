@@ -252,8 +252,20 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer, int zone_n) {
   
     if (mvect_buffer) {
       
-      uint16_t offset=4*zone_n;
-      memcpy(&alarm_pixels,mvect_buffer+offset,4);      
+      uint16_t offset=sizeof(vector_package)*zone_n;
+      vector_package vpack;
+      memcpy(&vpack,mvect_buffer,sizeof(vector_package));
+      
+      alarm_pixels=vpack.alarm_pixels;
+      alarm_centre=vpack.alarm_centre;
+      int alarm_lo_x = vpack.lo_X;
+      int alarm_hi_x = vpack.hi_X;
+      int alarm_lo_y = vpack.lo_Y;
+      int alarm_hi_y = vpack.hi_Y;
+      
+      //Info("RECEIVED alarm centre at %d,%d", alarm_centre.X(),alarm_centre.Y());
+      //Info("RECEIVED LowX %d, LowY %d, HiX %d, HiY %d", alarm_lo_x, alarm_lo_y, alarm_hi_x, alarm_hi_y);
+        
         
     }   
     

@@ -443,8 +443,8 @@ void Image::Initialise()
 }*/
 uint8_t *& Image::VectBuffer() {
 	   if (mv_buffer ==NULL) {
-		   //10 x 4 bytes to hold alarm_pixels for up to 10 zones //FIXME, don't really know the practical limit
-		   mv_size=40;
+		   //10 sets of zone scores
+		   mv_size=10*sizeof(vector_package);
 		   mv_buffer = (uint8_t*)zm_mallocaligned(32,mv_size);
 	       if(mv_buffer == NULL)
 		      Fatal("Memory allocation for mvect buffer failed: %s",strerror(errno));

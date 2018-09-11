@@ -380,7 +380,7 @@ Monitor::Monitor(
        + sizeof(VideoStoreData) //Information to pass back to the capture process
        + (image_buffer_count*sizeof(struct timeval))
        + (image_buffer_count*camera->ImageSize())
-       + (image_buffer_count*40  ) //mvect buffer size, only holds alarm_pixels now
+       + (image_buffer_count*10*sizeof(vector_package)) //mvect buffer size
        + (image_buffer_count*((width*height))) //JPEG buffer size
        + 64; /* Padding used to permit aligning the images buffer to 64 byte boundary */
 
@@ -553,7 +553,7 @@ bool Monitor::connect() {
   }
 #endif // ZM_MEM_MAPPED
 
-  int mv_buffer_size = 40;
+  int mv_buffer_size = sizeof(vector_package)*10;
   int j_buffer_size = (width*height);
 
   shared_data = (SharedData *)mem_ptr;

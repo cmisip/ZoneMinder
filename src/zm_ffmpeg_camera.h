@@ -133,6 +133,7 @@ class FfmpegCamera : public Camera {
     
     
     //typedef Image::motion_vector motion_vector;
+    typedef Image::vector_package vector_package;
   
   
   
@@ -165,7 +166,7 @@ class FfmpegCamera : public Camera {
     static void display_format(MMAL_PORT_T **port, MMAL_ES_FORMAT_T **iformat);
     
     int mmal_decode(AVPacket *packet);
-    int mmal_encode(uint8_t **mv_buffer);
+    int mmal_encode(uint8_t **mv_buffer, uint8_t **dbuffer);
     int mmal_resize(uint8_t **dbuffer);
     int mmal_jpeg(uint8_t** jbuffer);
     
@@ -180,7 +181,16 @@ class FfmpegCamera : public Camera {
     int czones_n=0;
     int j_encode_count=0;
     int jpeg_limit=0;
+    int numblocks=0;
+    Coord *coords=NULL;
     
+    struct RGB24 {
+	   uint8_t R=0;
+	   uint8_t G=0;
+	   uint8_t B=0;	
+	};	
+	
+	RGB24 *RGB=NULL;
     
     
 #endif

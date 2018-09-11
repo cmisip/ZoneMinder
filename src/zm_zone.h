@@ -48,7 +48,9 @@ public:
 
   
   //typedef Image::motion_vector motion_vector;
+  typedef Image::vector_package vector_package;
   uint8_t *zone_vector_mask=NULL;
+  bool     motion_detected=false;
 
 protected:
   // Inputs
@@ -102,6 +104,7 @@ protected:
   //Motion vector mask
   uint16_t zm_size=1024; //good enough for 1920x1080
   
+  
 
 protected:
   void Setup( Monitor *p_monitor, int p_id, const char *p_label, ZoneType p_type, const Polygon &p_polygon, const Rgb p_alarm_rgb, CheckMethod p_check_method, int p_min_pixel_threshold, int p_max_pixel_threshold, int p_min_alarm_pixels, int p_max_alarm_pixels, const Coord &p_filter_box, int p_min_filter_pixels, int p_max_filter_pixels, int p_min_blob_pixels, int p_max_blob_pixels, int p_min_blobs, int p_max_blobs, int p_overload_frames, int p_extend_alarm_frames );
@@ -139,6 +142,8 @@ public:
   inline bool IsPrivacy() const { return( type == PRIVACY ); }
   inline const Image *AlarmImage() const { return( image ); }
   inline const Polygon &GetPolygon() const { return( polygon ); }
+  inline const int GetAlarmRGB() { return (alarm_rgb);}
+  inline Box& GetAlarmBox() { return (alarm_box);}
   inline const int GetMinAlarmPixels() { return (min_alarm_pixels);}
   inline const int GetMaxAlarmPixels() { return (max_alarm_pixels);}
   inline bool Alarmed() const { return( alarmed ); }

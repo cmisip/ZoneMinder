@@ -236,6 +236,8 @@ int FfmpegCamera::Capture( Image &image ) {
                 Error("Failed requesting vector buffer for the captured image.");
                 return (-1); 
            } 
+           
+           memset(image.VectBuffer(),0,image.mv_size);
  
         
            if (!ctype) { //motion vectors from software h264 decoding
@@ -273,8 +275,20 @@ int FfmpegCamera::Capture( Image &image ) {
                    return (-1); 
                 }
                 
-		        int *jpeg_size=(int *)jpegbuffer; 
-		        mmal_encode(&mvect_buffer); 
+		        //int *jpeg_size=(int *)jpegbuffer; 
+		        mmal_encode(&mvect_buffer, &directbuffer); 
+		        
+		        for (int i=0; i < monitor->GetZonesNum() ; i++) {
+		         if (czones[i]->motion_detected) {
+					 Info("CAP width %d, height %d", width,height);
+		          /*if ( monitor->Colours() == ZM_COLOUR_GRAY8 ) {
+                     image = *image.HighlightEdges( czones[i]->GetAlarmRGB(), ZM_COLOUR_RGB24, ZM_SUBPIX_ORDER_RGB, &czones[i]->GetAlarmBox() );
+                  } else {
+                     image = *image.HighlightEdges( czones[i]->GetAlarmRGB(), monitor->Colours(), monitor->SubpixelOrder(), &czones[i]->GetAlarmBox() );
+                  }*/
+		         }  
+			    }	
+			    	        
 		        mmal_jpeg(&jpegbuffer);
 /*
                 //mmal_encode will read mFrame and create an RGB buffer and put it in directbuffer
@@ -472,12 +486,11 @@ int FfmpegCamera::mmal_decode(AVPacket *pkt) {
 
 
 
-int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled frame) data 
+int FfmpegCamera::mmal_encode(uint8_t **mv_buffer, uint8_t **dbuffer) {  //uses mFrame (downscaled frame) data 
 	MMAL_BUFFER_HEADER_T *buffer;
 	int motion_detected=false;
 	
-	uint16_t numblocks=((encoder->output[0]->format->es->video.width * encoder->output[0]->format->es->video.height)/256);
-               
+	           
 	if ((buffer = mmal_queue_get(pool_ine->queue)) != NULL) {  
          
          av_image_copy_to_buffer(buffer->data, bufsize_r, (const uint8_t **)mFrame->data, mFrame->linesize,
@@ -503,6 +516,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
          if(buffer->flags & MMAL_BUFFER_HEADER_FLAG_CODECSIDEINFO) {
 			      uint16_t m_offset=0; 
                   for (int i=0; i < czones_n ; i++) {
+					  czones[i]->motion_detected=false;
                         mmal_motion_vector *mvarray=(mmal_motion_vector *)buffer->data;
                         
 						
@@ -516,9 +530,20 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                         uint32_t vec_count=0;
                         uint8_t* zone_vector_mask=czones[i]->zone_vector_mask;
                         uint32_t alarm_pixels=0;
+                        Coord alarm_centre=Coord(0,0);
                         
+                        uint32_t x_sum=0;  //used for computing alarm centre
+                        uint32_t y_sum=0;
+                        
+                        uint32_t low_x=width;
+                        uint32_t low_y=height;
+                        uint32_t hi_x=0;
+                        uint32_t hi_y=0;
+                        
+                        uint16_t wcount=0;
+                        vector_package ups;
                         for (int j=0;j < numblocks ; j++) {
-                        
+                            
                             if ((abs(mvarray[j].x_vector) + abs(mvarray[j].y_vector)) > 1) 
                                registers =registers | (1 << count);
                             
@@ -528,7 +553,9 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 							   
                                memcpy(&mask, zone_vector_mask+offset, sizeof(mask));  
                                res= registers & mask;
+                               
                                count=0;
+                               wcount++;
                                offset+=4;
                                
                                registers=0;
@@ -537,23 +564,63 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                                c += (((res & 0xfff000) >> 12) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
                                c += ((res >> 24) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
                                vec_count+=c;
+                               
+                               while (res) { //this will loop 32 times with each bit of res
+			                        if (res & 1) { 
+										int index=(wcount*32)+count;
+                                        x_sum+=coords[index].X();
+                                        y_sum+=coords[index].Y();
+                                        
+                                        if (low_x > coords[index].X())
+                                          low_x=coords[index].X();
+                                        if (low_y > coords[index].Y())
+                                          low_y=coords[index].Y();
+                                        if (hi_x < coords[index].X())
+                                          hi_x=coords[index].X();
+                                        if (hi_y < coords[index].Y())
+                                          hi_y=coords[index].Y();
+                                            
+                                        /*if (colours == 3 )  
+                                          RGB=(RGB24*)*dbuffer; 
+                                          
+                                        //RGB+=index;
+                                        (RGB+(index*16))->R=255;
+                                        (RGB+(index*16))->G=0;
+                                        (RGB+(index*16))->B=0;   
+                                        */ 
+                                    }    
+                                    res >>= 1;
+                    		   }
 
                              }
-                             
-                             
-                             
 
                          }  
                          
+                         if (vec_count) {
+                             alarm_centre=Coord((int)(x_sum/vec_count),(int)(y_sum/vec_count));
+                             //Info("SENDING alarm centre at %d,%d", alarm_centre.X(),alarm_centre.Y());
+                             //Info("SENDING %d, LowY %d, HiX %d, HiY %d", low_x, low_y, hi_x, hi_y);
+                         }
+                         
                          alarm_pixels = vec_count<<10 ; //each 16x16 block is 1 shifted to the left 8; each block is further weighted as x4 so we shift <<10. 
-                         //if any of the zones trigger an alarm encode a jpeg buffer for the frame
+                         
                          if( (alarm_pixels > (unsigned int)czones[i]->GetMinAlarmPixels()) && (alarm_pixels < (unsigned int)czones[i]->GetMaxAlarmPixels()) ) {
-                             motion_detected=true;
+                             czones[i]->motion_detected=true;
+                             czones[i]->GetAlarmBox() = Box( Coord( low_x, low_y ), Coord( hi_x, hi_y ) );
 					     } 
                          
-                         //SAVE this vec count into mvect buffer which becomes a list of zone scores  
-                         memcpy((*mv_buffer)+m_offset ,&alarm_pixels, 4 ) ; 
-                         m_offset+=4;
+                         //SAVE the stats and send via ups
+                         ups.alarm_pixels=alarm_pixels;
+                         ups.alarm_centre=alarm_centre;
+                         ups.lo_X=low_x;
+                         ups.hi_X=hi_x;
+                         ups.lo_Y=low_y;
+                         ups.hi_Y=hi_y;
+                         memcpy((*mv_buffer)+m_offset, &ups, sizeof(vector_package));
+                         m_offset+=sizeof(vector_package);
+                         
+                         
+                         
                         
                      }
 	     }
@@ -939,6 +1006,8 @@ int FfmpegCamera::OpenMmalEncoder(AVCodecContext *mVideoCodecContext){
    if ( mmal_component_enable(encoder) != MMAL_SUCCESS ) {
      Fatal("failed to enable mmal encoder component");
    }  
+
+   
 
    return 0;
 
@@ -1585,6 +1654,18 @@ int FfmpegCamera::OpenFfmpeg() {
     
     jpeg_limit=(width*height);  //Avoid segfault in case jpeg is bigger than the buffer.
     
+    numblocks=((width * height)/256);
+    
+    //Create a lookup table
+    coords=(Coord*)zm_mallocaligned(32,sizeof(Coord)*numblocks);
+    for ( int i=0; i< numblocks; i++) {
+	   coords[i].X()=(i*16) % (width + 16);
+	   coords[i].Y()=((i*16)/(width +16))*16;	
+	}	
+	
+	
+	
+	//box=(Box*)zm_mallocaligned(32,sizeof(Box));
     
     //Retrieve the zones info and setup the vector mask
     czones_n=monitor->GetZonesNum();
@@ -1630,6 +1711,13 @@ int FfmpegCamera::CloseFfmpeg(){
 
   av_frame_free( &mFrame );
   av_frame_free( &mRawFrame );
+  
+  if (coords)
+     zm_freealigned(coords);
+     
+  //if (box)
+    // zm_freealigned(box);
+        
 
 #if HAVE_LIBSWSCALE
   if ( mConvertContext ) {
@@ -1811,6 +1899,8 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
                 Error("Failed requesting vector buffer for the captured image.");
                 return (-1); 
            } 
+           
+           memset(image.VectBuffer(),0,image.mv_size);
         
            if (!ctype) { //motion vectors from software h264 decoding
 			   
@@ -1848,8 +1938,20 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
                    return (-1); 
                 }
                 
-		        int *jpeg_size=(int *)jpegbuffer;  
-		        mmal_encode(&mvect_buffer);
+		        //int *jpeg_size=(int *)jpegbuffer;  
+		        mmal_encode(&mvect_buffer, &directbuffer); 
+		        
+			     
+			    for (int i=0; i < monitor->GetZonesNum() ; i++) {
+		         if (czones[i]->motion_detected) {
+		          /*if ( monitor->Colours() == ZM_COLOUR_GRAY8 ) {
+                     image = *image.HighlightEdges( czones[i]->GetAlarmRGB(), ZM_COLOUR_RGB24, ZM_SUBPIX_ORDER_RGB, &czones[i]->GetAlarmBox() );
+                  } else {
+                     image = *image.HighlightEdges( czones[i]->GetAlarmRGB(), monitor->Colours(), monitor->SubpixelOrder(), &czones[i]->GetAlarmBox() );
+                  }*/
+		         }  
+			    }	  
+		        
 		        mmal_jpeg(&jpegbuffer);
 
 /*                //mmal_encode will read mFrame and create an RGB buffer and put it in directbuffer
