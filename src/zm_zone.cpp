@@ -119,9 +119,9 @@ void Zone::Setup(
   
   //Zone motion vector mask setup is now done in zm_ffmpeg_camera.cpp
   zone_vector_mask=(uint8_t*)zm_mallocaligned(32,zm_size);
-      if(zone_vector_mask == NULL)
+  if(zone_vector_mask == NULL)
 		      Fatal("Memory allocation failed for zone vector mask: %s",strerror(errno));	
-  
+  memset(zone_vector_mask,0,zm_size);
   
   
 } // end Zone::Setup
@@ -203,12 +203,14 @@ bool Zone::CheckExtendAlarmCount() {
 void Zone::SetVectorMask() {
   uint16_t numblocks=0;
   uint16_t count=0;
-  uint16_t wcount=0;
+  //uint16_t wcount=0;
   
   uint32_t registers;
   uint16_t offset=0;
   
   numblocks= (monitor->Width()*monitor->Height())/256;
+  numblocks = (((numblocks + 16) / 32) * 32)+32;
+
   Info("Setting up the motion vector mask with numblocks %d", numblocks);
     for (uint16_t i=0 ; i< numblocks ; i++) {
   
@@ -220,10 +222,11 @@ void Zone::SetVectorMask() {
     } 
     
     count++;
-    if (( count == 32) || (i == numblocks-1)) {
+    //if (( count == 32) || (i == numblocks-1)) {
+    if ( count == 32) {
       memcpy(zone_vector_mask+offset , &registers, 4 ) ;  
       count=0;
-      wcount+=1;
+      //wcount+=1;
       offset+=4;
       registers=0;
 

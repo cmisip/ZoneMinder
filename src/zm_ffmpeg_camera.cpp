@@ -476,7 +476,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 	MMAL_BUFFER_HEADER_T *buffer;
 	int motion_detected=false;
 	
-	uint16_t numblocks=((encoder->output[0]->format->es->video.width * encoder->output[0]->format->es->video.height)/256);
+	//uint16_t numblocks=((encoder->output[0]->format->es->video.width * encoder->output[0]->format->es->video.height)/256);
                
 	if ((buffer = mmal_queue_get(pool_ine->queue)) != NULL) {  
          
@@ -528,6 +528,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 							   
                                memcpy(&mask, zone_vector_mask+offset, sizeof(mask));  
                                res= registers & mask;
+                               memcpy(result[i]+offset,&res,sizeof(res));
                                count=0;
                                offset+=4;
                                
@@ -548,7 +549,8 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                          alarm_pixels = vec_count<<10 ; //each 16x16 block is 1 shifted to the left 8; each block is further weighted as x4 so we shift <<10. 
                          //if any of the zones trigger an alarm encode a jpeg buffer for the frame
                          if( (alarm_pixels > (unsigned int)czones[i]->GetMinAlarmPixels()) && (alarm_pixels < (unsigned int)czones[i]->GetMaxAlarmPixels()) ) {
-                             motion_detected=true;
+                             czones[i]->motion_detected=false;
+                             //motion_detected=true;
 					     } 
                          
                          //SAVE this vec count into mvect buffer which becomes a list of zone scores  
@@ -940,6 +942,9 @@ int FfmpegCamera::OpenMmalEncoder(AVCodecContext *mVideoCodecContext){
      Fatal("failed to enable mmal encoder component");
    }  
 
+   numblocks=(width * height)/256;
+   numblocks = (((numblocks + 16) / 32) * 32)+32;
+       
    return 0;
 
 }
@@ -1591,7 +1596,10 @@ int FfmpegCamera::OpenFfmpeg() {
     czones=monitor->GetZones();
     
     for (int i=0; i < monitor->GetZonesNum() ; i++) {
-	  czones[i]->SetVectorMask(); 
+	  czones[i]->SetVectorMask();
+	  result[i]=(uint8_t*)zm_mallocaligned(4,numblocks/8);
+	  if(result[i] == NULL)
+		     Fatal("Memory allocation for result buffer failed: %s",strerror(errno));
     }	  
    
   }  
@@ -1630,6 +1638,12 @@ int FfmpegCamera::CloseFfmpeg(){
 
   av_frame_free( &mFrame );
   av_frame_free( &mRawFrame );
+  
+  
+  for (int i=0; i < monitor->GetZonesNum() ; i++) {
+	    if (result[i])
+         free(result[i]);
+  }      
 
 #if HAVE_LIBSWSCALE
   if ( mConvertContext ) {
@@ -1850,6 +1864,31 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
                 
 		        int *jpeg_size=(int *)jpegbuffer;  
 		        mmal_encode(&mvect_buffer);
+		        
+		        for (int i=0; i < monitor->GetZonesNum() ; i++) {
+                     uint32_t offset=0;
+                     uint32_t *res=NULL;
+                     if (czones[i]->motion_detected) {
+						 Info("Motion detected");
+						 //928 numblocks stored 928 bits in 928/8 bytes
+						 //read 32 bit or 4 byte at a time for total of 928/32 iterations
+						 for (int j=0; j<numblocks/32; j++) {
+				    		 res=(uint32_t*)(result[i]+offset); 
+                             bitset<32> bset(*res);
+                             //test the bits
+                             for (int k=0; k<32; k++) {
+                                if (bset.test(k)) {
+							       // 
+  					            }	
+ 					         offset+=4;	 
+					         }
+					     }
+                     }  
+                }   
+		        
+		        
+		        
+		        
 		        mmal_jpeg(&jpegbuffer);
 
 /*                //mmal_encode will read mFrame and create an RGB buffer and put it in directbuffer

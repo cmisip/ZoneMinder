@@ -26,6 +26,8 @@
 #include "zm_videostore.h"
 #include "zm_packetqueue.h"
 
+#include <bitset> 
+
 #ifdef __arm__
 extern "C" {
 #include "interface/mmal/mmal.h"
@@ -178,8 +180,11 @@ class FfmpegCamera : public Camera {
     
     Zone **czones;
     int czones_n=0;
-    int j_encode_count=0;
+    //int j_encode_count=0;
     int jpeg_limit=0;
+    
+    uint8_t *result[10];
+    int numblocks=0;
     
     
     
