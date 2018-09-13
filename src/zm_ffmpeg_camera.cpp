@@ -504,7 +504,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 			      uint16_t m_offset=0; 
                   for (int i=0; i < czones_n ; i++) {
                         mmal_motion_vector *mvarray=(mmal_motion_vector *)buffer->data;
-                        
+                        memset(result[i],0,numblocks/8);
 						
 						uint16_t count=0;
                         uint16_t offset=0;
@@ -519,7 +519,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                         
                         for (int j=0;j < numblocks ; j++) {
                         
-                            if ((abs(mvarray[j].x_vector) + abs(mvarray[j].y_vector)) > 1) 
+                            if ((abs(mvarray[j].x_vector) + abs(mvarray[j].y_vector)) > 8) 
                                registers =registers | (1 << count);
                             
                             count++;
@@ -549,8 +549,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                          alarm_pixels = vec_count<<10 ; //each 16x16 block is 1 shifted to the left 8; each block is further weighted as x4 so we shift <<10. 
                          //if any of the zones trigger an alarm encode a jpeg buffer for the frame
                          if( (alarm_pixels > (unsigned int)czones[i]->GetMinAlarmPixels()) && (alarm_pixels < (unsigned int)czones[i]->GetMaxAlarmPixels()) ) {
-                             czones[i]->motion_detected=false;
-                             //motion_detected=true;
+                             czones[i]->motion_detected=true;
 					     } 
                          
                          //SAVE this vec count into mvect buffer which becomes a list of zone scores  
@@ -1590,6 +1589,20 @@ int FfmpegCamera::OpenFfmpeg() {
     
     jpeg_limit=(width*height);  //Avoid segfault in case jpeg is bigger than the buffer.
     
+    //Create a lookup table for numblocks coordinates
+    coords=(Coord*)zm_mallocaligned(32,sizeof(Coord)*numblocks);
+    for ( int i=0; i< numblocks; i++) {
+	   coords[i].X()=(i*16) % (width + 16);
+	   coords[i].Y()=((i*16)/(width +16))*16;	
+	}	
+	
+	//Create a lookup table for numblocks to RGB index
+	rgbindex=(int*)zm_mallocaligned(32,sizeof(int)*numblocks);
+	for ( int i=0; i< numblocks; i++) {
+	   rgbindex[i]=((i/(width/16))*16*640)+(i%(width/16)*16);
+	   //Ex: numblock 4 is 4 % 40 = 4 * 16 = 64;
+	   //Ex: numblock 44 is 44/40 = 1 *16 * 640 = 10240 + 4 * 16 = 10304
+	}	
     
     //Retrieve the zones info and setup the vector mask
     czones_n=monitor->GetZonesNum();
@@ -1597,7 +1610,7 @@ int FfmpegCamera::OpenFfmpeg() {
     
     for (int i=0; i < monitor->GetZonesNum() ; i++) {
 	  czones[i]->SetVectorMask();
-	  result[i]=(uint8_t*)zm_mallocaligned(4,numblocks/8);
+	  result[i]=(uint8_t*)zm_mallocaligned(32,numblocks/8);
 	  if(result[i] == NULL)
 		     Fatal("Memory allocation for result buffer failed: %s",strerror(errno));
     }	  
@@ -1639,6 +1652,11 @@ int FfmpegCamera::CloseFfmpeg(){
   av_frame_free( &mFrame );
   av_frame_free( &mRawFrame );
   
+  if (coords)
+     zm_freealigned(coords);
+     
+  if (rgbindex)
+     zm_freealigned(rgbindex);   
   
   for (int i=0; i < monitor->GetZonesNum() ; i++) {
 	    if (result[i])
@@ -1869,7 +1887,7 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
                      uint32_t offset=0;
                      uint32_t *res=NULL;
                      if (czones[i]->motion_detected) {
-						 Info("Motion detected");
+						 //Info("Motion detected");
 						 //928 numblocks stored 928 bits in 928/8 bytes
 						 //read 32 bit or 4 byte at a time for total of 928/32 iterations
 						 for (int j=0; j<numblocks/32; j++) {
@@ -1878,7 +1896,27 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
                              //test the bits
                              for (int k=0; k<32; k++) {
                                 if (bset.test(k)) {
-							       // 
+							       int index=(j*32)+k;
+							       
+							       if (colours == 3 )  
+                                        RGB=(RGB24*)directbuffer; 
+                                   
+                                   (RGB+rgbindex[index])->R=255;
+                                   (RGB+rgbindex[index])->G=255;
+                                   (RGB+rgbindex[index])->B=255;     
+                                          
+                                   //RGB+=index;
+                                   //for (int l=index; l<index+16; l++) {
+                                     //(RGB+(index*16))->R=255;
+                                     //(RGB+(index*16))->G=255;
+                                     //(RGB+(index*16))->B=255; 
+							       //}
+                                   //Info("Block %d is set with R %d, G %d, B &d", index, (RGB+(index*16))->R, (RGB+(index*16))->G, (RGB+(index*16))->B);
+							         
+                                         
+							       
+							       
+							       
   					            }	
  					         offset+=4;	 
 					         }

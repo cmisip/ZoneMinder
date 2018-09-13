@@ -180,11 +180,20 @@ class FfmpegCamera : public Camera {
     
     Zone **czones;
     int czones_n=0;
-    //int j_encode_count=0;
     int jpeg_limit=0;
+    Coord *coords=NULL;
+    int *rgbindex=0;
     
     uint8_t *result[10];
     int numblocks=0;
+    
+    struct RGB24 {
+	   uint8_t R=0;
+	   uint8_t G=0;
+	   uint8_t B=0;	
+	};	
+	
+	RGB24 *RGB=NULL;
     
     
     
