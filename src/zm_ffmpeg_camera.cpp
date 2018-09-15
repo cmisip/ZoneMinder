@@ -509,7 +509,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 						uint16_t count=0;
                         uint16_t offset=0;
                        
-                        uint32_t registers;
+                        uint32_t registers=0;
                         uint32_t mask=0;
                         uint32_t res=0;
                         uint32_t c=0;
@@ -517,11 +517,29 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                         uint8_t* zone_vector_mask=czones[i]->zone_vector_mask;
                         uint32_t alarm_pixels=0;
                         
+                        
+                        memcpy(&mask, zone_vector_mask+offset, sizeof(mask));
+                        /*for (int j=0;j < numblocks ; j++) {
+							
+							
+							if (mask & (0x80000000 >> count))
+                                  Info("X %d, Y %d of block %d with motion", coords[j].X() , coords[j].Y(), j );
+                                  
+                                  count++;
+							if ( count == 32) {
+					           offset+=4;
+
+							   memcpy(&mask, zone_vector_mask+offset, sizeof(mask));    
+							   count=0;
+						    }
+							
+						}*/	
+                        
                         for (int j=0;j < numblocks ; j++) {
                         
-                            if ((abs(mvarray[j].x_vector) + abs(mvarray[j].y_vector)) > 8) 
-                               registers =registers | (1 << count);
-                            
+                            if ((abs(mvarray[j].x_vector) + abs(mvarray[j].y_vector)) > 8) { 
+                               registers =registers | (0x80000000 >> count);
+                            }
                             count++;
                             
                             if ( count == 32) {
@@ -943,6 +961,9 @@ int FfmpegCamera::OpenMmalEncoder(AVCodecContext *mVideoCodecContext){
 
    numblocks=(width * height)/256;
    numblocks = (((numblocks + 16) / 32) * 32)+32;
+   
+   numblocks= (monitor->Width()*monitor->Height())/256;
+  numblocks = (((numblocks + 16) / 32) * 32)+32;
        
    return 0;
 
@@ -1599,7 +1620,9 @@ int FfmpegCamera::OpenFfmpeg() {
 	//Create a lookup table for numblocks to RGB index
 	rgbindex=(int*)zm_mallocaligned(32,sizeof(int)*numblocks);
 	for ( int i=0; i< numblocks; i++) {
-	   rgbindex[i]=((i/(width/16))*16*640)+(i%(width/16)*16);
+	   //rgbindex[i]=((coords[i].Y()/16)*width) + coords[i].X();	
+	   rgbindex[i]=coords[i].Y()*width+coords[i].X();
+	   //rgbindex[i]=((i/(width/16))*16*640)+(i%(width/16)*16);
 	   //Ex: numblock 4 is 4 % 40 = 4 * 16 = 64;
 	   //Ex: numblock 44 is 44/40 = 1 *16 * 640 = 10240 + 4 * 16 = 10304
 	}	
@@ -1886,47 +1909,47 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
 		        for (int i=0; i < monitor->GetZonesNum() ; i++) {
                      uint32_t offset=0;
                      uint32_t *res=NULL;
+                     int count=0;
+                     int index=0;
                      if (czones[i]->motion_detected) {
 						 //Info("Motion detected");
 						 //928 numblocks stored 928 bits in 928/8 bytes
 						 //read 32 bit or 4 byte at a time for total of 928/32 iterations
-						 for (int j=0; j<numblocks/32; j++) {
-				    		 res=(uint32_t*)(result[i]+offset); 
-                             bitset<32> bset(*res);
-                             //test the bits
-                             for (int k=0; k<32; k++) {
-                                if (bset.test(k)) {
-							       int index=(j*32)+k;
-							       
-							       if (colours == 3 )  
+						 res=(uint32_t*)(result[i]+offset);
+						 for (int j=0; j<numblocks; j++) {
+							 if (*res & (0x80000000 >> count)) {
+								//Info("X %d, Y %d of block %d with motion", coords[j].X() , coords[j].Y(), j );
+                                   
+								 //index=((coords[j].Y()/16)*width) + coords[j].X();
+                                  //Info("X %d, Y %d of block %d with motion", coords[j].X() , coords[j].Y(), j );
+                                   if (colours == 3 )  
                                         RGB=(RGB24*)directbuffer; 
                                    
                                    (RGB+rgbindex[index])->R=255;
                                    (RGB+rgbindex[index])->G=255;
-                                   (RGB+rgbindex[index])->B=255;     
-                                          
-                                   //RGB+=index;
-                                   //for (int l=index; l<index+16; l++) {
-                                     //(RGB+(index*16))->R=255;
-                                     //(RGB+(index*16))->G=255;
-                                     //(RGB+(index*16))->B=255; 
-							       //}
-                                   //Info("Block %d is set with R %d, G %d, B &d", index, (RGB+(index*16))->R, (RGB+(index*16))->G, (RGB+(index*16))->B);
-							         
-                                         
-							       
-							       
-							       
-  					            }	
- 					         offset+=4;	 
-					         }
-					     }
+                                   (RGB+rgbindex[index])->B=255;       
+							 }
+							 count++;
+							 index++;
+							 if (count==32) {
+					            offset+=4;
+                                count=0;
+								res=(uint32_t*)(result[i]+offset); 
+							 }	 
+					     }		 	 
+						 
+						 
+						 
+						 
+					
                      }  
                 }   
 		        
 		        
 		        
-		        
+		        //Option 1. use the image EncodeJpeg function.
+				//image.EncodeJpeg(jpegbuffer+4, jpeg_size );
+				//Option 2. use hardware mmal.
 		        mmal_jpeg(&jpegbuffer);
 
 /*                //mmal_encode will read mFrame and create an RGB buffer and put it in directbuffer

@@ -23,6 +23,10 @@
 #include "zm_image.h"
 #include "zm_monitor.h"
 
+#include <string>         // std::string
+#include <bitset>         // std::bitset
+
+
 void Zone::Setup( 
   Monitor *p_monitor,
   int p_id,
@@ -205,7 +209,7 @@ void Zone::SetVectorMask() {
   uint16_t count=0;
   //uint16_t wcount=0;
   
-  uint32_t registers;
+  uint32_t registers=0;
   uint16_t offset=0;
   
   numblocks= (monitor->Width()*monitor->Height())/256;
@@ -218,12 +222,20 @@ void Zone::SetVectorMask() {
     uint16_t ycoord = ((i*16)/(monitor->Width() +16))*16;
     
     if (polygon.isInside(Coord(xcoord,ycoord))) {//coordinates inside polygon 
-           registers =registers | (1 << count);
+           //registers =registers | (1 << count);
+           registers =registers | (0x80000000 >> count);
+           //Info("X %d, Y %d of numblock %d in polygon ", xcoord, ycoord, i);
+           //std::bitset<32> bitmask(registers);
+           //std::string bstring =
+           //bitmask.to_string<char,std::string::traits_type,std::string::allocator_type>();
+
+
+           //Info("Register after block %d looks like  %s", numblocks, bstring);
     } 
     
     count++;
-    //if (( count == 32) || (i == numblocks-1)) {
-    if ( count == 32) {
+    if (( count == 32) || (i == numblocks-1)) {
+    //if ( count == 32) {
       memcpy(zone_vector_mask+offset , &registers, 4 ) ;  
       count=0;
       //wcount+=1;
@@ -236,7 +248,24 @@ void Zone::SetVectorMask() {
                              
 }
  Info("Done setting up zone vector mask");
+ 
+/*
+   std::bitset<900> bsTest { } ;
 
+   for ( unsigned ui = 0 ; ui < numblocks ; ++ui ){
+      bsTest <<= 8;
+
+      std::bitset<900> bsTmp { (unsigned long) *(zone_vector_mask+ui) };
+
+      bsTest |= bsTmp;
+      //std::string mystring =
+      //bsTmp.to_string<char,std::string::traits_type,std::string::allocator_type>();
+
+
+      //Info("Zone mask %d :  %s", ui, mystring);
+    }
+    
+*/
   
 }	
 
