@@ -273,8 +273,52 @@ int FfmpegCamera::Capture( Image &image ) {
                    return (-1); 
                 }
                 
-		        int *jpeg_size=(int *)jpegbuffer; 
 		        mmal_encode(&mvect_buffer); 
+		        
+		        //Buffer visualization should be here after the resized buffer is created, and before it is converted to jpeg
+		        //Turn off for faster performance.  if not visualizing, turn result[i] memcpy as well in mmal_encode. 
+		        
+		        for (int i=0; i < monitor->GetZonesNum() ; i++) {
+                     uint32_t offset=0;
+                     uint32_t *res=NULL;
+                     int count=0;
+                     int index=0;
+                     if (czones[i]->motion_detected) {
+						 res=(uint32_t*)(result[i]+offset);
+						 for (int j=0; j<numblocks; j++) {
+							 if (*res & (0x80000000 >> count)) {
+                                   
+                                   //This will only draw the white pixel on the macroblock upper left corner coordinate if the alarm_pixel value is within the value of min_alarm_pixels and max_alarm_pixels,
+                                   //so will not see the white pixels in all recorded frames. 
+                                   //This is only for debugging and not needed for normal use 
+                                   /*
+                                   if (colours == 3 )  
+                                        RGB=(RGB24*)directbuffer; 
+                                   (RGB+rgbindex[index])->R=255;
+                                   (RGB+rgbindex[index])->G=255;
+                                   (RGB+rgbindex[index])->B=255;
+                                   */       
+							 }
+							 count++;
+							 index++;
+							 if (count==32) {
+					            offset+=4;
+                                count=0;
+								res=(uint32_t*)(result[i]+offset); 
+							 }	 
+					     }		 	 
+						 
+						 
+						 
+						 
+					
+                     }  
+                }   
+		        
+		        //Option 1. use the image EncodeJpeg function which requires argument jpeg_size
+		        //int *jpeg_size=(int *)jpegbuffer; 
+				//image.EncodeJpeg(jpegbuffer+4, jpeg_size );
+				//Option 2. use hardware mmal.
 		        mmal_jpeg(&jpegbuffer);
 /*
                 //mmal_encode will read mFrame and create an RGB buffer and put it in directbuffer
@@ -476,7 +520,6 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 	MMAL_BUFFER_HEADER_T *buffer;
 	int motion_detected=false;
 	
-	uint16_t numblocks=((encoder->output[0]->format->es->video.width * encoder->output[0]->format->es->video.height)/256);
                
 	if ((buffer = mmal_queue_get(pool_ine->queue)) != NULL) {  
          
@@ -501,15 +544,16 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
          
          
          if(buffer->flags & MMAL_BUFFER_HEADER_FLAG_CODECSIDEINFO) {
-			      uint16_t m_offset=0; 
+			      uint32_t m_offset=0; 
                   for (int i=0; i < czones_n ; i++) {
                         mmal_motion_vector *mvarray=(mmal_motion_vector *)buffer->data;
-                        
+                        //memset(result[i],0,numblocks/8);
+                        czones[i]->motion_detected=false;
 						
-						uint16_t count=0;
-                        uint16_t offset=0;
+						uint32_t count=0;
+                        uint32_t offset=0;
                        
-                        uint32_t registers;
+                        uint32_t registers=0;
                         uint32_t mask=0;
                         uint32_t res=0;
                         uint32_t c=0;
@@ -517,17 +561,19 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                         uint8_t* zone_vector_mask=czones[i]->zone_vector_mask;
                         uint32_t alarm_pixels=0;
                         
+                        memcpy(&mask, zone_vector_mask+offset, sizeof(mask));
                         for (int j=0;j < numblocks ; j++) {
                         
-                            if ((abs(mvarray[j].x_vector) + abs(mvarray[j].y_vector)) > 1) 
-                               registers =registers | (1 << count);
-                            
+                            if ((abs(mvarray[j].x_vector) + abs(mvarray[j].y_vector)) > 1) { 
+                               registers = registers | (0x80000000 >> count);
+                            }
                             count++;
                             
                             if ( count == 32) {
 							   
                                memcpy(&mask, zone_vector_mask+offset, sizeof(mask));  
                                res= registers & mask;
+                               memcpy(result[i]+offset,&res,sizeof(res)); 
                                count=0;
                                offset+=4;
                                
@@ -546,9 +592,9 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                          }  
                          
                          alarm_pixels = vec_count<<10 ; //each 16x16 block is 1 shifted to the left 8; each block is further weighted as x4 so we shift <<10. 
-                         //if any of the zones trigger an alarm encode a jpeg buffer for the frame
+                         
                          if( (alarm_pixels > (unsigned int)czones[i]->GetMinAlarmPixels()) && (alarm_pixels < (unsigned int)czones[i]->GetMaxAlarmPixels()) ) {
-                             motion_detected=true;
+                             czones[i]->motion_detected=true;
 					     } 
                          
                          //SAVE this vec count into mvect buffer which becomes a list of zone scores  
@@ -570,7 +616,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                    }
 		  
       }
-     return (motion_detected);    
+      return (0);
 }	
 
 
@@ -939,7 +985,10 @@ int FfmpegCamera::OpenMmalEncoder(AVCodecContext *mVideoCodecContext){
    if ( mmal_component_enable(encoder) != MMAL_SUCCESS ) {
      Fatal("failed to enable mmal encoder component");
    }  
-
+   
+   numblocks= (monitor->Width()*monitor->Height())/256;
+   numblocks = (((numblocks + 16) / 32) * 32)+32;
+   
    return 0;
 
 }
@@ -1585,6 +1634,20 @@ int FfmpegCamera::OpenFfmpeg() {
     
     jpeg_limit=(width*height);  //Avoid segfault in case jpeg is bigger than the buffer.
     
+    //Create a lookup table for numblocks coordinates
+    coords=(Coord*)zm_mallocaligned(32,sizeof(Coord)*numblocks);
+    for ( int i=0; i< numblocks; i++) {
+	   coords[i].X()=(i*16) % (width + 16);
+	   coords[i].Y()=((i*16)/(width +16))*16;	
+	}	
+	
+	//Create a lookup table for numblocks to RGB index
+	rgbindex=(int*)zm_mallocaligned(32,sizeof(int)*numblocks);
+	for ( int i=0; i< numblocks; i++) {
+	   rgbindex[i]=coords[i].Y()*width+coords[i].X();
+	}	
+    
+    
     
     //Retrieve the zones info and setup the vector mask
     czones_n=monitor->GetZonesNum();
@@ -1592,6 +1655,10 @@ int FfmpegCamera::OpenFfmpeg() {
     
     for (int i=0; i < monitor->GetZonesNum() ; i++) {
 	  czones[i]->SetVectorMask(); 
+	  //Create the results buffer for recording indexes of macroblocks with motion per zone
+	  result[i]=(uint8_t*)zm_mallocaligned(32,numblocks/8);
+	  if(result[i] == NULL)
+		     Fatal("Memory allocation for result buffer failed: %s",strerror(errno));
     }	  
    
   }  
@@ -1630,6 +1697,17 @@ int FfmpegCamera::CloseFfmpeg(){
 
   av_frame_free( &mFrame );
   av_frame_free( &mRawFrame );
+  
+  if (coords)
+     zm_freealigned(coords);
+     
+  if (rgbindex)
+     zm_freealigned(rgbindex);   
+  
+  for (int i=0; i < monitor->GetZonesNum() ; i++) {
+	    if (result[i])
+         free(result[i]);
+  }      
 
 #if HAVE_LIBSWSCALE
   if ( mConvertContext ) {
@@ -1848,8 +1926,54 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
                    return (-1); 
                 }
                 
-		        int *jpeg_size=(int *)jpegbuffer;  
+		         
 		        mmal_encode(&mvect_buffer);
+		        
+		        //Buffer visualization should be here after the resized buffer is created, and before it is converted to jpeg
+		        //Turn off for faster performance.  if not visualizing, turn result[i] memcpy as well in mmal_encode. 
+		        
+		        for (int i=0; i < monitor->GetZonesNum() ; i++) {
+                     uint32_t offset=0;
+                     uint32_t *res=NULL;
+                     int count=0;
+                     int index=0;
+                     if (czones[i]->motion_detected) {
+						 res=(uint32_t*)(result[i]+offset);
+						 for (int j=0; j<numblocks; j++) {
+							 if (*res & (0x80000000 >> count)) {
+                                   
+                                   //This will only draw the white pixel on the macroblock upper left corner coordinate if the alarm_pixel value is within the value of min_alarm_pixels and max_alarm_pixels,
+                                   //so will not see the white pixels in all recorded frames. 
+                                   //This is only for debugging and not needed for normal use 
+                                   /*
+                                   if (colours == 3 )  
+                                        RGB=(RGB24*)directbuffer; 
+                                   (RGB+rgbindex[index])->R=255;
+                                   (RGB+rgbindex[index])->G=255;
+                                   (RGB+rgbindex[index])->B=255;
+                                   */       
+							 }
+							 count++;
+							 index++;
+							 if (count==32) {
+					            offset+=4;
+                                count=0;
+								res=(uint32_t*)(result[i]+offset); 
+							 }	 
+					     }		 	 
+						 
+						 
+						 
+						 
+					
+                     }  
+                }   
+		        
+		        
+		        //Option 1. use the image EncodeJpeg function which requires argument jpeg_size
+		        //int *jpeg_size=(int *)jpegbuffer; 
+				//image.EncodeJpeg(jpegbuffer+4, jpeg_size );
+				//Option 2. use hardware mmal.
 		        mmal_jpeg(&jpegbuffer);
 
 /*                //mmal_encode will read mFrame and create an RGB buffer and put it in directbuffer

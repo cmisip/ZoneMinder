@@ -201,29 +201,32 @@ bool Zone::CheckExtendAlarmCount() {
 } // end bool Zone::CheckExtendAlarmCount
 
 void Zone::SetVectorMask() {
-  uint16_t numblocks=0;
-  uint16_t count=0;
-  uint16_t wcount=0;
+  uint32_t numblocks=0;
+  uint32_t registers=0; 
+  uint32_t offset=0;
+  uint32_t count=0;
   
-  uint32_t registers;
-  uint16_t offset=0;
   
   numblocks= (monitor->Width()*monitor->Height())/256;
-  Info("Setting up the motion vector mask with numblocks %d", numblocks);
-    for (uint16_t i=0 ; i< numblocks ; i++) {
+  //Make numblocks a multiple of 32 which should make iterating through the mask less code complex
+  numblocks = (((numblocks + 16) / 32) * 32)+32;
   
-    uint16_t xcoord = (i*16) % (monitor->Width() + 16);  //these blocks are tiled to cover the entire frame and are 16x16 size
-    uint16_t ycoord = ((i*16)/(monitor->Width() +16))*16;
+  Info("Setting up the motion vector mask with numblocks %d", numblocks);
+    for (uint32_t i=0 ; i< numblocks ; i++) {
+  
+    uint32_t xcoord = (i*16) % (monitor->Width() + 16);  //these blocks are tiled to cover the entire frame and are 16x16 size
+    uint32_t ycoord = ((i*16)/(monitor->Width() +16))*16;
     
+    //Save the active bits Left to Right instead of Right to Left with each registers valuable
+    //so that the numblocks index can be used to index the corresponding pixel in an RGB buffer
     if (polygon.isInside(Coord(xcoord,ycoord))) {//coordinates inside polygon 
-           registers =registers | (1 << count);
-    } 
+           registers =registers | (0x80000000 >> count);
+    }
     
     count++;
     if (( count == 32) || (i == numblocks-1)) {
       memcpy(zone_vector_mask+offset , &registers, 4 ) ;  
       count=0;
-      wcount+=1;
       offset+=4;
       registers=0;
 
