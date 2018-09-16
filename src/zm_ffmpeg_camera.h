@@ -183,6 +183,14 @@ class FfmpegCamera : public Camera {
     Coord *coords=NULL;
     int *rgbindex=0;
     
+    
+    struct Blocks {
+		Coord *coords=NULL;
+        int rgbindex=-1;
+	};
+	
+	Blocks *Block=NULL;	
+    
     uint8_t *result[10]; //FIXME, 10 zone results only
     int numblocks=0;
     

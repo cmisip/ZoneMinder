@@ -229,6 +229,7 @@ protected:
 #ifdef __arm__ 
   unsigned int    s_width;
   unsigned int    s_height;
+  unsigned int    numblocks;
 #endif
 
   bool            v4l_multi_buffer;

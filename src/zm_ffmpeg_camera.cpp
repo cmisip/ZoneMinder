@@ -291,13 +291,13 @@ int FfmpegCamera::Capture( Image &image ) {
                                    //This will only draw the white pixel on the macroblock upper left corner coordinate if the alarm_pixel value is within the value of min_alarm_pixels and max_alarm_pixels,
                                    //so will not see the white pixels in all recorded frames. 
                                    //This is only for debugging and not needed for normal use 
-                                   /*
+                                   
                                    if (colours == 3 )  
                                         RGB=(RGB24*)directbuffer; 
                                    (RGB+rgbindex[index])->R=255;
                                    (RGB+rgbindex[index])->G=255;
                                    (RGB+rgbindex[index])->B=255;
-                                   */       
+                                          
 							 }
 							 count++;
 							 index++;
@@ -316,10 +316,10 @@ int FfmpegCamera::Capture( Image &image ) {
                 }   
 		        
 		        //Option 1. use the image EncodeJpeg function which requires argument jpeg_size
-		        //int *jpeg_size=(int *)jpegbuffer; 
-				//image.EncodeJpeg(jpegbuffer+4, jpeg_size );
+		        int *jpeg_size=(int *)jpegbuffer; 
+				image.EncodeJpeg(jpegbuffer+4, jpeg_size );
 				//Option 2. use hardware mmal.
-		        mmal_jpeg(&jpegbuffer);
+		        //mmal_jpeg(&jpegbuffer);
 /*
                 //mmal_encode will read mFrame and create an RGB buffer and put it in directbuffer
                 if (mmal_encode(&mvect_buffer)) //alarmed frame
@@ -569,7 +569,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                             }
                             count++;
                             
-                            if ( count == 32) {
+                            if ( count == 32) { //last batch of less than 32 bits will not be saved
 							   
                                memcpy(&mask, zone_vector_mask+offset, sizeof(mask));  
                                res= registers & mask;
@@ -985,9 +985,6 @@ int FfmpegCamera::OpenMmalEncoder(AVCodecContext *mVideoCodecContext){
    if ( mmal_component_enable(encoder) != MMAL_SUCCESS ) {
      Fatal("failed to enable mmal encoder component");
    }  
-   
-   numblocks= (monitor->Width()*monitor->Height())/256;
-   numblocks = (((numblocks + 16) / 32) * 32)+32;
    
    return 0;
 
@@ -1634,18 +1631,36 @@ int FfmpegCamera::OpenFfmpeg() {
     
     jpeg_limit=(width*height);  //Avoid segfault in case jpeg is bigger than the buffer.
     
-    //Create a lookup table for numblocks coordinates
+    
+    int frame_width=monitor->Width()+16;
+    int frame_height=((monitor->Height()+16)/16)*16;
+  
+    numblocks= (frame_width*frame_height)/256;
+    //Make numblocks a multiple of 32 which should make iterating through the mask less code complex
+    //numblocks=((numblocks+32)/32)*32;
+    
+    Info("ZMC with numblocks %d", numblocks);
+    
+    Block=(Blocks*)zm_mallocaligned(32,sizeof(Blocks)*numblocks);
+    
+    
+    //Create a lookup table for numblocks coordinates and associated rgb index
     coords=(Coord*)zm_mallocaligned(32,sizeof(Coord)*numblocks);
     for ( int i=0; i< numblocks; i++) {
 	   coords[i].X()=(i*16) % (width + 16);
-	   coords[i].Y()=((i*16)/(width +16))*16;	
+	   coords[i].Y()=((i*16)/(width +16))*16;
+	   (Block+i)->coords=coords+i;
+	   if ((coords[i].X() < monitor->Width()) && (coords[i].Y() < monitor->Height()))
+	      (Block+i)->rgbindex=coords[i].Y()*(width)+coords[i].X();
+	   else
+	      (Block+i)->rgbindex=-1;
 	}	
 	
 	//Create a lookup table for numblocks to RGB index
-	rgbindex=(int*)zm_mallocaligned(32,sizeof(int)*numblocks);
+	/*rgbindex=(int*)zm_mallocaligned(32,sizeof(int)*numblocks);
 	for ( int i=0; i< numblocks; i++) {
-	   rgbindex[i]=coords[i].Y()*width+coords[i].X();
-	}	
+	   rgbindex[i]=coords[i].Y()*(width+16)+coords[i].X();
+	}*/	
     
     
     
@@ -1656,7 +1671,7 @@ int FfmpegCamera::OpenFfmpeg() {
     for (int i=0; i < monitor->GetZonesNum() ; i++) {
 	  czones[i]->SetVectorMask(); 
 	  //Create the results buffer for recording indexes of macroblocks with motion per zone
-	  result[i]=(uint8_t*)zm_mallocaligned(32,numblocks/8);
+	  result[i]=(uint8_t*)zm_mallocaligned(32,numblocks/7); //slightly larger than needed
 	  if(result[i] == NULL)
 		     Fatal("Memory allocation for result buffer failed: %s",strerror(errno));
     }	  
@@ -1701,8 +1716,11 @@ int FfmpegCamera::CloseFfmpeg(){
   if (coords)
      zm_freealigned(coords);
      
-  if (rgbindex)
-     zm_freealigned(rgbindex);   
+  if (Block)
+     zm_freealigned(Block);    
+     
+  //if (rgbindex)
+    // zm_freealigned(rgbindex);   
   
   for (int i=0; i < monitor->GetZonesNum() ; i++) {
 	    if (result[i])
@@ -1942,23 +1960,26 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
 						 for (int j=0; j<numblocks; j++) {
 							 if (*res & (0x80000000 >> count)) {
                                    
+                                   //Mark the macroblocks that have motion detected. 
                                    //This will only draw the white pixel on the macroblock upper left corner coordinate if the alarm_pixel value is within the value of min_alarm_pixels and max_alarm_pixels,
                                    //so will not see the white pixels in all recorded frames. 
                                    //This is only for debugging and not needed for normal use 
-                                   /*
+                                   
                                    if (colours == 3 )  
                                         RGB=(RGB24*)directbuffer; 
-                                   (RGB+rgbindex[index])->R=255;
-                                   (RGB+rgbindex[index])->G=255;
-                                   (RGB+rgbindex[index])->B=255;
-                                   */       
+                                   Info("Index at %d, coordinates at %d,%d and RGB index at %d", index, (Block+index)->coords->X(), (Block+index)->coords->Y(), (Block+index)->rgbindex);     
+                                   if ((Block+index)->rgbindex >=0) {     
+                                     (RGB+((Block+index)->rgbindex))->R=255;
+                                     (RGB+((Block+index)->rgbindex))->G=255;
+                                     (RGB+((Block+index)->rgbindex))->B=255;
+							       }       
 							 }
 							 count++;
 							 index++;
 							 if (count==32) {
 					            offset+=4;
                                 count=0;
-								res=(uint32_t*)(result[i]+offset); 
+								res=(uint32_t*)(result[i]+offset); //Last iteration will read past actual data but the buffer is large enough, just filled with zeroes
 							 }	 
 					     }		 	 
 						 

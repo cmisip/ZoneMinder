@@ -50,6 +50,7 @@ public:
   //typedef Image::motion_vector motion_vector;
   uint8_t *zone_vector_mask=NULL;
   bool     motion_detected=false;
+  int numblocks=0;
 
 protected:
   // Inputs
