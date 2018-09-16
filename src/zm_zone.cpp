@@ -207,7 +207,7 @@ void Zone::SetVectorMask() {
   uint32_t count=0;
   
   int frame_width=monitor->Width()+16;
-  int frame_height=((monitor->Height()+16)/16)*16;
+  int frame_height=((monitor->Height()+16)/16)*16; //Vcos align up
   
   numblocks= (frame_width*frame_height)/256;
   //Make numblocks a multiple of 32 which should make iterating through the mask less code complex

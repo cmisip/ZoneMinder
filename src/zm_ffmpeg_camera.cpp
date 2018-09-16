@@ -288,23 +288,26 @@ int FfmpegCamera::Capture( Image &image ) {
 						 for (int j=0; j<numblocks; j++) {
 							 if (*res & (0x80000000 >> count)) {
                                    
+                                   //Mark the macroblocks that have motion detected. 
                                    //This will only draw the white pixel on the macroblock upper left corner coordinate if the alarm_pixel value is within the value of min_alarm_pixels and max_alarm_pixels,
                                    //so will not see the white pixels in all recorded frames. 
                                    //This is only for debugging and not needed for normal use 
                                    
                                    if (colours == 3 )  
                                         RGB=(RGB24*)directbuffer; 
-                                   (RGB+rgbindex[index])->R=255;
-                                   (RGB+rgbindex[index])->G=255;
-                                   (RGB+rgbindex[index])->B=255;
-                                          
+                                   //Info("Index at %d, coordinates at %d,%d and RGB index at %d", index, (Block+index)->coords->X(), (Block+index)->coords->Y(), (Block+index)->rgbindex);     
+                                   if ((Block+index)->rgbindex >=0) {     
+                                     (RGB+((Block+index)->rgbindex))->R=255;
+                                     (RGB+((Block+index)->rgbindex))->G=255;
+                                     (RGB+((Block+index)->rgbindex))->B=255;
+							       }       
 							 }
 							 count++;
 							 index++;
 							 if (count==32) {
 					            offset+=4;
                                 count=0;
-								res=(uint32_t*)(result[i]+offset); 
+								res=(uint32_t*)(result[i]+offset); //Last iteration will read past actual data but the buffer is large enough, just filled with zeroes
 							 }	 
 					     }		 	 
 						 
@@ -314,6 +317,8 @@ int FfmpegCamera::Capture( Image &image ) {
 					
                      }  
                 }   
+		        
+		        
 		        
 		        //Option 1. use the image EncodeJpeg function which requires argument jpeg_size
 		        int *jpeg_size=(int *)jpegbuffer; 
@@ -1636,15 +1641,14 @@ int FfmpegCamera::OpenFfmpeg() {
     int frame_height=((monitor->Height()+16)/16)*16;
   
     numblocks= (frame_width*frame_height)/256;
-    //Make numblocks a multiple of 32 which should make iterating through the mask less code complex
-    //numblocks=((numblocks+32)/32)*32;
-    
     Info("ZMC with numblocks %d", numblocks);
     
     Block=(Blocks*)zm_mallocaligned(32,sizeof(Blocks)*numblocks);
     
     
     //Create a lookup table for numblocks coordinates and associated rgb index
+    //The blocks will have coordinates outside of the frame due to the extra column
+    //The rgbindex is only positive if the coordinates are within frame dimensions
     coords=(Coord*)zm_mallocaligned(32,sizeof(Coord)*numblocks);
     for ( int i=0; i< numblocks; i++) {
 	   coords[i].X()=(i*16) % (width + 16);
@@ -1656,13 +1660,7 @@ int FfmpegCamera::OpenFfmpeg() {
 	      (Block+i)->rgbindex=-1;
 	}	
 	
-	//Create a lookup table for numblocks to RGB index
-	/*rgbindex=(int*)zm_mallocaligned(32,sizeof(int)*numblocks);
-	for ( int i=0; i< numblocks; i++) {
-	   rgbindex[i]=coords[i].Y()*(width+16)+coords[i].X();
-	}*/	
-    
-    
+
     
     //Retrieve the zones info and setup the vector mask
     czones_n=monitor->GetZonesNum();
@@ -1967,7 +1965,7 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
                                    
                                    if (colours == 3 )  
                                         RGB=(RGB24*)directbuffer; 
-                                   Info("Index at %d, coordinates at %d,%d and RGB index at %d", index, (Block+index)->coords->X(), (Block+index)->coords->Y(), (Block+index)->rgbindex);     
+                                   //Info("Index at %d, coordinates at %d,%d and RGB index at %d", index, (Block+index)->coords->X(), (Block+index)->coords->Y(), (Block+index)->rgbindex);     
                                    if ((Block+index)->rgbindex >=0) {     
                                      (RGB+((Block+index)->rgbindex))->R=255;
                                      (RGB+((Block+index)->rgbindex))->G=255;
