@@ -50,6 +50,8 @@ inline void* zm_mallocaligned(unsigned int reqalignment, size_t reqsize) {
 }
 
 inline void zm_freealigned(void* ptr) {
+if (!ptr)
+   return;	
 #if HAVE_POSIX_MEMALIGN
   free(ptr);
 #else

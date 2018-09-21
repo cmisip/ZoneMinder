@@ -164,6 +164,27 @@ class FfmpegCamera : public Camera {
     
     static void display_format(MMAL_PORT_T **port, MMAL_ES_FORMAT_T **iformat);
     
+    
+    struct RGB24 {
+	   uint8_t R=0;
+	   uint8_t G=0;
+	   uint8_t B=0;	
+	};	
+	
+	enum pattern {
+        center=0,
+        n,
+        ne,
+        e,
+        se,
+        s,
+        sw,
+        w,
+        nw
+    };
+	
+    void pixel_write(RGB24 *rgb_ptr, int b_index, pattern r_pattern);
+    
     int mmal_decode(AVPacket *packet);
     int mmal_encode(uint8_t **mv_buffer);
     int mmal_resize(uint8_t **dbuffer);
@@ -191,16 +212,20 @@ class FfmpegCamera : public Camera {
 	
 	Blocks *Block=NULL;	
     
-    uint8_t *result[10]; //FIXME, 10 zone results only
-    int numblocks=0;
+    uint8_t *result[10]={NULL}; //FIXME, 10 zone results only
+    uint8_t *n_s[10]={NULL};
+    uint8_t *e_w[10]={NULL};
+    uint8_t *ne_sw[10]={NULL};
+    uint8_t *nw_se[10]={NULL};
     
-    struct RGB24 {
-	   uint8_t R=0;
-	   uint8_t G=0;
-	   uint8_t B=0;	
-	};	
+    int numblocks=0;
 	
 	RGB24 *RGB=NULL;
+	
+	
+	
+	//CONFIG options
+	int min_vector_distance=1;
     
     
     

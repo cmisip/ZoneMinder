@@ -474,6 +474,15 @@ void FfmpegCamera::control_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf
 
 }
 
+void FfmpegCamera::pixel_write(RGB24 *rgb_ptr, int b_index, pattern r_pattern) {
+        if (b_index >=0) {     
+               (rgb_ptr+b_index)->R=255;
+               (rgb_ptr+b_index)->G=255;
+               (rgb_ptr+b_index)->B=255;
+        }              	
+	
+}	
+
 int FfmpegCamera::mmal_decode(AVPacket *pkt) {   
 	MMAL_BUFFER_HEADER_T *buffer;
 	int got_frame=false;
@@ -561,38 +570,108 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                         uint32_t registers=0;
                         uint32_t mask=0;
                         uint32_t res=0;
+                        
                         uint32_t c=0;
                         uint32_t vec_count=0;
                         uint8_t* zone_vector_mask=czones[i]->zone_vector_mask;
                         uint32_t alarm_pixels=0;
                         
+                        uint32_t n_s_reg=0; //0 n 1 s
+                        uint32_t e_w_reg=0; //0 e 1 w
+                        uint32_t ne_sw_reg=0; //0 ne 1 sw
+                        uint32_t nw_se_reg=0; //0 nw 1 se
+                        
+                        uint32_t n_s_res=0;
+                        uint32_t e_w_res=0;
+                        uint32_t ne_sw_res=0;
+                        uint32_t nw_se_res=0;
+                        
+                        
+                        
+                        
                         memcpy(&mask, zone_vector_mask+offset, sizeof(mask));
                         for (int j=0;j < numblocks ; j++) {
+							
+							int comparator= 0x80000000 >> count;
                         
-                            if ((abs(mvarray[j].x_vector) + abs(mvarray[j].y_vector)) > 1) { 
-                               registers = registers | (0x80000000 >> count);
-                            }
+                            if ((abs(mvarray[j].x_vector) + abs(mvarray[j].y_vector)) > min_vector_distance) { 
+                               registers = registers | comparator;
+                            
+                            
+ /*     N      */           if (mvarray[j].x_vector >0) { //to e
+                                if (mvarray[j].y_vector >0) { //to se
+ /* W       E  */                  nw_se_reg = nw_se_reg | comparator;
+                                } else if (mvarray[j].y_vector <0) { //to ne
+ /*     S      */                  //already zeroed
+                                } else { //e
+                                   //already zeroed
+							    }
+                            } else if (mvarray[j].x_vector <0) {  //to w 
+								if (mvarray[j].y_vector >0) { //to sw
+                                   ne_sw_reg = ne_sw_reg | comparator; 
+                                } else if (mvarray[j].y_vector <0) { //to nw
+                                   //already zeroed 
+                                } else { //w
+                                   e_w_reg = e_w_reg | comparator;
+							    }
+								     
+                            } else { //dx=0
+								if (mvarray[j].y_vector >0) { //to s
+                                   n_s_reg = n_s_reg | comparator; 
+                                } else if (mvarray[j].y_vector <0) { //to n
+                                   //already zeroed 
+                                } else { //dy=0
+                                
+							    }  
+							}
+							
+						    }	//if abs ending bracket
+							
                             count++;
                             
                             if ( count == 32) { //last batch of less than 32 bits will not be saved
 							   
                                memcpy(&mask, zone_vector_mask+offset, sizeof(mask));  
                                res= registers & mask;
-                               memcpy(result[i]+offset,&res,sizeof(res)); 
+                               if (res) {
+                                  memcpy(result[i]+offset,&res,sizeof(res));
+                               
+                                  n_s_res = res & n_s_reg; 
+                                  if (n_s_res)
+                                    memcpy(n_s[i]+offset,&n_s_res,sizeof(n_s_res));
+                                  
+                                  e_w_res = res & e_w_reg;
+                                  if (e_w_res)
+                                    memcpy(e_w[i]+offset,&e_w_res,sizeof(e_w_res));
+                                  
+                                  ne_sw_res = res & ne_sw_reg;
+                                  if (ne_sw_res)
+                                    memcpy(ne_sw[i]+offset,&ne_sw_res,sizeof(ne_sw_res));
+                                  
+                                  nw_se_res = res & nw_se_reg;
+                                  if (nw_se_res)
+                                    memcpy(nw_se[i]+offset,&nw_se_res,sizeof(nw_se_res));
+                               
+                                  
+                               
+                                  c =  ((res & 0xfff) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
+                                  c += (((res & 0xfff000) >> 12) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
+                                  c += ((res >> 24) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
+                                  vec_count+=c;
+                               
+						       } //if (res) closing bracket
+						       
                                count=0;
                                offset+=4;
                                
+                               n_s_reg = 0;
+                               e_w_reg = 0;
+                               ne_sw_reg = 0;
+                               nw_se_reg = 0;
+                                  
                                registers=0;
-                               
-                               c =  ((res & 0xfff) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
-                               c += (((res & 0xfff000) >> 12) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
-                               c += ((res >> 24) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
-                               vec_count+=c;
 
                              }
-                             
-                             
-                             
 
                          }  
                          
@@ -1670,6 +1749,11 @@ int FfmpegCamera::OpenFfmpeg() {
 	  czones[i]->SetVectorMask(); 
 	  //Create the results buffer for recording indexes of macroblocks with motion per zone
 	  result[i]=(uint8_t*)zm_mallocaligned(32,numblocks/7); //slightly larger than needed
+	  //Creat the directions buffers
+	  n_s[i]=(uint8_t*)zm_mallocaligned(32,numblocks/7);
+      e_w[i]=(uint8_t*)zm_mallocaligned(32,numblocks/7);
+      ne_sw[i]=(uint8_t*)zm_mallocaligned(32,numblocks/7);
+      nw_se[i]=(uint8_t*)zm_mallocaligned(32,numblocks/7);
 	  if(result[i] == NULL)
 		     Fatal("Memory allocation for result buffer failed: %s",strerror(errno));
     }	  
@@ -1717,12 +1801,18 @@ int FfmpegCamera::CloseFfmpeg(){
   if (Block)
      zm_freealigned(Block);    
      
-  //if (rgbindex)
-    // zm_freealigned(rgbindex);   
+  
   
   for (int i=0; i < monitor->GetZonesNum() ; i++) {
 	    if (result[i])
-         free(result[i]);
+         zm_freealigned(result[i]);
+        if (n_s[i])
+         zm_freealigned(n_s[i]);
+        if (e_w[i])
+         zm_freealigned(e_w[i]); 
+        if (ne_sw[i])
+         zm_freealigned(nw_se[i]);
+         
   }      
 
 #if HAVE_LIBSWSCALE
@@ -1950,35 +2040,89 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
 		        
 		        for (int i=0; i < monitor->GetZonesNum() ; i++) {
                      uint32_t offset=0;
+                     
                      uint32_t *res=NULL;
+                     uint32_t *n_s_res=NULL;
+                     uint32_t *e_w_res=NULL;
+                     uint32_t *ne_sw_res=NULL;
+                     uint32_t *nw_se_res=NULL;
+                     pattern r_pattern=center; //center pixel
+                     
                      int count=0;
                      int index=0;
                      if (czones[i]->motion_detected) {
 						 res=(uint32_t*)(result[i]+offset);
 						 for (int j=0; j<numblocks; j++) {
-							 if (*res & (0x80000000 >> count)) {
+						   if (*res) {
+							 int comparator= 0x80000000 >> count; 	 
+							 if (*res & comparator) {
                                    
                                    //Mark the macroblocks that have motion detected. 
                                    //This will only draw the white pixel on the macroblock upper left corner coordinate if the alarm_pixel value is within the value of min_alarm_pixels and max_alarm_pixels,
                                    //so will not see the white pixels in all recorded frames. 
                                    //This is only for debugging and not needed for normal use 
                                    
-                                   if (colours == 3 )  
-                                        RGB=(RGB24*)directbuffer; 
+                                   
                                    //Info("Index at %d, coordinates at %d,%d and RGB index at %d", index, (Block+index)->coords->X(), (Block+index)->coords->Y(), (Block+index)->rgbindex);     
-                                   if ((Block+index)->rgbindex >=0) {     
-                                     (RGB+((Block+index)->rgbindex))->R=255;
-                                     (RGB+((Block+index)->rgbindex))->G=255;
-                                     (RGB+((Block+index)->rgbindex))->B=255;
-							       }       
+                                   /*if ((Block+index)->rgbindex >=0) {  
+									 for (int m=0; m < colour ; m++) {   
+                                       *(uint8_t*)(directbuffer+(((Block+index)->rgbindex)+m))=255;
+								     }
+							       }*/ 
+							       
+							       if (*n_s_res & comparator) 
+								        r_pattern=s;
+								   else 
+								        r_pattern=n;
+								        
+								        
+								   if (!r_pattern) {
+								      if (*e_w_res & comparator) 
+								         r_pattern=w;
+								      else 
+								         r_pattern=e;       	   
+								   
+							       }
+							       
+							       if (!r_pattern) {
+									  if (*ne_sw_res & comparator) 
+								         r_pattern=sw;
+								      else 
+								         r_pattern=ne;  
+									   
+								   } 
+								   
+								   if (!r_pattern) {
+									  if (*nw_se_res & comparator) 
+								         r_pattern=se;
+								      else 
+								         r_pattern=nw;   
+									   
+								   }	     
+							       
+							       
+							       if (colours == 3 )  
+                                        RGB=(RGB24*)directbuffer; 
+							       pixel_write(RGB,(Block+index)->rgbindex, r_pattern);
+							       
+							           
 							 }
+							 
 							 count++;
 							 index++;
 							 if (count==32) {
 					            offset+=4;
                                 count=0;
 								res=(uint32_t*)(result[i]+offset); //Last iteration will read past actual data but the buffer is large enough, just filled with zeroes
-							 }	 
+								if (*res) {
+								   	n_s_res=(uint32_t*)(n_s[i]+offset);
+								   	e_w_res=(uint32_t*)(e_w[i]+offset);
+								   	ne_sw_res=(uint32_t*)(ne_sw[i]+offset);
+								   	nw_se_res=(uint32_t*)(nw_se[i]+offset);
+								}	
+							 }	
+							 
+						   } //if (*res)	  
 					     }		 	 
 						 
 						 
