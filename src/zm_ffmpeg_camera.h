@@ -172,15 +172,17 @@ class FfmpegCamera : public Camera {
 	};	
 	
 	enum pattern {
-        center=0,
-        n,
-        ne,
-        e,
-        se,
-        s,
-        sw,
+		//[n][ne][e][se][s][sw][w][nw]
+		//[7][6] [5][4] [3][2] [1][0] 
+		center=-1,
+        nw=0,
         w,
-        nw
+        sw,
+        s,
+        se,
+        e,
+        ne,
+        n
     };
 	
     void pixel_write(RGB24 *rgb_ptr, int b_index, pattern r_pattern);
@@ -213,10 +215,8 @@ class FfmpegCamera : public Camera {
 	Blocks *Block=NULL;	
     
     uint8_t *result[10]={NULL}; //FIXME, 10 zone results only
-    uint8_t *n_s[10]={NULL};
-    uint8_t *e_w[10]={NULL};
-    uint8_t *ne_sw[10]={NULL};
-    uint8_t *nw_se[10]={NULL};
+    uint8_t *direction[10]={NULL};
+    
     
     int numblocks=0;
 	

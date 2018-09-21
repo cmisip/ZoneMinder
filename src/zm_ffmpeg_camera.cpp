@@ -576,23 +576,22 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                         uint8_t* zone_vector_mask=czones[i]->zone_vector_mask;
                         uint32_t alarm_pixels=0;
                         
-                        uint32_t n_s_reg=0; //0 n 1 s
-                        uint32_t e_w_reg=0; //0 e 1 w
-                        uint32_t ne_sw_reg=0; //0 ne 1 sw
-                        uint32_t nw_se_reg=0; //0 nw 1 se
-                        
-                        uint32_t n_s_res=0;
-                        uint32_t e_w_res=0;
-                        uint32_t ne_sw_res=0;
-                        uint32_t nw_se_res=0;
-                        
-                        
                         
                         
                         memcpy(&mask, zone_vector_mask+offset, sizeof(mask));
+                        
                         for (int j=0;j < numblocks ; j++) {
 							
-							int comparator= 0x80000000 >> count;
+							int comparator=0x80000000 >> count;
+							
+							uint8_t block_direction=0;
+							 
+							 //[nw][w][sw][s][se][e][ne][n]
+							 //[0] [1][2] [3][4] [5][6] [7]
+							 
+							 
+							 //[n][ne][e][se][s][sw][w][nw]
+							 //[7][6] [5][4] [3][2] [1][0] 
                         
                             if ((abs(mvarray[j].x_vector) + abs(mvarray[j].y_vector)) > min_vector_distance) { 
                                registers = registers | comparator;
@@ -600,30 +599,33 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                             
  /*     N      */           if (mvarray[j].x_vector >0) { //to e
                                 if (mvarray[j].y_vector >0) { //to se
- /* W       E  */                  nw_se_reg = nw_se_reg | comparator;
+ /* W       E  */                  block_direction |= 1<<4;
                                 } else if (mvarray[j].y_vector <0) { //to ne
- /*     S      */                  //already zeroed
+ /*     S      */                  block_direction |= 1<<6;
                                 } else { //e
-                                   //already zeroed
+                                   block_direction |= 1<<5;
 							    }
                             } else if (mvarray[j].x_vector <0) {  //to w 
 								if (mvarray[j].y_vector >0) { //to sw
-                                   ne_sw_reg = ne_sw_reg | comparator; 
+                                   block_direction |= 1<<2; 
                                 } else if (mvarray[j].y_vector <0) { //to nw
-                                   //already zeroed 
+                                   block_direction |= 1<<0;
                                 } else { //w
-                                   e_w_reg = e_w_reg | comparator;
+                                   block_direction |= 1<<1;
 							    }
 								     
                             } else { //dx=0
 								if (mvarray[j].y_vector >0) { //to s
-                                   n_s_reg = n_s_reg | comparator; 
+                                   block_direction |= 1<<3; 
                                 } else if (mvarray[j].y_vector <0) { //to n
-                                   //already zeroed 
+                                   block_direction |= 1<<7;
                                 } else { //dy=0
                                 
 							    }  
 							}
+							
+							//each Block save to the zones direction buffer on the jth position
+							memcpy(direction[i]+j,&block_direction,sizeof(block_direction));
 							
 						    }	//if abs ending bracket
 							
@@ -636,24 +638,6 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                                if (res) {
                                   memcpy(result[i]+offset,&res,sizeof(res));
                                
-                                  n_s_res = res & n_s_reg; 
-                                  if (n_s_res)
-                                    memcpy(n_s[i]+offset,&n_s_res,sizeof(n_s_res));
-                                  
-                                  e_w_res = res & e_w_reg;
-                                  if (e_w_res)
-                                    memcpy(e_w[i]+offset,&e_w_res,sizeof(e_w_res));
-                                  
-                                  ne_sw_res = res & ne_sw_reg;
-                                  if (ne_sw_res)
-                                    memcpy(ne_sw[i]+offset,&ne_sw_res,sizeof(ne_sw_res));
-                                  
-                                  nw_se_res = res & nw_se_reg;
-                                  if (nw_se_res)
-                                    memcpy(nw_se[i]+offset,&nw_se_res,sizeof(nw_se_res));
-                               
-                                  
-                               
                                   c =  ((res & 0xfff) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
                                   c += (((res & 0xfff000) >> 12) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
                                   c += ((res >> 24) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
@@ -663,11 +647,6 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 						       
                                count=0;
                                offset+=4;
-                               
-                               n_s_reg = 0;
-                               e_w_reg = 0;
-                               ne_sw_reg = 0;
-                               nw_se_reg = 0;
                                   
                                registers=0;
 
@@ -1749,13 +1728,12 @@ int FfmpegCamera::OpenFfmpeg() {
 	  czones[i]->SetVectorMask(); 
 	  //Create the results buffer for recording indexes of macroblocks with motion per zone
 	  result[i]=(uint8_t*)zm_mallocaligned(32,numblocks/7); //slightly larger than needed
-	  //Creat the directions buffers
-	  n_s[i]=(uint8_t*)zm_mallocaligned(32,numblocks/7);
-      e_w[i]=(uint8_t*)zm_mallocaligned(32,numblocks/7);
-      ne_sw[i]=(uint8_t*)zm_mallocaligned(32,numblocks/7);
-      nw_se[i]=(uint8_t*)zm_mallocaligned(32,numblocks/7);
+	  //Create the directions buffer
+	  direction[i]=(uint8_t*)zm_mallocaligned(32,numblocks);
 	  if(result[i] == NULL)
 		     Fatal("Memory allocation for result buffer failed: %s",strerror(errno));
+      if(direction[i] == NULL)
+		     Fatal("Memory allocation for direction buffer failed: %s",strerror(errno));
     }	  
    
   }  
@@ -1805,14 +1783,10 @@ int FfmpegCamera::CloseFfmpeg(){
   
   for (int i=0; i < monitor->GetZonesNum() ; i++) {
 	    if (result[i])
-         zm_freealigned(result[i]);
-        if (n_s[i])
-         zm_freealigned(n_s[i]);
-        if (e_w[i])
-         zm_freealigned(e_w[i]); 
-        if (ne_sw[i])
-         zm_freealigned(nw_se[i]);
-         
+           zm_freealigned(result[i]);
+        if (direction[i])
+           zm_freealigned(direction[i]);
+        
   }      
 
 #if HAVE_LIBSWSCALE
@@ -2042,10 +2016,8 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
                      uint32_t offset=0;
                      
                      uint32_t *res=NULL;
-                     uint32_t *n_s_res=NULL;
-                     uint32_t *e_w_res=NULL;
-                     uint32_t *ne_sw_res=NULL;
-                     uint32_t *nw_se_res=NULL;
+                     uint8_t *dir_mask=NULL;
+                     
                      pattern r_pattern=center; //center pixel
                      
                      int count=0;
@@ -2054,8 +2026,9 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
 						 res=(uint32_t*)(result[i]+offset);
 						 for (int j=0; j<numblocks; j++) {
 						   if (*res) {
-							 int comparator= 0x80000000 >> count; 	 
-							 if (*res & comparator) {
+							 dir_mask=(uint8_t*)(direction[i]+j);  
+							 	 
+							 if (*res & (0x80000000 >> count)) {
                                    
                                    //Mark the macroblocks that have motion detected. 
                                    //This will only draw the white pixel on the macroblock upper left corner coordinate if the alarm_pixel value is within the value of min_alarm_pixels and max_alarm_pixels,
@@ -2070,35 +2043,17 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
 								     }
 							       }*/ 
 							       
-							       if (*n_s_res & comparator) 
-								        r_pattern=s;
-								   else 
-								        r_pattern=n;
-								        
-								        
-								   if (!r_pattern) {
-								      if (*e_w_res & comparator) 
-								         r_pattern=w;
-								      else 
-								         r_pattern=e;       	   
-								   
-							       }
+							       //[n][ne][e][se][s][sw][w][nw]
+							       //[7][6] [5][4] [3][2] [1][0] 
 							       
-							       if (!r_pattern) {
-									  if (*ne_sw_res & comparator) 
-								         r_pattern=sw;
-								      else 
-								         r_pattern=ne;  
-									   
-								   } 
-								   
-								   if (!r_pattern) {
-									  if (*nw_se_res & comparator) 
-								         r_pattern=se;
-								      else 
-								         r_pattern=nw;   
-									   
-								   }	     
+							       for ( int i=0; i<8 ; i++) {
+									  if (*dir_mask & 1<<i) {
+										r_pattern=(pattern)i;
+										break;  
+									  }	     
+								   }	   
+							       
+							       
 							       
 							       
 							       if (colours == 3 )  
@@ -2114,12 +2069,7 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
 					            offset+=4;
                                 count=0;
 								res=(uint32_t*)(result[i]+offset); //Last iteration will read past actual data but the buffer is large enough, just filled with zeroes
-								if (*res) {
-								   	n_s_res=(uint32_t*)(n_s[i]+offset);
-								   	e_w_res=(uint32_t*)(e_w[i]+offset);
-								   	ne_sw_res=(uint32_t*)(ne_sw[i]+offset);
-								   	nw_se_res=(uint32_t*)(nw_se[i]+offset);
-								}	
+								
 							 }	
 							 
 						   } //if (*res)	  
