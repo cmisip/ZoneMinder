@@ -184,7 +184,19 @@ class FfmpegCamera : public Camera {
         ne,
         n
     };
-	
+    
+    //hold relative positions of each center pixel to rgbindex, only 25 ints are used
+    //int cpixel[32]={0};
+    int *cpixel=NULL;
+    
+    //Bit patterns for direction, uses the first 25 bits only
+    struct bit_pattern{
+		int bpattern=0;
+		bit_pattern(int input):bpattern(input){};
+	};
+		
+	bit_pattern *P_ARRAY=NULL;	
+		
     void pixel_write(RGB24 *rgb_ptr, int b_index, pattern r_pattern);
     
     int mmal_decode(AVPacket *packet);

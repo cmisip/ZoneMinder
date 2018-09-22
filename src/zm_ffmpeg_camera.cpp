@@ -475,11 +475,50 @@ void FfmpegCamera::control_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf
 }
 
 void FfmpegCamera::pixel_write(RGB24 *rgb_ptr, int b_index, pattern r_pattern) {
-        if (b_index >=0) {     
-               (rgb_ptr+b_index)->R=255;
-               (rgb_ptr+b_index)->G=255;
-               (rgb_ptr+b_index)->B=255;
-        }              	
+	    if (b_index <0)
+	      return;
+        
+       /* switch (r_pattern) {
+		  case nw:
+		      DEFAULT=NW;
+		      break;
+		  case w:
+		      DEFAULT=WEST;
+		      break;
+		  case sw:
+		      DEFAULT=SW;
+		      break;
+		  case s:
+		      DEFAULT=SOUTH;
+		      break;
+		  case se:
+		      DEFAULT=SE;
+		      break;
+		  case e:
+		      DEFAULT=EAST;
+		      break;
+		  case ne:
+		      DEFAULT=NE;
+		      break;
+		  case n:
+		      DEFAULT=NORTH;
+		      break;
+		  case center:
+		      return;    
+		 }
+		*/              
+		int c_index=0;                                	
+		for ( int i=0; i<25 ; i++) {
+		   if ((P_ARRAY+r_pattern)->bpattern & (0x80000000 >> i)) {
+			  c_index=b_index + *(cpixel+i);
+			  (rgb_ptr+c_index)->R=255;
+              (rgb_ptr+c_index)->G=255;
+              (rgb_ptr+c_index)->B=255;   
+		   }	   
+		   	
+		}		
+			
+          	
 	
 }	
 
@@ -1718,6 +1757,52 @@ int FfmpegCamera::OpenFfmpeg() {
 	      (Block+i)->rgbindex=-1;
 	}	
 	
+	P_ARRAY=(bit_pattern*)zm_mallocaligned(32,sizeof(int)*9);
+	
+	
+	//*(P_ARRAY+0)=bit_pattern(stoi("11100110001010000010000000000000",nullptr,2)); //nw
+	*(P_ARRAY+0)=bit_pattern(3861389312);
+	//*(P_ARRAY+1)=bit_pattern(stoi("00100010001111001000001000000000",nullptr,2)); //w
+	*(P_ARRAY+1)=bit_pattern(574390784);
+	//*(P_ARRAY+2)=bit_pattern(stoi("00000000101010011000111000000000",nullptr,2)); //sw
+	*(P_ARRAY+2)=bit_pattern(11111936);
+	//*(P_ARRAY+3)=bit_pattern(stoi("00000001001010101110001000000000",nullptr,2)); //s
+	*(P_ARRAY+3)=bit_pattern(19587584);
+	//*(P_ARRAY+4)=bit_pattern(stoi("00000010000010100011001110000000",nullptr,2)); //se
+	*(P_ARRAY+4)=bit_pattern(34222976);
+	//*(P_ARRAY+5)=bit_pattern(stoi("00100000100111100010001000000000",nullptr,2)); //e
+	*(P_ARRAY+5)=bit_pattern(547234304);
+	//*(P_ARRAY+6)=bit_pattern(stoi("00111000110010101000000000000000",nullptr,2)); //ne
+	*(P_ARRAY+6)=bit_pattern(952795136);
+	//*(P_ARRAY+7)=bit_pattern(stoi("00100011101010100100000000000000",nullptr,2)); //n
+	*(P_ARRAY+7)=bit_pattern(598360064);
+	
+	
+	
+	cpixel=(int*)zm_mallocaligned(32,sizeof(int)*32);
+	//Calculate relative indexes of center 5x5 pixels of each macroblock
+	int topleft=5;
+	for (int i=0; i<5; i++) {
+	   *(cpixel+i)=5*monitor->Width()+(topleft++);	
+	}	
+	topleft=5;
+	for (int i=5; i<10; i++) {
+       *(cpixel+i)=6*monitor->Width()+(topleft++);		
+	}	
+	topleft=5;
+	for (int i=10; i<15; i++) {
+       *(cpixel+i)=7*monitor->Width()+(topleft++);		
+	}	
+	topleft=5;
+	for (int i=15; i<20; i++) {
+       *(cpixel+i)=8*monitor->Width()+(topleft++);		
+	}
+	topleft=5;
+	for (int i=20; i<25; i++) {
+       *(cpixel+i)=9*monitor->Width()+(topleft++);		
+	}		
+	
+	
 
     
     //Retrieve the zones info and setup the vector mask
@@ -1777,9 +1862,14 @@ int FfmpegCamera::CloseFfmpeg(){
      zm_freealigned(coords);
      
   if (Block)
-     zm_freealigned(Block);    
+     zm_freealigned(Block); 
      
-  
+  if (cpixel)
+     zm_freealigned(cpixel);      
+     
+  if (P_ARRAY)
+     zm_freealigned(P_ARRAY);      
+     
   
   for (int i=0; i < monitor->GetZonesNum() ; i++) {
 	    if (result[i])
