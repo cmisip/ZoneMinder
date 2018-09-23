@@ -116,9 +116,9 @@ class FfmpegCamera : public Camera {
     
 
     struct mmal_motion_vector {
-     char x_vector;
-     char y_vector; 
-     short sad;
+     int8_t x_vector;
+     int8_t y_vector;
+     int16_t sad; 
     };
 #endif
     enum h264_codec {

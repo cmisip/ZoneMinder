@@ -549,7 +549,10 @@ int FfmpegCamera::mmal_decode(AVPacket *pkt) {
 
       
       //while ((buffer = mmal_queue_get(context.dqueue)) != NULL)
-      while ((buffer = mmal_queue_timedwait(context.dqueue, 100)) != NULL) {
+      //while ((buffer = mmal_queue_timedwait(context.dqueue, 50)) != NULL) {
+      if ((buffer = mmal_queue_get(context.dqueue)) == NULL)
+         buffer = mmal_queue_timedwait(context.dqueue, 50);
+      if (buffer) {
          //save it as AVFrame holding an I420 buffer with original video source resolution
          av_image_fill_arrays(mRawFrame->data, mRawFrame->linesize, buffer->data, AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 1);
          got_frame=true;
@@ -594,8 +597,10 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 
       
       //while ((buffer = mmal_queue_get(context.equeue)) != NULL) {
-      while ((buffer = mmal_queue_timedwait(context.equeue, 100)) != NULL) {
-         
+      //while ((buffer = mmal_queue_timedwait(context.equeue, 100)) != NULL) {
+      if ((buffer = mmal_queue_get(context.equeue)) == NULL)
+         buffer = mmal_queue_timedwait(context.equeue, 50);
+      if (buffer) {   
          
          if(buffer->flags & MMAL_BUFFER_HEADER_FLAG_CODECSIDEINFO) {
 			      got_vectors=true;
@@ -746,7 +751,10 @@ int  FfmpegCamera::mmal_resize(uint8_t** dbuffer) {   //uses mRawFrame data, bui
       }
       
       //while ((buffer = mmal_queue_get(context.rqueue)) != NULL){
-      while ((buffer = mmal_queue_timedwait(context.rqueue, 100)) != NULL) {
+      //while ((buffer = mmal_queue_timedwait(context.rqueue, 100)) != NULL) {
+      if ((buffer = mmal_queue_get(context.rqueue)) == NULL)
+         buffer = mmal_queue_timedwait(context.rqueue, 50);
+      if (buffer) {
          got_resized=true;
          memcpy((*dbuffer),buffer->data,width*height*colours);
          //save it as AVFrame holding a buffer with original video source resolution
@@ -790,7 +798,10 @@ int  FfmpegCamera::mmal_jpeg(uint8_t** jbuffer) {   //uses mFrame data
       }
       
       //while ((buffer = mmal_queue_get(context.jqueue)) != NULL) {
-      while ((buffer = mmal_queue_timedwait(context.jqueue, 100)) != NULL) {
+      //while ((buffer = mmal_queue_timedwait(context.jqueue, 100)) != NULL) {
+      if ((buffer = mmal_queue_get(context.jqueue)) == NULL)
+         buffer = mmal_queue_timedwait(context.jqueue, 50);
+      if (buffer) {
 		 got_jpeg=true; 
          if (buffer->length < jpeg_limit) {
            memcpy((*jbuffer),&buffer->length,4);
