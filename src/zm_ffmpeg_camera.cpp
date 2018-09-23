@@ -2105,12 +2105,13 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
       Debug( 4, "Decoded video packet at frame %d", frameCount );
 }  //if cytpe   
 
-
+       uint8_t* directbuffer;
+       uint8_t* mvect_buffer=NULL;  
 
       if ( frameComplete ) {
-        Debug( 4, "Got frame %d", frameCount );
+        //Debug( 4, "Got frame %d", frameCount );
 
-        uint8_t* directbuffer;
+       
 
         /* Request a writeable buffer of the target image */
         directbuffer = image.WriteBuffer(width, height, colours, subpixelorder);
@@ -2123,7 +2124,7 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
         
         
         
-        uint8_t* mvect_buffer=NULL;  
+        
         if  (cfunction == Monitor::MVDECT) {
 	  
 	       mvect_buffer=image.VectBuffer();   
@@ -2137,12 +2138,13 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
                //FIXMEC, still need to write this          
 
            }  
+        }
+       
+       
         
         
-#ifdef __arm__
-        uint8_t* jpegbuffer=NULL;
+        if  (cfunction == Monitor::MVDECT) {
         //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels tile Left to Right and then top to bottom and there are a fixed number covering the entire frame.
-#endif 
            if (ctype) { 
                 //mmal_decode has filled MRawFrame with I420 buffer at this point
 
@@ -2159,17 +2161,17 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
 #ifdef __arm__ 
 
                 //mmal_resize will read mRawFrame and fill mFrame with RGB data with downscaled resolution
-                mmal_resize(&directbuffer); 
-                
-                //Create the JPEG buffer for this frame if frame is alarmed, using downscaled resolution
-                jpegbuffer=image.JPEGBuffer(width, height);
-                if (jpegbuffer ==  NULL ){
-                   Error("Failed requesting jpeg buffer for the captured image.");
-                   return (-1); 
-                }
-                
+                frameComplete=mmal_resize(&directbuffer); 
+             }   
+         }
+         
+        }      
+        
+        if (frameComplete) {
+         if  (cfunction == Monitor::MVDECT) {
+			 if (ctype) {       
 		         
-		        mmal_encode(&mvect_buffer);
+		        frameComplete=mmal_encode(&mvect_buffer);
 		        
 		        //Buffer visualization should be here after the resized buffer is created, and before it is converted to jpeg
 		        //Turn off for faster performance.  if not visualizing, turn result[i] memcpy as well in mmal_encode. 
@@ -2242,9 +2244,25 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
 						 
 					
                      }  
-                }   
-		        
-		        
+                } 
+                
+			} //if ctype  
+		}  //if cfunction
+	} //if frameComplete
+		
+		if ( frameComplete ) {
+		     
+		    if  (cfunction == Monitor::MVDECT) {	    
+		    if (ctype) {    
+				
+				//Create the JPEG buffer for this frame if frame is alarmed, using downscaled resolution
+                uint8_t* jpegbuffer=NULL;
+                jpegbuffer=image.JPEGBuffer(width, height);
+                if (jpegbuffer ==  NULL ){
+                   Error("Failed requesting jpeg buffer for the captured image.");
+                   return (-1); 
+                }
+			
 		        //Option 1. use the image EncodeJpeg function which requires argument jpeg_size
 		        //int *jpeg_size=(int *)jpegbuffer; 
 				//image.EncodeJpeg(jpegbuffer+4, jpeg_size );
@@ -2275,7 +2293,7 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
                 
            } //if ctype
         
-         }
+         } //ifcfunction
         
 #endif
 
