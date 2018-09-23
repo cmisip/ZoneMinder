@@ -247,11 +247,11 @@ int FfmpegCamera::Capture( Image &image ) {
 #ifdef __arm__
         uint8_t* jpegbuffer=NULL;
         //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels tile Left to Right and then top to bottom and there are a fixed number covering the entire frame.
- 
+#endif
            if (ctype) { 
                 //mmal_decode has filled MRawFrame with I420 buffer at this point
 
-#endif
+
                 
 #if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
                 av_image_fill_arrays(mFrame->data, mFrame->linesize,
@@ -548,8 +548,8 @@ int FfmpegCamera::mmal_decode(AVPacket *pkt) {
       }
 
       
-      while ((buffer = mmal_queue_get(context.dqueue)) != NULL)
-      {
+      //while ((buffer = mmal_queue_get(context.dqueue)) != NULL)
+      while ((buffer = mmal_queue_timedwait(context.dqueue, 100)) != NULL) {
          //save it as AVFrame holding an I420 buffer with original video source resolution
          av_image_fill_arrays(mRawFrame->data, mRawFrame->linesize, buffer->data, AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 1);
          got_frame=true;
@@ -571,7 +571,7 @@ int FfmpegCamera::mmal_decode(AVPacket *pkt) {
 
 int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled frame) data 
 	MMAL_BUFFER_HEADER_T *buffer;
-	int motion_detected=false;
+	int got_vectors=false;
 	
                
 	if ((buffer = mmal_queue_get(pool_ine->queue)) != NULL) {  
@@ -593,10 +593,12 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
       }
 
       
-      while ((buffer = mmal_queue_get(context.equeue)) != NULL) {
+      //while ((buffer = mmal_queue_get(context.equeue)) != NULL) {
+      while ((buffer = mmal_queue_timedwait(context.equeue, 100)) != NULL) {
          
          
          if(buffer->flags & MMAL_BUFFER_HEADER_FLAG_CODECSIDEINFO) {
+			      got_vectors=true;
 			      uint32_t m_offset=0; 
                   for (int i=0; i < czones_n ; i++) {
                         mmal_motion_vector *mvarray=(mmal_motion_vector *)buffer->data;
@@ -717,12 +719,13 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                    }
 		  
       }
-      return (0);
+      return (got_vectors);
 }	
 
 
 
 int  FfmpegCamera::mmal_resize(uint8_t** dbuffer) {   //uses mRawFrame data, builds mFrame
+	int got_resized=false;
 	MMAL_BUFFER_HEADER_T *buffer;
 	if ((buffer = mmal_queue_get(pool_inr->queue)) != NULL) { 
 		 
@@ -742,8 +745,9 @@ int  FfmpegCamera::mmal_resize(uint8_t** dbuffer) {   //uses mRawFrame data, bui
          
       }
       
-      while ((buffer = mmal_queue_get(context.rqueue)) != NULL){
-        
+      //while ((buffer = mmal_queue_get(context.rqueue)) != NULL){
+      while ((buffer = mmal_queue_timedwait(context.rqueue, 100)) != NULL) {
+         got_resized=true;
          memcpy((*dbuffer),buffer->data,width*height*colours);
          //save it as AVFrame holding a buffer with original video source resolution
          av_image_fill_arrays(mFrame->data, mFrame->linesize, *dbuffer, encoderPixFormat, mFrame->width, mFrame->height, 1);
@@ -759,11 +763,12 @@ int  FfmpegCamera::mmal_resize(uint8_t** dbuffer) {   //uses mRawFrame data, bui
                    }
 		  
       }
-     return (0);    
+     return (got_resized);    
 }	
 
 
 int  FfmpegCamera::mmal_jpeg(uint8_t** jbuffer) {   //uses mFrame data
+	int got_jpeg=false;
 	MMAL_BUFFER_HEADER_T *buffer;
 	if ((buffer = mmal_queue_get(pool_inj->queue)) != NULL) { 
 		 
@@ -784,7 +789,9 @@ int  FfmpegCamera::mmal_jpeg(uint8_t** jbuffer) {   //uses mFrame data
          
       }
       
-      while ((buffer = mmal_queue_get(context.jqueue)) != NULL){
+      //while ((buffer = mmal_queue_get(context.jqueue)) != NULL) {
+      while ((buffer = mmal_queue_timedwait(context.jqueue, 100)) != NULL) {
+		 got_jpeg=true; 
          if (buffer->length < jpeg_limit) {
            memcpy((*jbuffer),&buffer->length,4);
            memcpy((*jbuffer)+4,buffer->data,buffer->length);
@@ -804,7 +811,7 @@ int  FfmpegCamera::mmal_jpeg(uint8_t** jbuffer) {   //uses mFrame data
                    }
 		  
       }
-     return (0);    
+     return (got_jpeg);    
 }	
 
 
@@ -2087,6 +2094,8 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
       Debug( 4, "Decoded video packet at frame %d", frameCount );
 }  //if cytpe   
 
+
+
       if ( frameComplete ) {
         Debug( 4, "Got frame %d", frameCount );
 
@@ -2122,11 +2131,11 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
 #ifdef __arm__
         uint8_t* jpegbuffer=NULL;
         //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels tile Left to Right and then top to bottom and there are a fixed number covering the entire frame.
- 
+#endif 
            if (ctype) { 
                 //mmal_decode has filled MRawFrame with I420 buffer at this point
 
-#endif
+
                 
 #if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
                 av_image_fill_arrays(mFrame->data, mFrame->linesize,
@@ -2398,14 +2407,35 @@ else if ( packet.pts && video_last_pts > packet.pts ) {
 //This is only used if source is FFmpeg or source is FFmpeghw and Function is Modect.      
 if (((ctype) && (cfunction == Monitor::MODECT)) || (!ctype)) {   
 	
-         
+#if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
+        av_image_fill_arrays(mFrame->data, mFrame->linesize,
+            directbuffer, imagePixFormat, width, height, 1);
+#else
+        avpicture_fill( (AVPicture *)mFrame, directbuffer,
+            imagePixFormat, width, height);
+#endif
 
 
-        if (sws_scale(mConvertContext, mRawFrame->data, mRawFrame->linesize,
-                      0, mVideoCodecContext->height, mFrame->data, mFrame->linesize) < 0) {
-          Fatal("Unable to convert raw format %u to target format %u at frame %d",
-                mVideoCodecContext->pix_fmt, imagePixFormat, frameCount);
+ 
+#if HAVE_LIBSWSCALE
+        if(mConvertContext == NULL) {
+          mConvertContext = sws_getContext(mVideoCodecContext->width,
+                                           mVideoCodecContext->height,
+                                           mVideoCodecContext->pix_fmt,
+                                           width, height, imagePixFormat,
+                                           SWS_BICUBIC, NULL, NULL, NULL);
+
+          if(mConvertContext == NULL)
+            Fatal( "Unable to create conversion context for %s", mPath.c_str() );
         }
+
+        if (sws_scale(mConvertContext, mRawFrame->data, mRawFrame->linesize, 0, mVideoCodecContext->height, mFrame->data, mFrame->linesize) < 0)
+          Fatal("Unable to convert raw format %u to target format %u at frame %d", mVideoCodecContext->pix_fmt, imagePixFormat, frameCount);
+#else // HAVE_LIBSWSCALE
+        Fatal( "You must compile ffmpeg with the --enable-swscale option to use ffmpeg cameras" );
+#endif // HAVE_LIBSWSCALE         
+
+
         
 } // closing bracket for "if (((ctype) && (cfunction == Monitor::MODECT)) || (!ctype))"        
 
