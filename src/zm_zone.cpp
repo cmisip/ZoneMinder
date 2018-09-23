@@ -210,8 +210,7 @@ void Zone::SetVectorMask() {
   int frame_height=((monitor->Height()+16)/16)*16; //Vcos align up
   
   numblocks= (frame_width*frame_height)/256;
-  //Make numblocks a multiple of 32 which should make iterating through the mask less code complex
-  //numblocks=((numblocks+32)/32)*32;
+  
   
   Info("Setting up the motion vector mask with numblocks %d", numblocks);
     for (uint32_t i=0 ; i< numblocks ; i++) {

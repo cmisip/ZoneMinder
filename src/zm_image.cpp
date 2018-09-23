@@ -456,8 +456,10 @@ uint8_t *& Image::VectBuffer() {
 
 uint8_t *& Image::JPEGBuffer(int width, int height) {
 	  if (j_buffer ==NULL) {
-		   //Half width*height should be adequate jpeg buffer size. 
-		   j_size=(width*height);
+		   //Half width*height that is vcos aligned up to 32 and 16 should be adequate jpeg buffer size.
+		   int j_height=((height+16)/16)*16;
+		   int j_width=((width+32)/32)*32; 
+		   j_size=(j_width*j_height);
 		   j_buffer = (uint8_t*)zm_mallocaligned(32,j_size);
 	       if(j_buffer == NULL)
 		      Fatal("Memory allocation for jpeg buffer failed: %s",strerror(errno));

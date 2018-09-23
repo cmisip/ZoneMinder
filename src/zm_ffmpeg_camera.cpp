@@ -621,8 +621,6 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                         
                         for (int j=0;j < numblocks ; j++) {
 							
-							int comparator=0x80000000 >> count;
-							
 							uint8_t block_direction=0;
 							 
 							 //[nw][w][sw][s][se][e][ne][n]
@@ -633,7 +631,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 							 //[7][6] [5][4] [3][2] [1][0] 
                         
                             if ((abs(mvarray[j].x_vector) + abs(mvarray[j].y_vector)) > min_vector_distance) { 
-                               registers = registers | comparator;
+                               registers = registers | (0x80000000 >> count);
                             
                             
  /*     N      */           if (mvarray[j].x_vector >0) { //to e
@@ -694,10 +692,11 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                          }  
                          
                          alarm_pixels = vec_count<<10 ; //each 16x16 block is 1 shifted to the left 8; each block is further weighted as x4 so we shift <<10. 
-                         
-                         if( (alarm_pixels > (unsigned int)czones[i]->GetMinAlarmPixels()) && (alarm_pixels < (unsigned int)czones[i]->GetMaxAlarmPixels()) ) {
+                         //FIXME
+                         //if( (alarm_pixels > (unsigned int)czones[i]->GetMinAlarmPixels()) && (alarm_pixels < (unsigned int)czones[i]->GetMaxAlarmPixels()) ) {
+                         if (alarm_pixels)    
                              czones[i]->motion_detected=true;
-					     } 
+					     //} 
                          
                          //SAVE this vec count into mvect buffer which becomes a list of zone scores  
                          memcpy((*mv_buffer)+m_offset ,&alarm_pixels, 4 ) ; 
@@ -1731,7 +1730,9 @@ int FfmpegCamera::OpenFfmpeg() {
     OpenMmalResizer(mVideoCodecContext);
     OpenMmalJPEG(mVideoCodecContext); 
     
-    jpeg_limit=(width*height);  //Avoid segfault in case jpeg is bigger than the buffer.
+    int j_height=((height+16)/16)*16;
+    int j_width=((width+32)/32)*32; 
+    jpeg_limit=(j_width*j_height);  //Avoid segfault in case jpeg is bigger than the buffer.
     
     
     int frame_width=monitor->Width()+16;
@@ -1757,30 +1758,81 @@ int FfmpegCamera::OpenFfmpeg() {
 	      (Block+i)->rgbindex=-1;
 	}	
 	
+	
+	//Setup the bit patterns for displaying motion vector directionality
 	P_ARRAY=(bit_pattern*)zm_mallocaligned(32,sizeof(int)*9);
 	
 	
-	//*(P_ARRAY+0)=bit_pattern(stoi("11100110001010000010000000000000",nullptr,2)); //nw
-	*(P_ARRAY+0)=bit_pattern(3861389312);
-	//*(P_ARRAY+1)=bit_pattern(stoi("00100010001111001000001000000000",nullptr,2)); //w
-	*(P_ARRAY+1)=bit_pattern(574390784);
-	//*(P_ARRAY+2)=bit_pattern(stoi("00000000101010011000111000000000",nullptr,2)); //sw
-	*(P_ARRAY+2)=bit_pattern(11111936);
-	//*(P_ARRAY+3)=bit_pattern(stoi("00000001001010101110001000000000",nullptr,2)); //s
-	*(P_ARRAY+3)=bit_pattern(19587584);
-	//*(P_ARRAY+4)=bit_pattern(stoi("00000010000010100011001110000000",nullptr,2)); //se
-	*(P_ARRAY+4)=bit_pattern(34222976);
-	//*(P_ARRAY+5)=bit_pattern(stoi("00100000100111100010001000000000",nullptr,2)); //e
-	*(P_ARRAY+5)=bit_pattern(547234304);
-	//*(P_ARRAY+6)=bit_pattern(stoi("00111000110010101000000000000000",nullptr,2)); //ne
-	*(P_ARRAY+6)=bit_pattern(952795136);
-	//*(P_ARRAY+7)=bit_pattern(stoi("00100011101010100100000000000000",nullptr,2)); //n
-	*(P_ARRAY+7)=bit_pattern(598360064);
+	                                 
+	*(P_ARRAY+0)=bit_pattern(0xE6282000); /*11100  NW
+	                                        11000
+	                                        10100
+	                                        00010
+	                                        00000
+	                                        00000
+	                                        00*/
+	
+	*(P_ARRAY+1)=bit_pattern(0x223C8200); /*00100  W
+	                                        01000
+	                                        11110
+	                                        01000
+	                                        00100
+	                                        00000
+	                                        00*/
+	                                        
+	*(P_ARRAY+2)=bit_pattern(0xA98E00);   /*00000  SW
+	                                        00010
+	                                        10100
+	                                        11000
+	                                        11100
+	                                        00000
+	                                        00*/
+	                                        
+	*(P_ARRAY+3)=bit_pattern(0x12AE200);  /*00000  S
+	                                        00100
+	                                        10101
+	                                        01110
+	                                        00100
+	                                        00000
+	                                        00*/
+
+	*(P_ARRAY+4)=bit_pattern(0x20A3380);  /*00000  SE
+	                                        01000
+	                                        00101
+	                                        00011
+	                                        00111
+	                                        00000
+	                                        00*/
+	                                      
+	*(P_ARRAY+5)=bit_pattern(0x209E2200); /*00100  E
+	                                        00010
+	                                        01111
+	                                        00010
+	                                        00100
+	                                        00000
+	                                        00*/
+	                                        
+	*(P_ARRAY+6)=bit_pattern(0x38CA8000); /*00111  NE
+	                                        00011
+	                                        00101
+	                                        01000
+	                                        00000
+	                                        00000
+	                                        00*/
+	                                        
+	*(P_ARRAY+7)=bit_pattern(0x23AA4000); /*00100  N
+	                                        01110
+	                                        10101
+	                                        00100
+	                                        00000
+	                                        00000
+	                                        00*/
+	
+	//*(P_ARRAY+8) unused
 	
 	
-	
-	cpixel=(int*)zm_mallocaligned(32,sizeof(int)*32);
 	//Calculate relative indexes of center 5x5 pixels of each macroblock
+	cpixel=(int*)zm_mallocaligned(32,sizeof(int)*32);
 	int topleft=5;
 	for (int i=0; i<5; i++) {
 	   *(cpixel+i)=5*monitor->Width()+(topleft++);	
@@ -1805,7 +1857,7 @@ int FfmpegCamera::OpenFfmpeg() {
 	
 
     
-    //Retrieve the zones info and setup the vector mask
+    //Retrieve the zones info and setup the vector mask and result and direction buffers
     czones_n=monitor->GetZonesNum();
     czones=monitor->GetZones();
     
