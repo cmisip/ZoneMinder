@@ -120,6 +120,8 @@ class FfmpegCamera : public Camera {
      int8_t y_vector;
      int16_t sad; 
     };
+    
+    sigset_t ctype_sigmask;
 #endif
     enum h264_codec {
         software,
@@ -198,6 +200,9 @@ class FfmpegCamera : public Camera {
 	bit_pattern *P_ARRAY=NULL;	
 		
     void pixel_write(RGB24 *rgb_ptr, int b_index, pattern r_pattern);
+    
+    //Hold relative positions of Block neighbors
+    int *neighbors=NULL;
     
     int mmal_decode(AVPacket *packet);
     int mmal_encode(uint8_t **mv_buffer);

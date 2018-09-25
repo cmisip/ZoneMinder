@@ -32,6 +32,9 @@
 //
 class Polygon
 {
+	
+friend class Zone;
+	
 protected:
   struct Edge
   {

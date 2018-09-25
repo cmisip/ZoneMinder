@@ -128,7 +128,8 @@ int FfmpegCamera::PreCapture()
 }
 
 int FfmpegCamera::Capture( Image &image ) {
-	 
+  if (sigprocmask(SIG_BLOCK, &ctype_sigmask, NULL) == -1)
+       Info("Failed to block SIGKILL");	 
 	
   if (!mCanCapture){
     return -1;
@@ -408,7 +409,8 @@ if (((ctype) && (cfunction == Monitor::MODECT)) || (!ctype)) {
   
  
 	
-
+if (sigprocmask(SIG_UNBLOCK, &ctype_sigmask, NULL) == -1)
+       Info("Failed to unblock SIGKILL");
   
   
   return (0);
@@ -704,6 +706,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                          if (alarm_pixels)    
                              czones[i]->motion_detected=true;
 					     //} 
+					     //Info("Vec count is %d", vec_count);
                          
                          //SAVE this vec count into mvect buffer which becomes a list of zone scores  
                          memcpy((*mv_buffer)+m_offset ,&alarm_pixels, 4 ) ; 
@@ -724,6 +727,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                    }
 		  
       }
+      
       return (got_vectors);
 }	
 
@@ -1742,6 +1746,12 @@ int FfmpegCamera::OpenFfmpeg() {
   
     
   if (ctype) { 
+	  
+   if ((sigemptyset(&ctype_sigmask) == -1) || (sigaddset(&ctype_sigmask, SIGKILL) == -1) || (sigaddset(&ctype_sigmask, SIGTERM) == -1)){
+     Info("Failed to initialize the capture signal mask");
+     return -1;
+   }  
+	
 	
 	OpenMmalDecoder(mVideoCodecContext);
     OpenMmalEncoder(mVideoCodecContext);
@@ -1873,14 +1883,66 @@ int FfmpegCamera::OpenFfmpeg() {
 	}		
 	
 	
+	//Calculate relative indexes of neighboring 24 Blocks
+	neighbors=(int*)zm_mallocaligned(32,sizeof(int));
+	
+	int block_columns=(j_width+16)/16;
+	/*
+    //0 1 2
+    for (int i=0, j=2; j>-1; i++, --j){
+     *(neighbors+i) = 0 - (block_columns * 1 +j);
+	}
+	
+    //3	
+    *(neighbors+3) = 0 +(block_columns * 0 +1);
+  
+    //4 5 6
+    for (int i=4, j=2; j>-1; i++, --j){
+     *(neighbors+i) = 0 + (block_columns * 1 +j);
+	}
 
+    //7
+    *(neighbors+7) = 0 -(block_columns * 0 + 1);
+  
+    //8 9 10 11 12
+    for (int i=8, j=4; j>-1; i++, --j){
+     *(neighbors+i) = 0 - (block_columns * 2 +j);
+	}
+	
+    //13 
+    *(neighbors+13) = 0 - (block_columns * 1 -1);
+  
+    //14
+    *(neighbors+14) = 0 -(block_columns * 0 - 2);
+  
+    //15
+    *(neighbors+15) = 0 +(block_columns * 1 +3);
+  
+    //16 17 18 19 20
+    for (int i=16, j=4; j>-1; i++, --j){
+     *(neighbors+i) = 0 + (block_columns * 2 +j);
+	}
+	
+    //21
+    *(neighbors+21) = 0 +(block_columns * 1 -1);
+  
+    //22
+    *(neighbors+22) = 0 +(block_columns * 0 -2);
+  
+    //23
+    *(neighbors+23) = 0 -(block_columns * 1 +3);
+	
+	*/
+	
     
     //Retrieve the zones info and setup the vector mask and result and direction buffers
     czones_n=monitor->GetZonesNum();
     czones=monitor->GetZones();
     
     for (int i=0; i < monitor->GetZonesNum() ; i++) {
-	  czones[i]->SetVectorMask(); 
+	  czones[i]->SetVectorMask();
+	  Info("Zone %d with min alarm pixels %d and max alarm pixels %d", i, czones[i]->GetMinAlarmPixels(), czones[i]->GetMaxAlarmPixels());
+	  
 	  //Create the results buffer for recording indexes of macroblocks with motion per zone
 	  result[i]=(uint8_t*)zm_mallocaligned(32,numblocks/7); //slightly larger than needed
 	  //Create the directions buffer
@@ -1892,6 +1954,8 @@ int FfmpegCamera::OpenFfmpeg() {
     }	  
    
   }  
+  
+  
     
   
 #endif  
@@ -1935,7 +1999,10 @@ int FfmpegCamera::CloseFfmpeg(){
      zm_freealigned(Block); 
      
   if (cpixel)
-     zm_freealigned(cpixel);      
+     zm_freealigned(cpixel);  
+     
+  if (neighbors)
+     zm_freealigned(neighbors);       
      
   if (P_ARRAY)
      zm_freealigned(P_ARRAY);      
@@ -2015,6 +2082,11 @@ void *FfmpegCamera::ReopenFfmpegThreadCallback(void *ctx){
 
 //Function to handle capture and store
 int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event_file ) {
+	
+  
+  if (sigprocmask(SIG_BLOCK, &ctype_sigmask, NULL) == -1)
+       Info("Failed to block SIGKILL");
+       	
   if ( ! mCanCapture ) {
     return -1;
   }
@@ -2195,8 +2267,6 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
 							 if (*res & (0x80000000 >> count)) {
                                    
                                    //Mark the macroblocks that have motion detected. 
-                                   //This will only draw the white pixel on the macroblock upper left corner coordinate if the alarm_pixel value is within the value of min_alarm_pixels and max_alarm_pixels,
-                                   //so will not see the white pixels in all recorded frames. 
                                    //This is only for debugging and not needed for normal use 
                                    
                                    
@@ -2515,6 +2585,10 @@ if (((ctype) && (cfunction == Monitor::MODECT)) || (!ctype)) {
       zm_av_packet_unref( &packet );
     //}
   } // end while ! frameComplete
+  
+  if (sigprocmask(SIG_UNBLOCK, &ctype_sigmask, NULL) == -1)
+       Info("Failed to unblock SIGKILL");
+  
   return (frameCount);
 } // end FfmpegCamera::CaptureAndRecord
 

@@ -261,7 +261,9 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer, int zone_n) {
         
     }   
     
-    score = ((double) alarm_pixels/(polygon.Area()))*100;   
+    score = ((double) alarm_pixels/(polygon.Area()))*100; 
+    //Info("Motion score %d, alarm pixels %d, min %d, max %d ",  score, alarm_pixels, min_alarm_pixels, max_alarm_pixels);  
+  	  
     
     if( score ) {
       
@@ -295,7 +297,6 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer, int zone_n) {
     
     Debug( 5, "Adjusted score is %d", score );
     
-    //Info("Motion score %d, min %d, max %d ",  alarm_pixels, min_alarm_pixels, max_alarm_pixels);  
   	
     
     return true; 
@@ -831,7 +832,9 @@ bool Zone::CheckAlarms( const Image *delta_image ) {
   return( true );
 }
 
-bool Zone::ParsePolygonString( const char *poly_string, Polygon &polygon ) {
+
+bool Zone::ParsePolygonString( const char *poly_string, Polygon &polygon, float xfactor, float yfactor ) {
+
   Debug( 3, "Parsing polygon string '%s'", poly_string );
 
   char *str_ptr = new char[strlen(poly_string)+1];
@@ -882,7 +885,20 @@ bool Zone::ParsePolygonString( const char *poly_string, Polygon &polygon ) {
     else
       break;
   }
+  
+#ifdef __arm__
+Info("Adjusting zone polygons with x factor %.3f and y factor %.3f", xfactor, yfactor);
+  
+     for (int p = 0; p< n_coords; p++) {
+           coords[p].X()/=xfactor;
+           coords[p].Y()/=yfactor;
+           
+     }
+
+#endif  
+  
   polygon = Polygon( n_coords, coords );
+  Info("Polygon area after adjustment %d,", polygon.Area());   
 
   Debug( 3, "Successfully parsed polygon string" );
   //printf( "Area: %d\n", pg.Area() );
@@ -928,7 +944,7 @@ bool Zone::ParseZoneString( const char *zone_string, int &zone_id, int &colour, 
   *ws = '\0';
   str = ws+1;
 
-  bool result = ParsePolygonString( str, polygon );
+  bool result = ParsePolygonString( str, polygon, 1, 1 );
 
   //printf( "Area: %d\n", pg.Area() );
   //printf( "Centre: %d,%d\n", pg.Centre().X(), pg.Centre().Y() );
@@ -982,37 +998,31 @@ int Zone::Load( Monitor *monitor, Zone **&zones ) {
 
     /* HTML colour code is actually BGR in memory, we want RGB */
     AlarmRGB = rgb_convert(AlarmRGB, ZM_SUBPIX_ORDER_BGR);
+    
+#ifdef __arm__
+//Scale down the polygon to 640x360
+   float x_rfactor = (float) monitor->S_Width() /640;
+   float y_rfactor = (float) monitor->S_Height()/360;
+
+#endif    
+
 
     Debug( 5, "Parsing polygon %s", Coords );
     Polygon polygon;
-    if ( !ParsePolygonString( Coords, polygon ) ) {
+    if ( !ParsePolygonString( Coords, polygon, x_rfactor, y_rfactor ) ) {
       Error( "Unable to parse polygon string '%s' for zone %d/%s for monitor %s, ignoring", Coords, Id, Name, monitor->Name() );
       n_zones -= 1;
       continue;
     }
+#ifdef __arm__
+   //The min_alarm_pixels and max_alarm_pixels are loaded by the web UI to the db using the nondownscaled resolution
+   //The db value therefore needs to be adjusted down here.
+   //
+   MinAlarmPixels=(MinAlarmPixels/(float)(monitor->S_Width()*monitor->S_Height()))*polygon.Area();
+   MaxAlarmPixels=(MaxAlarmPixels/(float)(monitor->S_Width()*monitor->S_Height()))*polygon.Area();
+#endif   
 
-#ifdef __arm__  
-  Info("Adjusting zone polygons");
-  float x_rfactor = (float) monitor->S_Width() /640;
-  float y_rfactor = (float) monitor->S_Height()/360;
-  
-     Polygon *ppolygon=&polygon; 
-     for (int p = 0; p< polygon.getNumCoords(); p++) {
-           const_cast<Coord*>(&ppolygon->getCoord(p))->X()/=x_rfactor;
-           const_cast<Coord*>(&ppolygon->getCoord(p))->Y()/=y_rfactor;
-           
-     }
-     Box *bextent = const_cast<Box*>(&polygon.Extent());
-     
-     Coord *HI=const_cast<Coord*>(&bextent->Hi());
-     HI->X()/=x_rfactor;
-     HI->Y()/=y_rfactor;
-     
-     Coord *LO=const_cast<Coord*>(&bextent->Lo());
-     LO->X()/=x_rfactor;
-     LO->Y()/=y_rfactor;
-     
-#endif  
+
 
     if ( polygon.LoX() < 0 || polygon.HiX() >= (int)monitor->Width() 
         || polygon.LoY() < 0 || polygon.HiY() >= (int)monitor->Height() ) {
@@ -1029,7 +1039,7 @@ int Zone::Load( Monitor *monitor, Zone **&zones ) {
       MinBlobPixels = (MinBlobPixels*polygon.Area())/100;
       MaxBlobPixels = (MaxBlobPixels*polygon.Area())/100;
     }
-
+    
     if ( atoi(dbrow[2]) == Zone::INACTIVE ) {
       zones[i] = new Zone( monitor, Id, Name, polygon );
     } else if ( atoi(dbrow[2]) == Zone::PRIVACY ) {

@@ -2879,7 +2879,7 @@ Monitor *Monitor::Load( unsigned int p_id, bool load_zones, Purpose purpose ) {
   } else if ( type == "Ffmpeghw" ) {
 #if HAVE_LIBAVFORMAT    
   
- #ifdef __arm__  
+#ifdef __arm__  
     // Adjust the input resolution to 360. 
     s_width=width;
     s_height=height;
@@ -3005,21 +3005,7 @@ Monitor *Monitor::Load( unsigned int p_id, bool load_zones, Purpose purpose ) {
     monitor->AddPrivacyBitmask( zones );
   }
   Debug( 1, "Loaded monitor %d(%s), %d zones", id, name.c_str(), n_zones );
-/*  
-#ifdef __arm__  
-  Info("Adjusting zone polygons");
-  int x_rfactor = width/640;
-  int y_rfactor = height/360;
-      
-  for (int o = 0; o < n_zones ; o++) {
-	 Polygon *polygon=const_cast<Polygon*>(&monitor->zones[o]->GetPolygon());
-     for (int p = 0; p< polygon->getNumCoords(); p++) {
-           const_cast<Coord*>(&polygon->getCoord(p))->X()/=x_rfactor;
-           const_cast<Coord*>(&polygon->getCoord(p))->Y()/=y_rfactor;
-     }
-  }
-#endif  
-*/  
+  
   
   return( monitor );
 }
