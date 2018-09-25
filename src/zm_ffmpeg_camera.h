@@ -151,6 +151,9 @@ class FfmpegCamera : public Camera {
     int PrimeCapture();
     int PreCapture();
     int Capture( Image &image );
+    int QueueVideoPackets(timeval recording, char* event_file);
+    int WriteVideoPacket();
+    int WriteAudioPacket();
     int CaptureAndRecord( Image &image, timeval recording, char* event_directory );
     int PostCapture();
     

@@ -2080,6 +2080,174 @@ void *FfmpegCamera::ReopenFfmpegThreadCallback(void *ctx){
   }
 }
 
+int FfmpegCamera::QueueVideoPackets(timeval recording, char* event_file){
+ 
+        
+    //Video recording
+    int key_frame = packet.flags & AV_PKT_FLAG_KEY;
+    if ( recording.tv_sec ) {
+
+      uint32_t last_event_id = monitor->GetLastEventId() ;
+
+      if ( last_event_id != monitor->GetVideoWriterEventId() ) {
+        Debug(2, "Have change of event.  last_event(%d), our current (%d)", last_event_id, monitor->GetVideoWriterEventId() );
+
+        if ( videoStore ) {
+          Info("Re-starting video storage module");
+
+          // I don't know if this is important or not... but I figure we might as well write this last packet out to the store before closing it.
+          // Also don't know how much it matters for audio.
+          if ( packet.stream_index == mVideoStreamId ) {
+            //Write the packet to our video store
+            int ret = videoStore->writeVideoFramePacket( &packet );
+            if ( ret < 0 ) { //Less than zero and we skipped a frame
+              Warning("Error writing last packet to videostore.");
+            }
+          } // end if video
+
+          delete videoStore;
+          videoStore = NULL;
+
+          monitor->SetVideoWriterEventId( 0 );
+        } // end if videoStore
+      } // end if end of recording
+
+      if ( last_event_id and ! videoStore ) {
+        //Instantiate the video storage module
+
+        if (record_audio) {
+          if (mAudioStreamId == -1) {
+            Debug(3, "Record Audio on but no audio stream found");
+            videoStore = new VideoStore((const char *) event_file, "mp4",
+                mFormatContext->streams[mVideoStreamId],
+                NULL,
+                startTime,
+                this->getMonitor());
+
+          } else {
+            Debug(3, "Video module initiated with audio stream");
+            videoStore = new VideoStore((const char *) event_file, "mp4",
+                mFormatContext->streams[mVideoStreamId],
+                mFormatContext->streams[mAudioStreamId],
+                startTime,
+                this->getMonitor());
+          }
+        } else {
+          Debug(3, "Record_audio is false so exclude audio stream");
+          videoStore = new VideoStore((const char *) event_file, "mp4",
+              mFormatContext->streams[mVideoStreamId],
+              NULL,
+              startTime,
+              this->getMonitor());
+        } // end if record_audio
+        strcpy(oldDirectory, event_file);
+        monitor->SetVideoWriterEventId( last_event_id );
+
+        // Need to write out all the frames from the last keyframe?
+        // No... need to write out all frames from when the event began. Due to PreEventFrames, this could be more than since the last keyframe.
+        unsigned int packet_count = 0;
+        ZMPacket *queued_packet;
+
+        // Clear all packets that predate the moment when the recording began
+        packetqueue.clear_unwanted_packets( &recording, mVideoStreamId );
+
+        while ( ( queued_packet = packetqueue.popPacket() ) ) {
+          AVPacket *avp = queued_packet->av_packet();
+            
+          packet_count += 1;
+          int ret=0;
+          //Write the packet to our video store
+          Debug(2, "Writing queued packet stream: %d  KEY %d, remaining (%d)", avp->stream_index, avp->flags & AV_PKT_FLAG_KEY, packetqueue.size() );
+          if ( avp->stream_index == mVideoStreamId ) {
+            ret = videoStore->writeVideoFramePacket( avp );
+          } else if ( avp->stream_index == mAudioStreamId ) {
+            ret = videoStore->writeAudioFramePacket( avp );
+          } else {
+            Warning("Unknown stream id in queued packet (%d)", avp->stream_index );
+            ret = -1;
+          }
+          if ( ret < 0 ) {
+            //Less than zero and we skipped a frame
+          }
+          delete queued_packet;
+        } // end while packets in the packetqueue
+        Debug(2, "Wrote %d queued packets", packet_count );
+      } // end if ! was recording
+
+    } else {
+      // Not recording
+      if ( videoStore ) {
+        Info("Deleting videoStore instance");
+        delete videoStore;
+        videoStore = NULL;
+        monitor->SetVideoWriterEventId( 0 );
+      }
+
+      // Buffer video packets, since we are not recording.
+      // All audio packets are keyframes, so only if it's a video keyframe
+      if ( packet.stream_index == mVideoStreamId ) {
+        if ( key_frame ) {
+          Debug(3, "Clearing queue");
+          packetqueue.clearQueue( monitor->GetPreEventCount(), mVideoStreamId );
+        } 
+#if 0
+// Not sure this is valid.  While a camera will PROBABLY always have an increasing pts... it doesn't have to.
+// Also, I think there are integer wrap-around issues.
+
+else if ( packet.pts && video_last_pts > packet.pts ) {
+          Warning( "Clearing queue due to out of order pts packet.pts(%d) < video_last_pts(%d)");
+          packetqueue.clearQueue();
+        }
+#endif
+      } 
+ 
+      // The following lines should ensure that the queue always begins with a video keyframe
+      if ( packet.stream_index == mAudioStreamId ) {
+//Debug(2, "Have audio packet, reocrd_audio is (%d) and packetqueue.size is (%d)", record_audio, packetqueue.size() );
+        if ( record_audio && packetqueue.size() ) { 
+          // if it's audio, and we are doing audio, and there is already something in the queue
+          packetqueue.queuePacket( &packet );
+        }
+      } else if ( packet.stream_index == mVideoStreamId ) {
+        if ( key_frame || packetqueue.size() ) // it's a keyframe or we already have something in the queue
+          packetqueue.queuePacket( &packet );
+      }
+    } // end if recording or not
+        
+	
+}	
+
+int FfmpegCamera::WriteVideoPacket(){
+    if ( videoStore ) {
+        //Write the packet to our video store
+        int ret = videoStore->writeVideoFramePacket( &packet );
+        if ( ret < 0 ) { //Less than zero and we skipped a frame
+          zm_av_packet_unref( &packet );
+          return 0;
+        }
+    }	
+}	
+
+int FfmpegCamera::WriteAudioPacket(){
+	if ( videoStore ) {
+        if ( record_audio ) {
+          Debug(3, "Recording audio packet streamindex(%d) packetstreamindex(%d)", mAudioStreamId, packet.stream_index );
+          //Write the packet to our video store
+          //FIXME no relevance of last key frame
+          int ret = videoStore->writeAudioFramePacket( &packet );
+          if ( ret < 0 ) {//Less than zero and we skipped a frame
+            Warning("Failure to write audio packet.");
+            zm_av_packet_unref( &packet );
+            return 0;
+          }
+        } else {
+          Debug(4, "Not doing recording of audio packet" );
+        }
+      } else {
+        Debug(4, "Have audio packet, but not recording atm" );
+      }
+}	
+
 //Function to handle capture and store
 int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event_file ) {
 	
@@ -2170,6 +2338,9 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
 #endif
 
       Debug( 4, "Decoded video packet at frame %d", frameCount );
+      
+      //Start queueing video packets if successfully decoded video
+      QueueVideoPackets(recording, event_file);
       
    }  else { //if ctype
     //the mmal decoder builds mRawFrame here with an I420 buffer	
@@ -2368,138 +2539,6 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
 #endif
 
         
-    //Video recording
-    int key_frame = packet.flags & AV_PKT_FLAG_KEY;
-    if ( recording.tv_sec ) {
-
-      uint32_t last_event_id = monitor->GetLastEventId() ;
-
-      if ( last_event_id != monitor->GetVideoWriterEventId() ) {
-        Debug(2, "Have change of event.  last_event(%d), our current (%d)", last_event_id, monitor->GetVideoWriterEventId() );
-
-        if ( videoStore ) {
-          Info("Re-starting video storage module");
-
-          // I don't know if this is important or not... but I figure we might as well write this last packet out to the store before closing it.
-          // Also don't know how much it matters for audio.
-          if ( packet.stream_index == mVideoStreamId ) {
-            //Write the packet to our video store
-            int ret = videoStore->writeVideoFramePacket( &packet );
-            if ( ret < 0 ) { //Less than zero and we skipped a frame
-              Warning("Error writing last packet to videostore.");
-            }
-          } // end if video
-
-          delete videoStore;
-          videoStore = NULL;
-
-          monitor->SetVideoWriterEventId( 0 );
-        } // end if videoStore
-      } // end if end of recording
-
-      if ( last_event_id and ! videoStore ) {
-        //Instantiate the video storage module
-
-        if (record_audio) {
-          if (mAudioStreamId == -1) {
-            Debug(3, "Record Audio on but no audio stream found");
-            videoStore = new VideoStore((const char *) event_file, "mp4",
-                mFormatContext->streams[mVideoStreamId],
-                NULL,
-                startTime,
-                this->getMonitor());
-
-          } else {
-            Debug(3, "Video module initiated with audio stream");
-            videoStore = new VideoStore((const char *) event_file, "mp4",
-                mFormatContext->streams[mVideoStreamId],
-                mFormatContext->streams[mAudioStreamId],
-                startTime,
-                this->getMonitor());
-          }
-        } else {
-          Debug(3, "Record_audio is false so exclude audio stream");
-          videoStore = new VideoStore((const char *) event_file, "mp4",
-              mFormatContext->streams[mVideoStreamId],
-              NULL,
-              startTime,
-              this->getMonitor());
-        } // end if record_audio
-        strcpy(oldDirectory, event_file);
-        monitor->SetVideoWriterEventId( last_event_id );
-
-        // Need to write out all the frames from the last keyframe?
-        // No... need to write out all frames from when the event began. Due to PreEventFrames, this could be more than since the last keyframe.
-        unsigned int packet_count = 0;
-        ZMPacket *queued_packet;
-
-        // Clear all packets that predate the moment when the recording began
-        packetqueue.clear_unwanted_packets( &recording, mVideoStreamId );
-
-        while ( ( queued_packet = packetqueue.popPacket() ) ) {
-          AVPacket *avp = queued_packet->av_packet();
-            
-          packet_count += 1;
-          //Write the packet to our video store
-          Debug(2, "Writing queued packet stream: %d  KEY %d, remaining (%d)", avp->stream_index, avp->flags & AV_PKT_FLAG_KEY, packetqueue.size() );
-          if ( avp->stream_index == mVideoStreamId ) {
-            ret = videoStore->writeVideoFramePacket( avp );
-          } else if ( avp->stream_index == mAudioStreamId ) {
-            ret = videoStore->writeAudioFramePacket( avp );
-          } else {
-            Warning("Unknown stream id in queued packet (%d)", avp->stream_index );
-            ret = -1;
-          }
-          if ( ret < 0 ) {
-            //Less than zero and we skipped a frame
-          }
-          delete queued_packet;
-        } // end while packets in the packetqueue
-        Debug(2, "Wrote %d queued packets", packet_count );
-      } // end if ! was recording
-
-    } else {
-      // Not recording
-      if ( videoStore ) {
-        Info("Deleting videoStore instance");
-        delete videoStore;
-        videoStore = NULL;
-        monitor->SetVideoWriterEventId( 0 );
-      }
-
-      // Buffer video packets, since we are not recording.
-      // All audio packets are keyframes, so only if it's a video keyframe
-      if ( packet.stream_index == mVideoStreamId ) {
-        if ( key_frame ) {
-          Debug(3, "Clearing queue");
-          packetqueue.clearQueue( monitor->GetPreEventCount(), mVideoStreamId );
-        } 
-#if 0
-// Not sure this is valid.  While a camera will PROBABLY always have an increasing pts... it doesn't have to.
-// Also, I think there are integer wrap-around issues.
-
-else if ( packet.pts && video_last_pts > packet.pts ) {
-          Warning( "Clearing queue due to out of order pts packet.pts(%d) < video_last_pts(%d)");
-          packetqueue.clearQueue();
-        }
-#endif
-      } 
- 
-      // The following lines should ensure that the queue always begins with a video keyframe
-      if ( packet.stream_index == mAudioStreamId ) {
-//Debug(2, "Have audio packet, reocrd_audio is (%d) and packetqueue.size is (%d)", record_audio, packetqueue.size() );
-        if ( record_audio && packetqueue.size() ) { 
-          // if it's audio, and we are doing audio, and there is already something in the queue
-          packetqueue.queuePacket( &packet );
-        }
-      } else if ( packet.stream_index == mVideoStreamId ) {
-        if ( key_frame || packetqueue.size() ) // it's a keyframe or we already have something in the queue
-          packetqueue.queuePacket( &packet );
-      }
-    } // end if recording or not
-        
-
-        
 //This is the software scaler. Directbuffer is packaged into mFrame and processed by swscale to convert to appropriate format and size
 //Need SWScale when Source Type is FFmpeg with Function as Mvdect or Modect
 //or Source type is FFmpeghw and Function is Modect  
@@ -2543,35 +2582,15 @@ if (((ctype) && (cfunction == Monitor::MODECT)) || (!ctype)) {
         Debug( 3, "Not framecomplete after av_read_frame" );
       } // end if frameComplete
       
+      WriteVideoPacket();
       
-       if ( videoStore ) {
-        //Write the packet to our video store
-        int ret = videoStore->writeVideoFramePacket( &packet );
-        if ( ret < 0 ) { //Less than zero and we skipped a frame
-          zm_av_packet_unref( &packet );
-          return 0;
-        }
-      }
+       
       
       
     } else if ( packet.stream_index == mAudioStreamId ) { //FIXME best way to copy all other streams
-      if ( videoStore ) {
-        if ( record_audio ) {
-          Debug(3, "Recording audio packet streamindex(%d) packetstreamindex(%d)", mAudioStreamId, packet.stream_index );
-          //Write the packet to our video store
-          //FIXME no relevance of last key frame
-          int ret = videoStore->writeAudioFramePacket( &packet );
-          if ( ret < 0 ) {//Less than zero and we skipped a frame
-            Warning("Failure to write audio packet.");
-            zm_av_packet_unref( &packet );
-            return 0;
-          }
-        } else {
-          Debug(4, "Not doing recording of audio packet" );
-        }
-      } else {
-        Debug(4, "Have audio packet, but not recording atm" );
-      }
+		
+	  WriteAudioPacket();	
+      
     } else {
 #if LIBAVUTIL_VERSION_CHECK(56, 23, 0, 23, 0)
       Debug( 3, "Some other stream index %d, %s", packet.stream_index, av_get_media_type_string( mFormatContext->streams[packet.stream_index]->codecpar->codec_type) );
