@@ -283,7 +283,7 @@ VideoStore::VideoStore(const char *filename_in, const char *format_in,
     zm_dump_stream_format( oc, 1, 0, 1 );
 
   AVDictionary * opts = NULL;
-  av_dict_set(&opts, "movflags", "frag_custom+dash+delay_moov", 0);
+  av_dict_set(&opts, "movflags", "faststart", "frag_custom+dash+delay_moov", 0);
   //av_dict_set(&opts, "movflags", "frag_custom+dash+delay_moov", 0);
   //av_dict_set(&opts, "movflags", "frag_keyframe+empty_moov+default_base_moof", 0);
   if ((ret = avformat_write_header( oc, &opts )) < 0) {

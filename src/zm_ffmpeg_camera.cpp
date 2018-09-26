@@ -128,17 +128,23 @@ int FfmpegCamera::PreCapture()
 }
 
 int FfmpegCamera::Capture( Image &image ) {
+
+  uint8_t* directbuffer=NULL;
+  uint8_t* mvect_buffer=NULL;  
+  
   if (sigprocmask(SIG_BLOCK, &ctype_sigmask, NULL) == -1)
-       Info("Failed to block SIGKILL");	 
-	
-  if (!mCanCapture){
+       Info("Failed to block SIGKILL");
+       	
+  if ( ! mCanCapture ) {
     return -1;
   }
-
+  
+  int ret;
+  static char errbuf[AV_ERROR_MAX_STRING_SIZE];
+  
   // If the reopen thread has a value, but mCanCapture != 0, then we have just reopened the connection to the ffmpeg device, and we can clean up the thread.
-  if (mReopenThread != 0) {
+  if ( mReopenThread != 0 ) {
     void *retval = 0;
-    int ret;
 
     ret = pthread_join(mReopenThread, &retval);
     if (ret != 0){
@@ -149,34 +155,43 @@ int FfmpegCamera::Capture( Image &image ) {
     mReopenThread = 0;
   }
 
+  if ( mVideoCodecContext->codec_id != AV_CODEC_ID_H264 ) {
+    Error( "Input stream is not h264.  The stored event file may not be viewable in browser." );
+  }
+
   int frameComplete = false;
-  while ( !frameComplete ) {
-    int ret;
+  while ( ! frameComplete ) {
     av_init_packet( &packet );
-    int avResult = av_read_frame( mFormatContext, &packet );
-    
-    char errbuf[AV_ERROR_MAX_STRING_SIZE];
-    if ( avResult < 0 ) {
-      av_strerror(avResult, errbuf, AV_ERROR_MAX_STRING_SIZE);
+
+    ret = av_read_frame( mFormatContext, &packet );
+    if ( ret < 0 ) {
+      av_strerror( ret, errbuf, AV_ERROR_MAX_STRING_SIZE );
       if (
           // Check if EOF.
-          (avResult == AVERROR_EOF || (mFormatContext->pb && mFormatContext->pb->eof_reached)) ||
+          (ret == AVERROR_EOF || (mFormatContext->pb && mFormatContext->pb->eof_reached)) ||
           // Check for Connection failure.
-          (avResult == -110)
+          (ret == -110)
          ) {
-        Info( "av_read_frame returned \"%s\". Reopening stream.", errbuf );
-        ReopenFfmpeg();
+          Info( "av_read_frame returned \"%s\". Reopening stream.", errbuf);
+          ReopenFfmpeg();
       }
 
-      Error( "Unable to read packet from stream %d: error %d \"%s\".", packet.stream_index, avResult, errbuf );
+      Error( "Unable to read packet from stream %d: error %d \"%s\".", packet.stream_index, ret, errbuf );
       return( -1 );
     }
-    Debug( 5, "Got packet from stream %d dts (%d) pts(%d)", packet.stream_index, packet.pts, packet.dts );
-    // What about audio stream? Maybe someday we could do sound detection...
+
+   
+
+    Debug( 4, "Got packet from stream %d packet pts (%d) dts(%d)", 
+        packet.stream_index, packet.pts, packet.dts
+        );
+
 
     if ( packet.stream_index == mVideoStreamId ) {
-    if (!ctype) { 
-    
+     
+      Debug(4, "about to decode video" );
+      
+    if (!ctype) {   
 #if LIBAVCODEC_VERSION_CHECK(57, 64, 0, 64, 0)
       ret = avcodec_send_packet( mVideoCodecContext, &packet );
       if ( ret < 0 ) {
@@ -188,12 +203,11 @@ int FfmpegCamera::Capture( Image &image ) {
       ret = avcodec_receive_frame( mVideoCodecContext, mRawFrame );
       if ( ret < 0 ) {
         av_strerror( ret, errbuf, AV_ERROR_MAX_STRING_SIZE );
-        Error( "Unable to receive frame at frame %d: %s, continuing", frameCount, errbuf );
+        Debug( 1, "Unable to send packet at frame %d: %s, continuing", frameCount, errbuf );
         zm_av_packet_unref( &packet );
         continue;
       }
       frameComplete = 1;
- 
 # else
       ret = zm_avcodec_decode_video( mVideoCodecContext, mRawFrame, &frameComplete, &packet );
       if ( ret < 0 ) {
@@ -205,215 +219,169 @@ int FfmpegCamera::Capture( Image &image ) {
 #endif
 
       Debug( 4, "Decoded video packet at frame %d", frameCount );
-
-}  else { //if ctype
+      
+      
+   }  else { //if ctype
     //the mmal decoder builds mRawFrame here with an I420 buffer	
       frameComplete=mmal_decode(&packet);
       Debug( 4, "Decoded video packet at frame %d", frameCount );
-}  //if cytpe
+      
+   }  //if cytpe   
+
+  } //if packet index is video
+
+  if ( packet.stream_index == mVideoStreamId ) {
+	  //Mvect buffer to be requested for both ctype and !ctype
+        if (cfunction == Monitor::MVDECT) {
+           mvect_buffer=image.VectBuffer();   
+           if (mvect_buffer ==  NULL ){
+                Error("Failed requesting vector buffer for the captured image.");
+                return (-1); 
+           } 
+        } 
+	  
+	  
+  }	
+  
+  if ( packet.stream_index == mVideoStreamId ) {      
+//FRAMECOMPLETE 1 -> got a decoded packet and in case of mmal, 
+                   //mmal_decode has filled MRawFrame with I420 buffer at this point
 
       if ( frameComplete ) {
-        Debug( 4, "Got frame %d", frameCount );
-        //Info("Got frame %d", frameCount );
-        
-        uint8_t* directbuffer;
+        //Debug( 4, "Got frame %d", frameCount );
 
         /* Request a writeable buffer of the target image */
         directbuffer = image.WriteBuffer(width, height, colours, subpixelorder);
-        if(directbuffer == NULL) {
+                   
+        if ( directbuffer == NULL ) {
           Error("Failed requesting writeable buffer for the captured image.");
           zm_av_packet_unref( &packet );
           return (-1);
         }
         
         
-
-        uint8_t* mvect_buffer=NULL;  
         
-        if  (cfunction == Monitor::MVDECT) {
-	  
-	       mvect_buffer=image.VectBuffer();   
-           if (mvect_buffer ==  NULL ){
-                Error("Failed requesting vector buffer for the captured image.");
-                return (-1); 
-           } 
- 
         
-           if (!ctype) { //motion vectors from software h264 decoding
-			   
-               //FIXMEC, still need to rewrite this          
-
-           }         
-
-#ifdef __arm__
-        uint8_t* jpegbuffer=NULL;
-        //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels tile Left to Right and then top to bottom and there are a fixed number covering the entire frame.
-#endif
-           if (ctype) { 
-                //mmal_decode has filled MRawFrame with I420 buffer at this point
-
-
-                
+        //mmal will use mFrame to store the rgb buffer
+        if  (ctype) {
+           
 #if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
-                av_image_fill_arrays(mFrame->data, mFrame->linesize,
+            av_image_fill_arrays(mFrame->data, mFrame->linesize,
                      directbuffer, imagePixFormat, width, height, 1);
 #else
-                avpicture_fill( (AVPicture *)mFrame, directbuffer,
+            avpicture_fill( (AVPicture *)mFrame, directbuffer,
                      imagePixFormat, width, height);
 #endif
-
-#ifdef __arm__ 
-
-                //mmal_resize will read mRawFrame and fill mFrame with RGB data with downscaled resolution
-                mmal_resize(&directbuffer); 
-                
-                //Create the JPEG buffer for this frame if frame is alarmed, using downscaled resolution
-                jpegbuffer=image.JPEGBuffer(width, height);
-                if (jpegbuffer ==  NULL ){
-                   Error("Failed requesting jpeg buffer for the captured image.");
-                   return (-1); 
-                }
-                
-		        mmal_encode(&mvect_buffer); 
-		        
-		        //Buffer visualization should be here after the resized buffer is created, and before it is converted to jpeg
-		        //Turn off for faster performance.  if not visualizing, turn result[i] memcpy as well in mmal_encode. 
-		        
-		        for (int i=0; i < monitor->GetZonesNum() ; i++) {
-                     uint32_t offset=0;
-                     uint32_t *res=NULL;
-                     int count=0;
-                     int index=0;
-                     if (czones[i]->motion_detected) {
-						 res=(uint32_t*)(result[i]+offset);
-						 for (int j=0; j<numblocks; j++) {
-							 if (*res & (0x80000000 >> count)) {
-                                   
-                                   //Mark the macroblocks that have motion detected. 
-                                   //This will only draw the white pixel on the macroblock upper left corner coordinate if the alarm_pixel value is within the value of min_alarm_pixels and max_alarm_pixels,
-                                   //so will not see the white pixels in all recorded frames. 
-                                   //This is only for debugging and not needed for normal use 
-                                   
-                                   if (colours == 3 )  
-                                        RGB=(RGB24*)directbuffer; 
-                                   //Info("Index at %d, coordinates at %d,%d and RGB index at %d", index, (Block+index)->coords->X(), (Block+index)->coords->Y(), (Block+index)->rgbindex);     
-                                   if ((Block+index)->rgbindex >=0) {     
-                                     (RGB+((Block+index)->rgbindex))->R=255;
-                                     (RGB+((Block+index)->rgbindex))->G=255;
-                                     (RGB+((Block+index)->rgbindex))->B=255;
-							       }       
-							 }
-							 count++;
-							 index++;
-							 if (count==32) {
-					            offset+=4;
-                                count=0;
-								res=(uint32_t*)(result[i]+offset); //Last iteration will read past actual data but the buffer is large enough, just filled with zeroes
-							 }	 
-					     }		 	 
-						 
-						 
-						 
-						 
-					
-                     }  
-                }   
-		        
-		        
-		        
-		        //Option 1. use the image EncodeJpeg function which requires argument jpeg_size
-		        int *jpeg_size=(int *)jpegbuffer; 
-				image.EncodeJpeg(jpegbuffer+4, jpeg_size );
-				//Option 2. use hardware mmal.
-		        //mmal_jpeg(&jpegbuffer);
-/*
-                //mmal_encode will read mFrame and create an RGB buffer and put it in directbuffer
-                if (mmal_encode(&mvect_buffer)) //alarmed frame
-                   //jpeg encode the frames between current alarmed write frame and frame that analyse is reading up to the post event count frames
-                   j_encode_count=monitor->GetImageBufferCount()+monitor->GetPostEventCount(); 
-                if (j_encode_count){
-				   //first word is jpeg size, rest is jpeg data
-				   //Option 1. use the image EncodeJpeg function.
-				   //image.EncodeJpeg(jpegbuffer+4, jpeg_size );
-				   //Option 2. use hardware mmal.
-				   mmal_jpeg(&jpegbuffer);
-				   
-				   if (j_encode_count >0) 
-				     j_encode_count--;
-				} else { //set the first word as zero
-				   *jpeg_size=0;
-				}
-*/				
-				
-					
-
-                
-                
-           } //if ctype
         
-         }
-        
-
-#endif
-        
-      
-
-//This is the software scaler. Directbuffer is packaged into mFrame and processed by swscale to convert to appropriate format and size
-//Need SWScale when Source Type is FFmpeg with Function as Mvdect or Modect
-//or Source type is FFmpeghw and Function is Modect  
-//This is only used if source is FFmpeg or source is FFmpeghw and Function is Modect.      
-if (((ctype) && (cfunction == Monitor::MODECT)) || (!ctype)) {   
-	
- 
-
-#if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
-        av_image_fill_arrays(mFrame->data, mFrame->linesize,
-            directbuffer, imagePixFormat, width, height, 1);
+            frameComplete=mmal_resize(&directbuffer); 
+           
+        } else  if (((ctype) && (cfunction == Monitor::MODECT)) || (!ctype)) {
+	      //This is the software scaler. Directbuffer is packaged into mFrame and processed by swscale to convert to appropriate format and size
+          //Need SWScale when Source Type is FFmpeg with Function as Mvdect or Modect
+          //or Source type is FFmpeghw and Function is Modect  
+          //This is only used if source is FFmpeg or source is FFmpeghw and Function is Modect. 
+			
+			#if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
+             av_image_fill_arrays(mFrame->data, mFrame->linesize,
+                                  directbuffer, imagePixFormat, width, height, 1);
 #else
-        avpicture_fill( (AVPicture *)mFrame, directbuffer,
-            imagePixFormat, width, height);
+             avpicture_fill( (AVPicture *)mFrame, directbuffer,
+                            imagePixFormat, width, height);
 #endif
 
 
  
 #if HAVE_LIBSWSCALE
-        if(mConvertContext == NULL) {
-          mConvertContext = sws_getContext(mVideoCodecContext->width,
+             if(mConvertContext == NULL) {
+                 mConvertContext = sws_getContext(mVideoCodecContext->width,
                                            mVideoCodecContext->height,
                                            mVideoCodecContext->pix_fmt,
                                            width, height, imagePixFormat,
                                            SWS_BICUBIC, NULL, NULL, NULL);
 
-          if(mConvertContext == NULL)
-            Fatal( "Unable to create conversion context for %s", mPath.c_str() );
-        }
+             if(mConvertContext == NULL)
+                Fatal( "Unable to create conversion context for %s", mPath.c_str() );
+             }
 
-        if (sws_scale(mConvertContext, mRawFrame->data, mRawFrame->linesize, 0, mVideoCodecContext->height, mFrame->data, mFrame->linesize) < 0)
-          Fatal("Unable to convert raw format %u to target format %u at frame %d", mVideoCodecContext->pix_fmt, imagePixFormat, frameCount);
+             if (sws_scale(mConvertContext, mRawFrame->data, mRawFrame->linesize, 0, mVideoCodecContext->height, mFrame->data, mFrame->linesize) < 0)
+                Fatal("Unable to convert raw format %u to target format %u at frame %d", mVideoCodecContext->pix_fmt, imagePixFormat, frameCount);
 #else // HAVE_LIBSWSCALE
-        Fatal( "You must compile ffmpeg with the --enable-swscale option to use ffmpeg cameras" );
-#endif // HAVE_LIBSWSCALE
+                Fatal( "You must compile ffmpeg with the --enable-swscale option to use ffmpeg cameras" );
+#endif // HAVE_LIBSWSCALE         
+		frameCount++; //MODECT mode ends here
+	    }	
+        
+         
+      }  //if framecomplete 1 
 
-} // closing bracket for "if (((ctype) && (cfunction == Monitor::MODECT)) || (!ctype))"
- 
+
+
+//FRAMECOMPLETE 2 -> mmal_resize has taken the buffer from mRawFrame, resized it and put it in mFrame        
+        
+      if (frameComplete) {
+         if ((ctype) && (cfunction == Monitor::MVDECT)) {
+		         
+		        frameComplete=mmal_encode(&mvect_buffer);
+		        
+		}  //if cfunction
+	  } //if frameComplete 2
+	  
+	  
+	  
+//FRAMECOMPLETE 3 -> mmal_encode successfully received an output buffer. 	  
+	
+		
+	  if ( frameComplete ) {
+		    if  ((ctype) && (cfunction == Monitor::MVDECT)) {
+				
+				Visualize_Buffer(&directbuffer);	    
+				
+				//Create the JPEG buffer for this frame if frame is alarmed, using downscaled resolution
+                uint8_t* jpegbuffer=NULL;
+                jpegbuffer=image.JPEGBuffer(width, height);
+                if (jpegbuffer ==  NULL ){
+                   Error("Failed requesting jpeg buffer for the captured image.");
+                   return (-1); 
+                }
+			
+		        //Option 1. use the image EncodeJpeg function which requires argument jpeg_size
+		        //int *jpeg_size=(int *)jpegbuffer; 
+				//image.EncodeJpeg(jpegbuffer+4, jpeg_size );
+				//Option 2. use hardware mmal.
+		        mmal_jpeg(&jpegbuffer);
+
+
+        
+          } //if cfunction
+        
+          
         frameCount++;
-      } // end if frameComplete
+      }  // end if frameComplete
       
+      
+      
+    } else if ( packet.stream_index == mAudioStreamId ) { //FIXME best way to copy all other streams
+		
+	 //Nothing to do
       
     } else {
-      Debug( 4, "Different stream_index %d", packet.stream_index );
-    } // end if packet.stream_index == mVideoStreamId
-    zm_av_packet_unref( &packet );
+#if LIBAVUTIL_VERSION_CHECK(56, 23, 0, 23, 0)
+      Debug( 3, "Some other stream index %d, %s", packet.stream_index, av_get_media_type_string( mFormatContext->streams[packet.stream_index]->codecpar->codec_type) );
+#else
+      Debug( 3, "Some other stream index %d", packet.stream_index );
+#endif
+    }
+      
+      // the packet contents are ref counted... when queuing, we allocate another packet and reference it with that one, so we should always need to unref here, which should not affect the queued version.
+      zm_av_packet_unref( &packet );
   } // end while ! frameComplete
   
   
- 
-	
-if (sigprocmask(SIG_UNBLOCK, &ctype_sigmask, NULL) == -1)
+  
+  if (sigprocmask(SIG_UNBLOCK, &ctype_sigmask, NULL) == -1)
        Info("Failed to unblock SIGKILL");
-  
-  
-  return (0);
+  //Info("Framecount is %d", frameCount);
+  return (frameCount);
 } // FfmpegCamera::Capture
 
 int FfmpegCamera::PostCapture() {
@@ -576,7 +544,7 @@ int FfmpegCamera::mmal_decode(AVPacket *pkt) {
 
 int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled frame) data 
 	MMAL_BUFFER_HEADER_T *buffer;
-	int got_vectors=false;
+	int got_result=false;
 	
                
 	if ((buffer = mmal_queue_get(pool_ine->queue)) != NULL) {  
@@ -603,9 +571,9 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
       if ((buffer = mmal_queue_get(context.equeue)) == NULL)
          buffer = mmal_queue_timedwait(context.equeue, 50);
       if (buffer) {   
-         
+            got_result=true;  //succeeded wether we receive a video buffer or vector buffer
          if(buffer->flags & MMAL_BUFFER_HEADER_FLAG_CODECSIDEINFO) {
-			      got_vectors=true;
+			      
 			      uint32_t m_offset=0; 
                   for (int i=0; i < czones_n ; i++) {
                         mmal_motion_vector *mvarray=(mmal_motion_vector *)buffer->data;
@@ -728,7 +696,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 		  
       }
       
-      return (got_vectors);
+      return (got_result);
 }	
 
 
@@ -1391,7 +1359,9 @@ int FfmpegCamera::OpenMmalJPEG(AVCodecContext *mVideoCodecContext){
 
 
 int FfmpegCamera::CloseMmal(){
-	
+if (sigprocmask(SIG_BLOCK, &ctype_sigmask, NULL) == -1)
+       Info("Failed to block SIGKILL");
+       	
    MMAL_BUFFER_HEADER_T *buffer;
 	
    mmal_port_disable(decoder->input[0]);
@@ -1477,7 +1447,8 @@ int FfmpegCamera::CloseMmal(){
    if (context.jqueue)
       mmal_queue_destroy(context.jqueue);  	 
    
-   
+   if (sigprocmask(SIG_UNBLOCK, &ctype_sigmask, NULL) == -1)
+       Info("Failed to unblock SIGKILL");
    return 0;
 }
 #endif
@@ -1752,11 +1723,14 @@ int FfmpegCamera::OpenFfmpeg() {
      return -1;
    }  
 	
-	
+	if (sigprocmask(SIG_BLOCK, &ctype_sigmask, NULL) == -1)
+       Info("Failed to block SIGKILL");
 	OpenMmalDecoder(mVideoCodecContext);
     OpenMmalEncoder(mVideoCodecContext);
     OpenMmalResizer(mVideoCodecContext);
-    OpenMmalJPEG(mVideoCodecContext); 
+    OpenMmalJPEG(mVideoCodecContext);
+    if (sigprocmask(SIG_UNBLOCK, &ctype_sigmask, NULL) == -1)
+       Info("Failed to unblock SIGKILL"); 
     
     int j_height=((height+16)/16)*16;
     int j_width=((width+32)/32)*32; 
@@ -2081,7 +2055,7 @@ void *FfmpegCamera::ReopenFfmpegThreadCallback(void *ctx){
 }
 
 int FfmpegCamera::QueueVideoPackets(timeval recording, char* event_file){
- 
+    //Info("Queue Video Packet");
         
     //Video recording
     int key_frame = packet.flags & AV_PKT_FLAG_KEY;
@@ -2218,6 +2192,7 @@ else if ( packet.pts && video_last_pts > packet.pts ) {
 }	
 
 int FfmpegCamera::WriteVideoPacket(){
+	//Info("Write Video packet");
     if ( videoStore ) {
         //Write the packet to our video store
         int ret = videoStore->writeVideoFramePacket( &packet );
@@ -2229,6 +2204,7 @@ int FfmpegCamera::WriteVideoPacket(){
 }	
 
 int FfmpegCamera::WriteAudioPacket(){
+	//Info("Write audio packet");
 	if ( videoStore ) {
         if ( record_audio ) {
           Debug(3, "Recording audio packet streamindex(%d) packetstreamindex(%d)", mAudioStreamId, packet.stream_index );
@@ -2248,9 +2224,85 @@ int FfmpegCamera::WriteAudioPacket(){
       }
 }	
 
+int FfmpegCamera::Visualize_Buffer(uint8_t **dbuffer){
+    //Buffer visualization should be here after the resized buffer is created, and before it is converted to jpeg
+		        //Turn off for faster performance.  if not visualizing, turn result[i] memcpy off as well in mmal_encode. 
+		        
+		        for (int i=0; i < monitor->GetZonesNum() ; i++) {
+                     uint32_t offset=0;
+                     
+                     uint32_t *res=NULL;
+                     uint8_t *dir_mask=NULL;
+                     
+                     pattern r_pattern=center; 
+                     
+                     int count=0;
+                     int index=0;
+                     if (czones[i]->motion_detected) {
+						 res=(uint32_t*)(result[i]+offset);
+						 for (int j=0; j<numblocks; j++) {
+						   if (*res) {
+							 dir_mask=(uint8_t*)(direction[i]+j);  
+							 	 
+							 if (*res & (0x80000000 >> count)) {
+                                   
+                                   //Mark the macroblocks that have motion detected. 
+                                   //This is only for debugging and not needed for normal use 
+                                   
+                                   
+                                   //Info("Index at %d, coordinates at %d,%d and RGB index at %d", index, (Block+index)->coords->X(), (Block+index)->coords->Y(), (Block+index)->rgbindex);     
+                                   /*if ((Block+index)->rgbindex >=0) {  
+									 for (int m=0; m < colour ; m++) {   
+                                       *(uint8_t*)(directbuffer+(((Block+index)->rgbindex)+m))=255;
+								     }
+							       }*/ 
+							       
+							       //[n][ne][e][se][s][sw][w][nw]
+							       //[7][6] [5][4] [3][2] [1][0] 
+							       
+							       for ( int i=0; i<8 ; i++) {
+									  if (*dir_mask & 1<<i) {
+										r_pattern=(pattern)i;
+										break;  
+									  }	     
+								   }	   
+							       
+							       
+							       
+							       
+							       if (colours == 3 )  
+                                        RGB=(RGB24*)(*dbuffer); 
+							       pixel_write(RGB,(Block+index)->rgbindex, r_pattern);
+							       
+							           
+							 }
+							 
+							 count++;
+							 index++;
+							 if (count==32) {
+					            offset+=4;
+                                count=0;
+								res=(uint32_t*)(result[i]+offset); //Last iteration will read past actual data but the buffer is large enough, just filled with zeroes
+								
+							 }	
+							 
+						   } //if (*res)	  
+					     }		 	 
+						 
+						 
+						 
+						 
+					
+                     }  
+                } 
+                	
+}	
+
 //Function to handle capture and store
 int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event_file ) {
-	
+
+  uint8_t* directbuffer=NULL;
+  uint8_t* mvect_buffer=NULL;  
   
   if (sigprocmask(SIG_BLOCK, &ctype_sigmask, NULL) == -1)
        Info("Failed to block SIGKILL");
@@ -2258,6 +2310,7 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
   if ( ! mCanCapture ) {
     return -1;
   }
+  
   int ret;
   static char errbuf[AV_ERROR_MAX_STRING_SIZE];
   
@@ -2346,15 +2399,32 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
     //the mmal decoder builds mRawFrame here with an I420 buffer	
       frameComplete=mmal_decode(&packet);
       Debug( 4, "Decoded video packet at frame %d", frameCount );
-}  //if cytpe   
+      
+      //Start queueing video packets if successfully decoded video
+      QueueVideoPackets(recording, event_file);
+   }  //if cytpe   
 
-       uint8_t* directbuffer;
-       uint8_t* mvect_buffer=NULL;  
+  } //if packet index is video
+
+  if ( packet.stream_index == mVideoStreamId ) {
+	  //Mvect buffer to be requested for both ctype and !ctype
+        if (cfunction == Monitor::MVDECT) {
+           mvect_buffer=image.VectBuffer();   
+           if (mvect_buffer ==  NULL ){
+                Error("Failed requesting vector buffer for the captured image.");
+                return (-1); 
+           } 
+        } 
+	  
+	  
+  }	
+  
+  if ( packet.stream_index == mVideoStreamId ) {      
+//FRAMECOMPLETE 1 -> got a decoded packet and in case of mmal, 
+                   //mmal_decode has filled MRawFrame with I420 buffer at this point
 
       if ( frameComplete ) {
         //Debug( 4, "Got frame %d", frameCount );
-
-       
 
         /* Request a writeable buffer of the target image */
         directbuffer = image.WriteBuffer(width, height, colours, subpixelorder);
@@ -2368,133 +2438,80 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
         
         
         
-        if  (cfunction == Monitor::MVDECT) {
-	  
-	       mvect_buffer=image.VectBuffer();   
-           if (mvect_buffer ==  NULL ){
-                Error("Failed requesting vector buffer for the captured image.");
-                return (-1); 
-           } 
-        
-           if (!ctype) { //motion vectors from software h264 decoding
-			   
-               //FIXMEC, still need to write this          
-
-           }  
-        }
-       
-       
-        
-        
-        if  (cfunction == Monitor::MVDECT) {
-        //motion vectors from hardware h264 encoding on the RPI only, the size of macroblocks are 16x16 pixels tile Left to Right and then top to bottom and there are a fixed number covering the entire frame.
-           if (ctype) { 
-                //mmal_decode has filled MRawFrame with I420 buffer at this point
-
-
-                
+        //mmal will use mFrame to store the rgb buffer
+        if  (ctype) {
+           
 #if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
-                av_image_fill_arrays(mFrame->data, mFrame->linesize,
+            av_image_fill_arrays(mFrame->data, mFrame->linesize,
                      directbuffer, imagePixFormat, width, height, 1);
 #else
-                avpicture_fill( (AVPicture *)mFrame, directbuffer,
+            avpicture_fill( (AVPicture *)mFrame, directbuffer,
                      imagePixFormat, width, height);
 #endif
-
-#ifdef __arm__ 
-
-                //mmal_resize will read mRawFrame and fill mFrame with RGB data with downscaled resolution
-                frameComplete=mmal_resize(&directbuffer); 
-             }   
-         }
-         
-        }      
         
-        if (frameComplete) {
-         if  (cfunction == Monitor::MVDECT) {
-			 if (ctype) {       
+            frameComplete=mmal_resize(&directbuffer); 
+           
+        } else  if (((ctype) && (cfunction == Monitor::MODECT)) || (!ctype)) {
+	      //This is the software scaler. Directbuffer is packaged into mFrame and processed by swscale to convert to appropriate format and size
+          //Need SWScale when Source Type is FFmpeg with Function as Mvdect or Modect
+          //or Source type is FFmpeghw and Function is Modect  
+          //This is only used if source is FFmpeg or source is FFmpeghw and Function is Modect. 
+			
+			#if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
+             av_image_fill_arrays(mFrame->data, mFrame->linesize,
+                                  directbuffer, imagePixFormat, width, height, 1);
+#else
+             avpicture_fill( (AVPicture *)mFrame, directbuffer,
+                            imagePixFormat, width, height);
+#endif
+
+
+ 
+#if HAVE_LIBSWSCALE
+             if(mConvertContext == NULL) {
+                 mConvertContext = sws_getContext(mVideoCodecContext->width,
+                                           mVideoCodecContext->height,
+                                           mVideoCodecContext->pix_fmt,
+                                           width, height, imagePixFormat,
+                                           SWS_BICUBIC, NULL, NULL, NULL);
+
+             if(mConvertContext == NULL)
+                Fatal( "Unable to create conversion context for %s", mPath.c_str() );
+             }
+
+             if (sws_scale(mConvertContext, mRawFrame->data, mRawFrame->linesize, 0, mVideoCodecContext->height, mFrame->data, mFrame->linesize) < 0)
+                Fatal("Unable to convert raw format %u to target format %u at frame %d", mVideoCodecContext->pix_fmt, imagePixFormat, frameCount);
+#else // HAVE_LIBSWSCALE
+                Fatal( "You must compile ffmpeg with the --enable-swscale option to use ffmpeg cameras" );
+#endif // HAVE_LIBSWSCALE         
+		frameCount++; //MODECT mode ends here
+	    }	
+        
+         
+      }  //if framecomplete 1 
+
+
+
+//FRAMECOMPLETE 2 -> mmal_resize has taken the buffer from mRawFrame, resized it and put it in mFrame        
+        
+      if (frameComplete) {
+         if ((ctype) && (cfunction == Monitor::MVDECT)) {
 		         
 		        frameComplete=mmal_encode(&mvect_buffer);
 		        
-		        //Buffer visualization should be here after the resized buffer is created, and before it is converted to jpeg
-		        //Turn off for faster performance.  if not visualizing, turn result[i] memcpy as well in mmal_encode. 
-		        
-		        for (int i=0; i < monitor->GetZonesNum() ; i++) {
-                     uint32_t offset=0;
-                     
-                     uint32_t *res=NULL;
-                     uint8_t *dir_mask=NULL;
-                     
-                     pattern r_pattern=center; //center pixel
-                     
-                     int count=0;
-                     int index=0;
-                     if (czones[i]->motion_detected) {
-						 res=(uint32_t*)(result[i]+offset);
-						 for (int j=0; j<numblocks; j++) {
-						   if (*res) {
-							 dir_mask=(uint8_t*)(direction[i]+j);  
-							 	 
-							 if (*res & (0x80000000 >> count)) {
-                                   
-                                   //Mark the macroblocks that have motion detected. 
-                                   //This is only for debugging and not needed for normal use 
-                                   
-                                   
-                                   //Info("Index at %d, coordinates at %d,%d and RGB index at %d", index, (Block+index)->coords->X(), (Block+index)->coords->Y(), (Block+index)->rgbindex);     
-                                   /*if ((Block+index)->rgbindex >=0) {  
-									 for (int m=0; m < colour ; m++) {   
-                                       *(uint8_t*)(directbuffer+(((Block+index)->rgbindex)+m))=255;
-								     }
-							       }*/ 
-							       
-							       //[n][ne][e][se][s][sw][w][nw]
-							       //[7][6] [5][4] [3][2] [1][0] 
-							       
-							       for ( int i=0; i<8 ; i++) {
-									  if (*dir_mask & 1<<i) {
-										r_pattern=(pattern)i;
-										break;  
-									  }	     
-								   }	   
-							       
-							       
-							       
-							       
-							       if (colours == 3 )  
-                                        RGB=(RGB24*)directbuffer; 
-							       pixel_write(RGB,(Block+index)->rgbindex, r_pattern);
-							       
-							           
-							 }
-							 
-							 count++;
-							 index++;
-							 if (count==32) {
-					            offset+=4;
-                                count=0;
-								res=(uint32_t*)(result[i]+offset); //Last iteration will read past actual data but the buffer is large enough, just filled with zeroes
-								
-							 }	
-							 
-						   } //if (*res)	  
-					     }		 	 
-						 
-						 
-						 
-						 
-					
-                     }  
-                } 
-                
-			} //if ctype  
 		}  //if cfunction
-	} //if frameComplete
+	  } //if frameComplete 2
+	  
+	  
+	  
+//FRAMECOMPLETE 3 -> mmal_encode successfully received an output buffer. 	  
+	
 		
-		if ( frameComplete ) {
-		     
-		    if  (cfunction == Monitor::MVDECT) {	    
-		    if (ctype) {    
+	  if ( frameComplete ) {
+		    if  ((ctype) && (cfunction == Monitor::MVDECT)) {
+				
+				Visualize_Buffer(&directbuffer);
+				
 				
 				//Create the JPEG buffer for this frame if frame is alarmed, using downscaled resolution
                 uint8_t* jpegbuffer=NULL;
@@ -2510,82 +2527,16 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
 				//Option 2. use hardware mmal.
 		        mmal_jpeg(&jpegbuffer);
 
-/*                //mmal_encode will read mFrame and create an RGB buffer and put it in directbuffer
-                if (mmal_encode(&mvect_buffer)) //alarmed frame
-                   //jpeg encode the frames between current alarmed write frame and frame that analyse is reading up to the post event count frames
-                   j_encode_count=monitor->GetImageBufferCount()+monitor->GetPostEventCount(); 
-                if (j_encode_count){
-				   //first word is jpeg size, rest is jpeg data
-				   //Option 1. use the image EncodeJpeg function.
-				   //image.EncodeJpeg(jpegbuffer+4, jpeg_size );
-				   //Option 2. use hardware mmal.
-				   mmal_jpeg(&jpegbuffer);
-				   
-				   if (j_encode_count >0) 
-				     j_encode_count--;
-				} else { //set the first word as zero
-				   *jpeg_size=0;
-				}
-				
-*/				
-					
-
-                
-                
-           } //if ctype
-        
-         } //ifcfunction
-        
-#endif
 
         
-//This is the software scaler. Directbuffer is packaged into mFrame and processed by swscale to convert to appropriate format and size
-//Need SWScale when Source Type is FFmpeg with Function as Mvdect or Modect
-//or Source type is FFmpeghw and Function is Modect  
-//This is only used if source is FFmpeg or source is FFmpeghw and Function is Modect.      
-if (((ctype) && (cfunction == Monitor::MODECT)) || (!ctype)) {   
-	
-#if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
-        av_image_fill_arrays(mFrame->data, mFrame->linesize,
-            directbuffer, imagePixFormat, width, height, 1);
-#else
-        avpicture_fill( (AVPicture *)mFrame, directbuffer,
-            imagePixFormat, width, height);
-#endif
-
-
- 
-#if HAVE_LIBSWSCALE
-        if(mConvertContext == NULL) {
-          mConvertContext = sws_getContext(mVideoCodecContext->width,
-                                           mVideoCodecContext->height,
-                                           mVideoCodecContext->pix_fmt,
-                                           width, height, imagePixFormat,
-                                           SWS_BICUBIC, NULL, NULL, NULL);
-
-          if(mConvertContext == NULL)
-            Fatal( "Unable to create conversion context for %s", mPath.c_str() );
-        }
-
-        if (sws_scale(mConvertContext, mRawFrame->data, mRawFrame->linesize, 0, mVideoCodecContext->height, mFrame->data, mFrame->linesize) < 0)
-          Fatal("Unable to convert raw format %u to target format %u at frame %d", mVideoCodecContext->pix_fmt, imagePixFormat, frameCount);
-#else // HAVE_LIBSWSCALE
-        Fatal( "You must compile ffmpeg with the --enable-swscale option to use ffmpeg cameras" );
-#endif // HAVE_LIBSWSCALE         
-
-
+          } //if cfunction
         
-} // closing bracket for "if (((ctype) && (cfunction == Monitor::MODECT)) || (!ctype))"        
-
+          
         frameCount++;
-      } else {
-        Debug( 3, "Not framecomplete after av_read_frame" );
-      } // end if frameComplete
+      }  // end if frameComplete
+      
       
       WriteVideoPacket();
-      
-       
-      
       
     } else if ( packet.stream_index == mAudioStreamId ) { //FIXME best way to copy all other streams
 		
@@ -2598,16 +2549,16 @@ if (((ctype) && (cfunction == Monitor::MODECT)) || (!ctype)) {
       Debug( 3, "Some other stream index %d", packet.stream_index );
 #endif
     }
-    //if ( videoStore ) {
       
       // the packet contents are ref counted... when queuing, we allocate another packet and reference it with that one, so we should always need to unref here, which should not affect the queued version.
       zm_av_packet_unref( &packet );
-    //}
   } // end while ! frameComplete
+  
+  
   
   if (sigprocmask(SIG_UNBLOCK, &ctype_sigmask, NULL) == -1)
        Info("Failed to unblock SIGKILL");
-  
+  //Info("Framecount is %d", frameCount);
   return (frameCount);
 } // end FfmpegCamera::CaptureAndRecord
 
