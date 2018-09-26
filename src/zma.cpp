@@ -147,6 +147,8 @@ int main( int argc, char *argv[] )
 
     sigset_t block_set;
     sigemptyset( &block_set );
+    sigaddset( &block_set, SIGKILL);
+    sigaddset( &block_set, SIGTERM);
 
     useconds_t analysis_rate = monitor->GetAnalysisRate();
     unsigned int analysis_update_delay = monitor->GetAnalysisUpdateDelay();

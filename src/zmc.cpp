@@ -231,6 +231,8 @@ int main( int argc, char *argv[] ) {
 
   sigaddset( &block_set, SIGUSR1 );
   sigaddset( &block_set, SIGUSR2 );
+  sigaddset( &block_set, SIGKILL);
+  sigaddset( &block_set, SIGTERM);
 
   if ( monitors[0]->PrimeCapture() < 0 ) {
     Error( "Failed to prime capture of initial monitor" );

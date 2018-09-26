@@ -132,9 +132,6 @@ int FfmpegCamera::Capture( Image &image ) {
   uint8_t* directbuffer=NULL;
   uint8_t* mvect_buffer=NULL;  
   
-  if (sigprocmask(SIG_BLOCK, &ctype_sigmask, NULL) == -1)
-       Info("Failed to block SIGKILL");
-       	
   if ( ! mCanCapture ) {
     return -1;
   }
@@ -378,8 +375,6 @@ int FfmpegCamera::Capture( Image &image ) {
   
   
   
-  if (sigprocmask(SIG_UNBLOCK, &ctype_sigmask, NULL) == -1)
-       Info("Failed to unblock SIGKILL");
   //Info("Framecount is %d", frameCount);
   return (frameCount);
 } // FfmpegCamera::Capture
@@ -571,9 +566,9 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
       if ((buffer = mmal_queue_get(context.equeue)) == NULL)
          buffer = mmal_queue_timedwait(context.equeue, 50);
       if (buffer) {   
-            got_result=true;  //succeeded wether we receive a video buffer or vector buffer
+            
          if(buffer->flags & MMAL_BUFFER_HEADER_FLAG_CODECSIDEINFO) {
-			      
+			    got_result=true;  //succeeded wether we receive a video buffer or vector buffer  
 			      uint32_t m_offset=0; 
                   for (int i=0; i < czones_n ; i++) {
                         mmal_motion_vector *mvarray=(mmal_motion_vector *)buffer->data;
@@ -2304,9 +2299,6 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
   uint8_t* directbuffer=NULL;
   uint8_t* mvect_buffer=NULL;  
   
-  if (sigprocmask(SIG_BLOCK, &ctype_sigmask, NULL) == -1)
-       Info("Failed to block SIGKILL");
-       	
   if ( ! mCanCapture ) {
     return -1;
   }
@@ -2556,8 +2548,6 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
   
   
   
-  if (sigprocmask(SIG_UNBLOCK, &ctype_sigmask, NULL) == -1)
-       Info("Failed to unblock SIGKILL");
   //Info("Framecount is %d", frameCount);
   return (frameCount);
 } // end FfmpegCamera::CaptureAndRecord
