@@ -663,16 +663,64 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 
                          }  
                          
-                         alarm_pixels = vec_count<<10 ; //each 16x16 block is 1 shifted to the left 8; each block is further weighted as x4 so we shift <<10. 
-                         //FIXME
-                         //if( (alarm_pixels > (unsigned int)czones[i]->GetMinAlarmPixels()) && (alarm_pixels < (unsigned int)czones[i]->GetMaxAlarmPixels()) ) {
-                         if (alarm_pixels)    
-                             czones[i]->motion_detected=true;
-					     //} 
-					     //Info("Vec count is %d", vec_count);
+                         //-----------------------
                          
-                         //SAVE this vec count into mvect buffer which becomes a list of zone scores  
-                         memcpy((*mv_buffer)+m_offset ,&alarm_pixels, 4 ) ; 
+                         switch (czones[i]->GetCheckMethod()) {
+							//LEVEL 1 scoring is just counting number of pixels 
+							case 1 : //AlarmPixels
+							  alarm_pixels = vec_count<<(8+score_shift_multiplier);
+							  memcpy((*mv_buffer)+m_offset ,&alarm_pixels, 4 );
+							  czones[i]->motion_detected=true;
+							  Info("Alarm pixels score %d", alarm_pixels);	
+							  break;
+							  
+							//LEVEL 2 scoring is Filtered Pixels, Count a block only if it has greater than min_filtered_pixels
+                            //currently neighbor counting limited to 0-23  
+							case 2 : //FilteredPixels 
+							  int total_alarmed_neighbors=0;
+							  int min_filtered=czones[i]->GetMinFilteredPixels();
+							  
+							  
+							  
+							  for ( int o=0; o< numblocks ; o++) {
+								 (Block+o)->is_neighbors=0;
+								 (Block+o)->has_neighbors=0;  
+							  }	  
+							  
+							  
+							  for ( int o=0; o< numblocks ; o++) {
+								if  ((Block+o)->status) {  
+								 if  ((Block+o)->is_neighbors >= min_filtered) {
+									 total_alarmed_neighbors+=1;
+									 //registers = registers | (0x80000000 >> count);
+								     continue; 
+								 }    
+							     for ( int p=0 ; p<23 ; p++) {
+							         int p_index=(o+*(neighbors+p));
+							         if (p_index) {
+							           if (((Block+o)+p_index)->status) {
+							             (Block+o)->has_neighbors+=1;
+							             ((Block+o)+p_index)->is_neighbors+=1;
+							             if ((Block+o)->has_neighbors >= min_filtered)  {
+							                   total_alarmed_neighbors+=1;
+							                   //registers = registers | (0x80000000 >> count);
+							                   break;
+							             }      
+								       }
+								     }
+								 }
+							    }
+								 
+							   }	 
+							   filter_pixels=total_alarmed_neighbors<<(8+score_shift_multiplier);
+							   memcpy((*mv_buffer)+m_offset ,&filter_pixels, 4 );
+							   czones[i]->motion_detected=true;	
+							   Info("Filter pixels score %d", filter_pixels);
+							   break;	//case break    
+							   
+							  
+						 }	 
+                         
                          m_offset+=4;
                         
                      }
@@ -1738,13 +1786,13 @@ int FfmpegCamera::OpenFfmpeg() {
     numblocks= (frame_width*frame_height)/256;
     Info("ZMC with numblocks %d", numblocks);
     
-    Block=(Blocks*)zm_mallocaligned(32,sizeof(Blocks)*numblocks);
+    Block=(Blocks*)zm_mallocaligned(4,sizeof(Blocks)*numblocks);
     
     
     //Create a lookup table for numblocks coordinates and associated rgb index
     //The blocks will have coordinates outside of the frame due to the extra column
     //The rgbindex is only positive if the coordinates are within frame dimensions
-    coords=(Coord*)zm_mallocaligned(32,sizeof(Coord)*numblocks);
+    coords=(Coord*)zm_mallocaligned(4,sizeof(Coord)*numblocks);
     for ( int i=0; i< numblocks; i++) {
 	   coords[i].X()=(i*16) % (width + 16);
 	   coords[i].Y()=((i*16)/(width +16))*16;
@@ -1757,7 +1805,7 @@ int FfmpegCamera::OpenFfmpeg() {
 	
 	
 	//Setup the bit patterns for displaying motion vector directionality
-	P_ARRAY=(bit_pattern*)zm_mallocaligned(32,sizeof(int)*9);
+	P_ARRAY=(bit_pattern*)zm_mallocaligned(4,sizeof(int)*9);
 	
 	
 	                                 
@@ -1829,7 +1877,7 @@ int FfmpegCamera::OpenFfmpeg() {
 	
 	
 	//Calculate relative indexes of center 5x5 pixels of each macroblock
-	cpixel=(int*)zm_mallocaligned(32,sizeof(int)*32);
+	cpixel=(int*)zm_mallocaligned(4,sizeof(int)*32);
 	int topleft=5;
 	for (int i=0; i<5; i++) {
 	   *(cpixel+i)=5*monitor->Width()+(topleft++);	
@@ -1853,7 +1901,7 @@ int FfmpegCamera::OpenFfmpeg() {
 	
 	
 	//Calculate relative indexes of neighboring 24 Blocks
-	neighbors=(int*)zm_mallocaligned(32,sizeof(int));
+	neighbors=(int*)zm_mallocaligned(4,sizeof(int));
 	
 	int block_columns=(j_width+16)/16;
 	/*
@@ -1913,9 +1961,9 @@ int FfmpegCamera::OpenFfmpeg() {
 	  Info("Zone %d with min alarm pixels %d and max alarm pixels %d", i, czones[i]->GetMinAlarmPixels(), czones[i]->GetMaxAlarmPixels());
 	  
 	  //Create the results buffer for recording indexes of macroblocks with motion per zone
-	  result[i]=(uint8_t*)zm_mallocaligned(32,numblocks/7); //slightly larger than needed
+	  result[i]=(uint8_t*)zm_mallocaligned(4,numblocks/7); //slightly larger than needed
 	  //Create the directions buffer
-	  direction[i]=(uint8_t*)zm_mallocaligned(32,numblocks);
+	  direction[i]=(uint8_t*)zm_mallocaligned(4,numblocks);
 	  if(result[i] == NULL)
 		     Fatal("Memory allocation for result buffer failed: %s",strerror(errno));
       if(direction[i] == NULL)
