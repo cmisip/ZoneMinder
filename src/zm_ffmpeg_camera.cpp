@@ -439,39 +439,11 @@ void FfmpegCamera::control_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf
 
 }
 
-void FfmpegCamera::pixel_write(RGB24 *rgb_ptr, int b_index, pattern r_pattern) {
+void FfmpegCamera::pixel_write(RGB24 *rgb_ptr, int b_index, pattern r_pattern, RGB24 rgb) {
 	    if (b_index <0)
 	      return;
         
-       /* switch (r_pattern) {
-		  case nw:
-		      DEFAULT=NW;
-		      break;
-		  case w:
-		      DEFAULT=WEST;
-		      break;
-		  case sw:
-		      DEFAULT=SW;
-		      break;
-		  case s:
-		      DEFAULT=SOUTH;
-		      break;
-		  case se:
-		      DEFAULT=SE;
-		      break;
-		  case e:
-		      DEFAULT=EAST;
-		      break;
-		  case ne:
-		      DEFAULT=NE;
-		      break;
-		  case n:
-		      DEFAULT=NORTH;
-		      break;
-		  case center:
-		      return;    
-		 }
-		*/              
+       
 		int c_index=0;                                	
 		for ( int i=0; i<25 ; i++) {
 		   if ((P_ARRAY+r_pattern)->bpattern & (0x80000000 >> i)) {
@@ -568,7 +540,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
       if (buffer) {   
             
          if(buffer->flags & MMAL_BUFFER_HEADER_FLAG_CODECSIDEINFO) {
-			    got_result=true;  //succeeded wether we receive a video buffer or vector buffer  
+			    got_result=true;  //succeed when we receive motion vector info only  
 			      uint32_t m_offset=0; 
                   for (int i=0; i < czones_n ; i++) {
                         mmal_motion_vector *mvarray=(mmal_motion_vector *)buffer->data;
@@ -586,6 +558,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                         uint32_t vec_count=0;
                         uint8_t* zone_vector_mask=czones[i]->zone_vector_mask;
                         uint32_t alarm_pixels=0;
+                        uint32_t filter_pixels=0;
                         
                         
                         
@@ -601,9 +574,12 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 							 
 							 //[n][ne][e][se][s][sw][w][nw]
 							 //[7][6] [5][4] [3][2] [1][0] 
-                        
-                            if ((abs(mvarray[j].x_vector) + abs(mvarray[j].y_vector)) > min_vector_distance) { 
+							 
+							//zero the block status 
+                            (Block+j)->status=0;
+                            if (((abs(mvarray[j].x_vector) + abs(mvarray[j].y_vector)) > min_vector_distance) && (mvarray[j].sad < sad_threshold)){ 
                                registers = registers | (0x80000000 >> count);
+                               (Block+j)->status=1; //set the block status if motion detected
                             
                             
  /*     N      */           if (mvarray[j].x_vector >0) { //to e
@@ -663,17 +639,92 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 
                          }  
                          
-                         alarm_pixels = vec_count<<10 ; //each 16x16 block is 1 shifted to the left 8; each block is further weighted as x4 so we shift <<10. 
-                         //FIXME
-                         //if( (alarm_pixels > (unsigned int)czones[i]->GetMinAlarmPixels()) && (alarm_pixels < (unsigned int)czones[i]->GetMaxAlarmPixels()) ) {
-                         if (alarm_pixels)    
+                         /*if (vector_study) { //mark all zones as motion detected to study the motion triggers
+                           if (alarm_pixels)    
                              czones[i]->motion_detected=true;
-					     //} 
-					     //Info("Vec count is %d", vec_count);
+                         } else {
+						    if( (alarm_pixels > (unsigned int)czones[i]->GetMinAlarmPixels()) && (alarm_pixels < (unsigned int)czones[i]->GetMaxAlarmPixels()) ) {
+						      czones[i]->motion_detected=true;		
+                            } 	 
+						 }	*/     
                          
-                         //SAVE this vec count into mvect buffer which becomes a list of zone scores  
-                         memcpy((*mv_buffer)+m_offset ,&alarm_pixels, 4 ) ; 
-                         m_offset+=4;
+                         
+                         switch (czones[i]->GetCheckMethod()) {
+							//LEVEL 1 scoring is just counting number of pixels 
+							case 1 : //AlarmPixels
+							  alarm_pixels = vec_count<<(8+score_shift_multiplier);
+							  memcpy((*mv_buffer)+m_offset ,&alarm_pixels, 4 );
+							  czones[i]->motion_detected=true;
+							  Info("Alarm pixels score %d", alarm_pixels);	
+							  break;
+							  
+							//LEVEL 2 scoring is Filtered Pixels, Count a block only if it has greater than min_filtered_pixels
+                            //currently neighbor counting limited to 0-23  
+							case 2 : //FilteredPixels 
+							  int total_alarmed_neighbors=0;
+							  int min_filtered=czones[i]->GetMinFilteredPixels();
+							  
+							  
+							  
+							  for ( int o=0; o< numblocks ; o++) {
+								 (Block+o)->is_neighbors=0;
+								 (Block+o)->has_neighbors=0;  
+							  }	  
+							  
+							  
+							  for ( int o=0; o< numblocks ; o++) {
+								if  ((Block+o)->status) {  
+								 if  ((Block+o)->is_neighbors >= min_filtered) {
+									 total_alarmed_neighbors+=1;
+									 //registers = registers | (0x80000000 >> count);
+								     continue; 
+								 }    
+							     for ( int p=0 ; p<23 ; p++) {
+							         int p_index=(o+*(neighbors+p));
+							         if (p_index) {
+							           if (((Block+o)+p_index)->status) {
+							             (Block+o)->has_neighbors+=1;
+							             ((Block+o)+p_index)->is_neighbors+=1;
+							             if ((Block+o)->has_neighbors >= min_filtered)  {
+							                   total_alarmed_neighbors+=1;
+							                   //registers = registers | (0x80000000 >> count);
+							                   break;
+							             }      
+								       }
+								     }
+								 }
+							    }
+								 /*count++;   
+								 
+								 if ( count == 32) {
+									//memcpy(&mask, results[i]+offset, sizeof(mask));
+									//res= registers & mask;
+                                    memcpy(result[i]+offset,&res,sizeof(res));
+                               
+                                    //       c =  ((res & 0xfff) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
+                                    //       c += (((res & 0xfff000) >> 12) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
+                                    //       c += ((res >> 24) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
+                                    //       vec_count+=c;
+                               
+						       
+                                    count=0;
+                                    offset+=4;
+                                  
+                                    registers=0; 
+									 
+								 }   */ 
+							   }	 
+							   filter_pixels=total_alarmed_neighbors<<(8+score_shift_multiplier);
+							   memcpy((*mv_buffer)+m_offset ,&filter_pixels, 4 );
+							   czones[i]->motion_detected=true;	
+							   Info("Filter pixels score %d", filter_pixels);
+							   break;	//case break    
+							   
+							  
+						 }	 
+					      
+					     //Info("Vec count is %d", vec_count);
+                         m_offset+=4;//mvect_buffer offset for scores per zone
                         
                      }
 	     }
@@ -1727,24 +1778,20 @@ int FfmpegCamera::OpenFfmpeg() {
     if (sigprocmask(SIG_UNBLOCK, &ctype_sigmask, NULL) == -1)
        Info("Failed to unblock SIGKILL"); 
     
-    int j_height=((height+16)/16)*16;
-    int j_width=((width+32)/32)*32; 
-    jpeg_limit=(j_width*j_height);  //Avoid segfault in case jpeg is bigger than the buffer.
+    jpeg_limit=((((width+32)/32)*32)*(((height+16)/16)*16));  //Avoid segfault in case jpeg is bigger than the buffer.
     
     
-    int frame_width=monitor->Width()+16;
-    int frame_height=((monitor->Height()+16)/16)*16;
   
-    numblocks= (frame_width*frame_height)/256;
+    numblocks= ((monitor->Width()+16)*(((monitor->Height()+16)/16)*16))/256;
     Info("ZMC with numblocks %d", numblocks);
     
-    Block=(Blocks*)zm_mallocaligned(32,sizeof(Blocks)*numblocks);
+    Block=(Blocks*)zm_mallocaligned(4,sizeof(Blocks)*numblocks);
     
     
     //Create a lookup table for numblocks coordinates and associated rgb index
     //The blocks will have coordinates outside of the frame due to the extra column
     //The rgbindex is only positive if the coordinates are within frame dimensions
-    coords=(Coord*)zm_mallocaligned(32,sizeof(Coord)*numblocks);
+    coords=(Coord*)zm_mallocaligned(4,sizeof(Coord)*numblocks);
     for ( int i=0; i< numblocks; i++) {
 	   coords[i].X()=(i*16) % (width + 16);
 	   coords[i].Y()=((i*16)/(width +16))*16;
@@ -1757,7 +1804,7 @@ int FfmpegCamera::OpenFfmpeg() {
 	
 	
 	//Setup the bit patterns for displaying motion vector directionality
-	P_ARRAY=(bit_pattern*)zm_mallocaligned(32,sizeof(int)*9);
+	P_ARRAY=(bit_pattern*)zm_mallocaligned(4,sizeof(int)*9);
 	
 	
 	                                 
@@ -1829,7 +1876,7 @@ int FfmpegCamera::OpenFfmpeg() {
 	
 	
 	//Calculate relative indexes of center 5x5 pixels of each macroblock
-	cpixel=(int*)zm_mallocaligned(32,sizeof(int)*32);
+	cpixel=(int*)zm_mallocaligned(4,sizeof(int)*32);
 	int topleft=5;
 	for (int i=0; i<5; i++) {
 	   *(cpixel+i)=5*monitor->Width()+(topleft++);	
@@ -1853,55 +1900,64 @@ int FfmpegCamera::OpenFfmpeg() {
 	
 	
 	//Calculate relative indexes of neighboring 24 Blocks
-	neighbors=(int*)zm_mallocaligned(32,sizeof(int));
+	neighbors=(int*)zm_mallocaligned(4,sizeof(int));
 	
-	int block_columns=(j_width+16)/16;
-	/*
+	//int block_columns=(((((width+32)/32)*32)+16)/16);
+	
+	
+	//   08 09  10  11 12
+    //   23 00  01  02 13
+	//   22 07  X   03 14
+	//   21 06  05  04 15
+	//   20 19  18  17 16  
+	     
+	Info("Calculating neighbors");     
+	  
     //0 1 2
     for (int i=0, j=2; j>-1; i++, --j){
-     *(neighbors+i) = 0 - (block_columns * 1 +j);
+     *(neighbors+i) = 0 - ((((((width+32)/32)*32)+16)/16) * 1 +j);
 	}
 	
     //3	
-    *(neighbors+3) = 0 +(block_columns * 0 +1);
+    *(neighbors+3) = 0 +((((((width+32)/32)*32)+16)/16) * 0 +1);
   
     //4 5 6
     for (int i=4, j=2; j>-1; i++, --j){
-     *(neighbors+i) = 0 + (block_columns * 1 +j);
+     *(neighbors+i) = 0 + ((((((width+32)/32)*32)+16)/16) * 1 +j);
 	}
 
     //7
-    *(neighbors+7) = 0 -(block_columns * 0 + 1);
+    *(neighbors+7) = 0 -((((((width+32)/32)*32)+16)/16) * 0 + 1);
   
     //8 9 10 11 12
     for (int i=8, j=4; j>-1; i++, --j){
-     *(neighbors+i) = 0 - (block_columns * 2 +j);
+     *(neighbors+i) = 0 - ((((((width+32)/32)*32)+16)/16) * 2 +j);
 	}
 	
     //13 
-    *(neighbors+13) = 0 - (block_columns * 1 -1);
+    *(neighbors+13) = 0 - ((((((width+32)/32)*32)+16)/16) * 1 -1);
   
     //14
-    *(neighbors+14) = 0 -(block_columns * 0 - 2);
+    *(neighbors+14) = 0 -((((((width+32)/32)*32)+16)/16) * 0 - 2);
   
     //15
-    *(neighbors+15) = 0 +(block_columns * 1 +3);
+    *(neighbors+15) = 0 +((((((width+32)/32)*32)+16)/16) * 1 +3);
   
     //16 17 18 19 20
     for (int i=16, j=4; j>-1; i++, --j){
-     *(neighbors+i) = 0 + (block_columns * 2 +j);
+     *(neighbors+i) = 0 + ((((((width+32)/32)*32)+16)/16) * 2 +j);
 	}
 	
     //21
-    *(neighbors+21) = 0 +(block_columns * 1 -1);
+    *(neighbors+21) = 0 +((((((width+32)/32)*32)+16)/16) * 1 -1);
   
     //22
-    *(neighbors+22) = 0 +(block_columns * 0 -2);
+    *(neighbors+22) = 0 +((((((width+32)/32)*32)+16)/16) * 0 -2);
   
     //23
-    *(neighbors+23) = 0 -(block_columns * 1 +3);
+    *(neighbors+23) = 0 -((((((width+32)/32)*32)+16)/16) * 1 +3);
 	
-	*/
+	Info("Done calculating neighbors");
 	
     
     //Retrieve the zones info and setup the vector mask and result and direction buffers
@@ -1913,9 +1969,9 @@ int FfmpegCamera::OpenFfmpeg() {
 	  Info("Zone %d with min alarm pixels %d and max alarm pixels %d", i, czones[i]->GetMinAlarmPixels(), czones[i]->GetMaxAlarmPixels());
 	  
 	  //Create the results buffer for recording indexes of macroblocks with motion per zone
-	  result[i]=(uint8_t*)zm_mallocaligned(32,numblocks/7); //slightly larger than needed
+	  result[i]=(uint8_t*)zm_mallocaligned(4,numblocks/7); //slightly larger than needed
 	  //Create the directions buffer
-	  direction[i]=(uint8_t*)zm_mallocaligned(32,numblocks);
+	  direction[i]=(uint8_t*)zm_mallocaligned(4,numblocks);
 	  if(result[i] == NULL)
 		     Fatal("Memory allocation for result buffer failed: %s",strerror(errno));
       if(direction[i] == NULL)
@@ -2220,6 +2276,9 @@ int FfmpegCamera::WriteAudioPacket(){
 }	
 
 int FfmpegCamera::Visualize_Buffer(uint8_t **dbuffer){
+	if (!visualize_vectors)
+	   return (0);
+	
     //Buffer visualization should be here after the resized buffer is created, and before it is converted to jpeg
 		        //Turn off for faster performance.  if not visualizing, turn result[i] memcpy off as well in mmal_encode. 
 		        
@@ -2234,6 +2293,7 @@ int FfmpegCamera::Visualize_Buffer(uint8_t **dbuffer){
                      int count=0;
                      int index=0;
                      if (czones[i]->motion_detected) {
+						 int min_filtered=czones[i]->GetMinFilteredPixels();
 						 res=(uint32_t*)(result[i]+offset);
 						 for (int j=0; j<numblocks; j++) {
 						   if (*res) {
@@ -2261,13 +2321,14 @@ int FfmpegCamera::Visualize_Buffer(uint8_t **dbuffer){
 										break;  
 									  }	     
 								   }	   
-							       
-							       
-							       
-							       
-							       if (colours == 3 )  
+								   
+								   if (colours == 3 )  
                                         RGB=(RGB24*)(*dbuffer); 
-							       pixel_write(RGB,(Block+index)->rgbindex, r_pattern);
+							       
+							       if (((Block+index)->has_neighbors >= min_filtered) || ((Block+index)->is_neighbors >= min_filtered))
+							           pixel_write(RGB,(Block+index)->rgbindex, r_pattern,RGB24(255,0,0));
+							       else
+							           pixel_write(RGB,(Block+index)->rgbindex, r_pattern,RGB24(255,255,255));
 							       
 							           
 							 }
@@ -2512,14 +2573,18 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
                    Error("Failed requesting jpeg buffer for the captured image.");
                    return (-1); 
                 }
-			
-		        //Option 1. use the image EncodeJpeg function which requires argument jpeg_size
-		        //int *jpeg_size=(int *)jpegbuffer; 
-				//image.EncodeJpeg(jpegbuffer+4, jpeg_size );
-				//Option 2. use hardware mmal.
-		        mmal_jpeg(&jpegbuffer);
-
-
+			     
+			    int *jpeg_size=(int *)jpegbuffer;  
+		        //How to encode the jpeg
+				switch (jpeg_encoder) {
+				  case analyze_software : 
+				    break;
+				  case capture_software :
+				    image.EncodeJpeg(jpegbuffer+4, jpeg_size );	
+				    break;
+				  case mmal_hardware :
+				     mmal_jpeg(&jpegbuffer);	
+				}	
         
           } //if cfunction
         
