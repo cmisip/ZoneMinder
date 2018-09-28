@@ -170,12 +170,18 @@ class FfmpegCamera : public Camera {
     
     static void display_format(MMAL_PORT_T **port, MMAL_ES_FORMAT_T **iformat);
     
-    
-    struct RGB24 {
+	
+	struct RGB24 {
 	   uint8_t R=0;
 	   uint8_t G=0;
 	   uint8_t B=0;	
+	     	
+	   RGB24():R(0),G(0),B(0){};
+	   RGB24(uint8_t r, uint8_t g, uint8_t b):R(r),G(g),B(b){}; 	
+	   
 	};	
+	
+	
 	
 	enum pattern {
 		//[n][ne][e][se][s][sw][w][nw]
@@ -191,6 +197,9 @@ class FfmpegCamera : public Camera {
         n
     };
     
+    void pixel_write(RGB24 *rgb_ptr, int b_index, pattern r_pattern, RGB24 rgb);
+    
+    
     //hold relative positions of each center pixel to rgbindex, only 25 ints are used
     //int cpixel[32]={0};
     int *cpixel=NULL;
@@ -203,7 +212,7 @@ class FfmpegCamera : public Camera {
 		
 	bit_pattern *P_ARRAY=NULL;	
 		
-    void pixel_write(RGB24 *rgb_ptr, int b_index, pattern r_pattern);
+    
     
     //Hold relative positions of Block neighbors
     int *neighbors=NULL;
@@ -231,6 +240,9 @@ class FfmpegCamera : public Camera {
     struct Blocks {
 		Coord *coords=NULL;
         int rgbindex=-1;
+        int status=0; //alarmed=1
+        int has_neighbors=0;
+        int is_neighbors=0;
 	};
 	
 	Blocks *Block=NULL;	
@@ -246,7 +258,11 @@ class FfmpegCamera : public Camera {
 	
 	
 	//CONFIG options
-	int min_vector_distance=1;
+    int min_vector_distance=1;  //minimum value of absolute value of sum of x_vector and y_vector to consider block alarmed
+    int sad_threshold=0; //higher Sum of Absolute Difference mean lower probability that this macroblock represents the macroblock it references in the previous frame
+    bool visualize_vectors=true; //Draw arrow patterns on the jpegs to visualize vector direction
+    bool vector_study=true; //Mark all jpegs with vector arrow patterns
+    int score_shift_multiplier=2; //Weighting of macroblocks, this is power of 2 so 2 means score is multiplied by 4
     
     
     

@@ -439,7 +439,7 @@ void FfmpegCamera::control_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf
 
 }
 
-void FfmpegCamera::pixel_write(RGB24 *rgb_ptr, int b_index, pattern r_pattern) {
+void FfmpegCamera::pixel_write(RGB24 *rgb_ptr, int b_index, pattern r_pattern, RGB24 rgb) {
 	    if (b_index <0)
 	      return;
         
@@ -476,9 +476,9 @@ void FfmpegCamera::pixel_write(RGB24 *rgb_ptr, int b_index, pattern r_pattern) {
 		for ( int i=0; i<25 ; i++) {
 		   if ((P_ARRAY+r_pattern)->bpattern & (0x80000000 >> i)) {
 			  c_index=b_index + *(cpixel+i);
-			  (rgb_ptr+c_index)->R=255;
-              (rgb_ptr+c_index)->G=255;
-              (rgb_ptr+c_index)->B=255;   
+			  (rgb_ptr+c_index)->R=rgb.R;
+              (rgb_ptr+c_index)->G=rgb.G;
+              (rgb_ptr+c_index)->B=rgb.B;   
 		   }	   
 		   	
 		}		
@@ -586,6 +586,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                         uint32_t vec_count=0;
                         uint8_t* zone_vector_mask=czones[i]->zone_vector_mask;
                         uint32_t alarm_pixels=0;
+                        uint32_t filter_pixels=0;
                         
                         
                         
@@ -602,8 +603,11 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 							 //[n][ne][e][se][s][sw][w][nw]
 							 //[7][6] [5][4] [3][2] [1][0] 
                         
+                            (Block+j)->status=0;
                             if ((abs(mvarray[j].x_vector) + abs(mvarray[j].y_vector)) > min_vector_distance) { 
+							//if (((abs(mvarray[j].x_vector) + abs(mvarray[j].y_vector)) > min_vector_distance) && (mvarray[j].sad < sad_threshold)){ 
                                registers = registers | (0x80000000 >> count);
+                               (Block+j)->status=1; //set the block status if motion detected
                             
                             
  /*     N      */           if (mvarray[j].x_vector >0) { //to e
@@ -663,7 +667,6 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 
                          }  
                          
-                         //-----------------------
                          
                          switch (czones[i]->GetCheckMethod()) {
 							//LEVEL 1 scoring is just counting number of pixels 
@@ -671,7 +674,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 							  alarm_pixels = vec_count<<(8+score_shift_multiplier);
 							  memcpy((*mv_buffer)+m_offset ,&alarm_pixels, 4 );
 							  czones[i]->motion_detected=true;
-							  Info("Alarm pixels score %d", alarm_pixels);	
+							  //Info("Alarm pixels score %d", alarm_pixels);	
 							  break;
 							  
 							//LEVEL 2 scoring is Filtered Pixels, Count a block only if it has greater than min_filtered_pixels
@@ -681,7 +684,6 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 							  int min_filtered=czones[i]->GetMinFilteredPixels();
 							  
 							  
-							  
 							  for ( int o=0; o< numblocks ; o++) {
 								 (Block+o)->is_neighbors=0;
 								 (Block+o)->has_neighbors=0;  
@@ -689,7 +691,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 							  
 							  
 							  for ( int o=0; o< numblocks ; o++) {
-								if  ((Block+o)->status) {  
+								if  ((Block+o)->status) { 
 								 if  ((Block+o)->is_neighbors >= min_filtered) {
 									 total_alarmed_neighbors+=1;
 									 //registers = registers | (0x80000000 >> count);
@@ -697,7 +699,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 								 }    
 							     for ( int p=0 ; p<23 ; p++) {
 							         int p_index=(o+*(neighbors+p));
-							         if (p_index) {
+							         if (p_index >= 0) {
 							           if (((Block+o)+p_index)->status) {
 							             (Block+o)->has_neighbors+=1;
 							             ((Block+o)+p_index)->is_neighbors+=1;
@@ -711,11 +713,13 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 								 }
 							    }
 								 
-							   }	 
+							   }
+							   
 							   filter_pixels=total_alarmed_neighbors<<(8+score_shift_multiplier);
 							   memcpy((*mv_buffer)+m_offset ,&filter_pixels, 4 );
-							   czones[i]->motion_detected=true;	
-							   Info("Filter pixels score %d", filter_pixels);
+							   czones[i]->motion_detected=true;
+							   if (filter_pixels)	
+							      Info("Filter pixels score %d", filter_pixels);
 							   break;	//case break    
 							   
 							  
@@ -1904,7 +1908,7 @@ int FfmpegCamera::OpenFfmpeg() {
 	neighbors=(int*)zm_mallocaligned(4,sizeof(int));
 	
 	int block_columns=(j_width+16)/16;
-	/*
+	
     //0 1 2
     for (int i=0, j=2; j>-1; i++, --j){
      *(neighbors+i) = 0 - (block_columns * 1 +j);
@@ -1949,7 +1953,7 @@ int FfmpegCamera::OpenFfmpeg() {
     //23
     *(neighbors+23) = 0 -(block_columns * 1 +3);
 	
-	*/
+	
 	
     
     //Retrieve the zones info and setup the vector mask and result and direction buffers
@@ -1962,8 +1966,10 @@ int FfmpegCamera::OpenFfmpeg() {
 	  
 	  //Create the results buffer for recording indexes of macroblocks with motion per zone
 	  result[i]=(uint8_t*)zm_mallocaligned(4,numblocks/7); //slightly larger than needed
+	  memset(result[i],0,numblocks/7);
 	  //Create the directions buffer
 	  direction[i]=(uint8_t*)zm_mallocaligned(4,numblocks);
+	  memset(direction[i],0,numblocks);
 	  if(result[i] == NULL)
 		     Fatal("Memory allocation for result buffer failed: %s",strerror(errno));
       if(direction[i] == NULL)
@@ -2282,6 +2288,7 @@ int FfmpegCamera::Visualize_Buffer(uint8_t **dbuffer){
                      int count=0;
                      int index=0;
                      if (czones[i]->motion_detected) {
+						 int min_filtered=czones[i]->GetMinFilteredPixels();
 						 res=(uint32_t*)(result[i]+offset);
 						 for (int j=0; j<numblocks; j++) {
 						   if (*res) {
@@ -2315,7 +2322,12 @@ int FfmpegCamera::Visualize_Buffer(uint8_t **dbuffer){
 							       
 							       if (colours == 3 )  
                                         RGB=(RGB24*)(*dbuffer); 
-							       pixel_write(RGB,(Block+index)->rgbindex, r_pattern);
+                                        
+                                   if (((Block+index)->has_neighbors >= min_filtered) || ((Block+index)->is_neighbors >= min_filtered))
+							           pixel_write(RGB,(Block+index)->rgbindex, r_pattern,RGB24(255,0,0)); //RED for FILTERED
+							       else
+							           pixel_write(RGB,(Block+index)->rgbindex, r_pattern,RGB24(0,255,0)); //GREEN for ALARM
+							            
 							       
 							           
 							 }
