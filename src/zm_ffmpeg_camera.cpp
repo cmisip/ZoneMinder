@@ -697,9 +697,9 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 									 //registers = registers | (0x80000000 >> count);
 								     continue; 
 								 }    
-							     for ( int p=0 ; p<23 ; p++) {
+							     for ( int p=0 ; p<7 ; p++) {
 							         int p_index=(o+*(neighbors+p));
-							         if (p_index >= 0) {
+							         if ((p_index >= 0) || (p_index<numblocks)) {
 							           if (((Block+o)+p_index)->status) {
 							             (Block+o)->has_neighbors+=1;
 							             ((Block+o)+p_index)->is_neighbors+=1;
