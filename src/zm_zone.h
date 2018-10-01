@@ -144,9 +144,7 @@ public:
   inline const int &GetMinAlarmPixels() { return (min_alarm_pixels);}
   inline const int &GetMaxAlarmPixels() { return (max_alarm_pixels);}
   inline const int &GetMinFilteredPixels() { return (min_filter_pixels);}
-  inline const int &GetMaxFilteredPixels() { if (max_filter_pixels>23)
-	                                            max_filter_pixels=23;
-	                                         return (max_filter_pixels);}
+  inline const int &GetMaxFilteredPixels() { return (max_filter_pixels);}
   inline const CheckMethod GetCheckMethod() { return (check_method);}
   inline bool Alarmed() const { return( alarmed ); }
 	inline bool WasAlarmed() const { return( was_alarmed ); }

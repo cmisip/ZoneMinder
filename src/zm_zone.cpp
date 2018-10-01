@@ -1017,9 +1017,16 @@ int Zone::Load( Monitor *monitor, Zone **&zones ) {
 #ifdef __arm__
    //The min_alarm_pixels and max_alarm_pixels are loaded by the web UI to the db using the nondownscaled resolution
    //The db value therefore needs to be adjusted down here.
-   //
-   MinAlarmPixels=(MinAlarmPixels/(float)(monitor->S_Width()*monitor->S_Height()))*polygon.Area();
-   MaxAlarmPixels=(MaxAlarmPixels/(float)(monitor->S_Width()*monitor->S_Height()))*polygon.Area();
+   //These values are in pixels
+   //FIXME, would be better to get the Area value of non downscaled frame directly from DB parsing.  
+   if ( monitor->GetFunction() == Monitor::MVDECT ) {
+       MinAlarmPixels=(MinAlarmPixels/(float)(monitor->S_Width()*monitor->S_Height()))*polygon.Area();
+       MaxAlarmPixels=(MaxAlarmPixels/(float)(monitor->S_Width()*monitor->S_Height()))*polygon.Area();
+   
+       //Number of macroblocks to comprise minimum blob size
+       MinFilterPixels=((MinFilterPixels/(float)(monitor->S_Width()*monitor->S_Height()))*polygon.Area())/256;
+       MaxFilterPixels=((MaxFilterPixels/(float)(monitor->S_Width()*monitor->S_Height()))*polygon.Area())/256;
+   }
 #endif   
 
 
@@ -1036,8 +1043,12 @@ int Zone::Load( Monitor *monitor, Zone **&zones ) {
       MaxAlarmPixels = (MaxAlarmPixels*polygon.Area())/100;
       MinFilterPixels = (MinFilterPixels*polygon.Area())/100;
       MaxFilterPixels = (MaxFilterPixels*polygon.Area())/100;
-      MinBlobPixels = (MinBlobPixels*polygon.Area())/100;
-      MaxBlobPixels = (MaxBlobPixels*polygon.Area())/100;
+#ifdef __arm__   
+      if ( monitor->GetFunction() == Monitor::MVDECT ) {   
+          MinBlobPixels = ((MinBlobPixels*polygon.Area())/100)/256;
+          MaxBlobPixels = ((MaxBlobPixels*polygon.Area())/100)/256;
+      }    
+#endif      
     }
     
     if ( atoi(dbrow[2]) == Zone::INACTIVE ) {

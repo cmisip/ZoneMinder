@@ -616,27 +616,27 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 							   //[7][6] [5][4] [3][2] [1][0] 
 								    
 								                                
- /*     N      */              if (mvarray[j].x_vector >0) { //to e
-                                if (mvarray[j].y_vector >0) { //to se
+ /*     N      */              if (mvarray[bcount].x_vector >0) { //to e
+                                if (mvarray[bcount].y_vector >0) { //to se
  /* W       E  */                  block_direction |= 1<<4;
-                                } else if (mvarray[j].y_vector <0) { //to ne
+                                } else if (mvarray[bcount].y_vector <0) { //to ne
  /*     S      */                  block_direction |= 1<<6;
                                 } else { //e
                                    block_direction |= 1<<5;
 							    }
-                               } else if (mvarray[j].x_vector <0) {  //to w 
-								if (mvarray[j].y_vector >0) { //to sw
+                               } else if (mvarray[bcount].x_vector <0) {  //to w 
+								if (mvarray[bcount].y_vector >0) { //to sw
                                    block_direction |= 1<<2; 
-                                } else if (mvarray[j].y_vector <0) { //to nw
+                                } else if (mvarray[bcount].y_vector <0) { //to nw
                                    block_direction |= 1<<0;
                                 } else { //w
                                    block_direction |= 1<<1;
 							    }
 								     
                                } else { //dx=0
-								if (mvarray[j].y_vector >0) { //to s
+								if (mvarray[bcount].y_vector >0) { //to s
                                    block_direction |= 1<<3; 
-                                } else if (mvarray[j].y_vector <0) { //to n
+                                } else if (mvarray[bcount].y_vector <0) { //to n
                                    block_direction |= 1<<7;
                                 } else { //dy=0
                                 
@@ -644,7 +644,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 							  }
 							
 							 //each Block save to the zones direction buffer on the jth position
-							 memcpy(direction[i]+j,&block_direction,sizeof(block_direction));
+							 memcpy(direction[i]+bcount,&block_direction,sizeof(block_direction));
 								    
 								    
 							 }
@@ -676,7 +676,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 					    memcpy((*mv_buffer)+m_offset ,&alarm_pixels, 4 );
 					    czones[i]->motion_detected=true; //FIXME, only turn on if there are sufficient alarm_pixels 
 					    if (alarm_pixels)	
-							    Info("Filter pixels score %d", alarm_pixels); 	    
+							    Info("Alarm pixels score %d", alarm_pixels); 	    
 						} else if (czones[i]->GetCheckMethod() == 2) {
 						
 						//Filtered Pixels
@@ -703,52 +703,61 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 		                   for (int k=0; k<columns; k++) {
 							  cur_block=(Block+bcount);
 							  cur_block->status=0;
-							  //-----------direction-start
 							  
-							  uint8_t block_direction=0;
+							  cur_block=(Block+bcount);
+							  cur_block->status=0;
+		                      if ((abs(mvarray[bcount].x_vector) + abs(mvarray[bcount].y_vector)) > min_vector_distance) { //if THIS is ON
+								    cur_block->status=1;
+								    
+								    //-----------direction-start
+							  
+						        	uint8_t block_direction=0;
 							   
-							  //[nw][w][sw][s][se][e][ne][n]
-							  //[0] [1][2] [3][4] [5][6] [7]
+							        //[nw][w][sw][s][se][e][ne][n]
+							        //[0] [1][2] [3][4] [5][6] [7]
 							 
 							 
-							  //[n][ne][e][se][s][sw][w][nw]
-							  //[7][6] [5][4] [3][2] [1][0] 
+							        //[n][ne][e][se][s][sw][w][nw]
+							        //[7][6] [5][4] [3][2] [1][0] 
 								    
 								                                
- /*     N      */             if (mvarray[j].x_vector >0) { //to e
-                                if (mvarray[j].y_vector >0) { //to se
- /* W       E  */                  block_direction |= 1<<4;
-                                } else if (mvarray[j].y_vector <0) { //to ne
- /*     S      */                  block_direction |= 1<<6;
-                                } else { //e
-                                   block_direction |= 1<<5;
-							    }
-                              } else if (mvarray[j].x_vector <0) {  //to w 
-								if (mvarray[j].y_vector >0) { //to sw
-                                   block_direction |= 1<<2; 
-                                } else if (mvarray[j].y_vector <0) { //to nw
-                                   block_direction |= 1<<0;
-                                } else { //w
-                                   block_direction |= 1<<1;
-							    }
+ /*     N      */                 if (mvarray[bcount].x_vector >0) { //to e
+                                      if (mvarray[bcount].y_vector >0) { //to se
+ /* W       E  */                         block_direction |= 1<<4;
+                                    } else if (mvarray[bcount].y_vector <0) { //to ne
+ /*     S      */                         block_direction |= 1<<6;
+                                    } else { //e
+                                          block_direction |= 1<<5;
+							        }
+                                  } else if (mvarray[bcount].x_vector <0) {  //to w 
+								     if (mvarray[bcount].y_vector >0) { //to sw
+                                         block_direction |= 1<<2; 
+                                     } else if (mvarray[bcount].y_vector <0) { //to nw
+                                         block_direction |= 1<<0;
+                                     } else { //w
+                                         block_direction |= 1<<1;
+							      }
 								     
-                              } else { //dx=0
-								if (mvarray[j].y_vector >0) { //to s
-                                   block_direction |= 1<<3; 
-                                } else if (mvarray[j].y_vector <0) { //to n
-                                   block_direction |= 1<<7;
-                                } else { //dy=0
+                                  } else { //dx=0
+								    if (mvarray[bcount].y_vector >0) { //to s
+                                         block_direction |= 1<<3; 
+                                    } else if (mvarray[bcount].y_vector <0) { //to n
+                                         block_direction |= 1<<7;
+                                    } else { //dy=0
                                 
-							    }  
-							  }
+							      }  
+							    }
 							
-							  //each Block save to the zones direction buffer on the jth position
-							  memcpy(direction[i]+j,&block_direction,sizeof(block_direction));
+							    //each Block save to the zones direction buffer on the jth position
+							    memcpy(direction[i]+bcount,&block_direction,sizeof(block_direction));
 								    
 							  
 							  //-----------direction-end
-		                      if ((abs(mvarray[bcount].x_vector) + abs(mvarray[bcount].y_vector)) > min_vector_distance) { //if THIS is ON
-								    cur_block->status=1;
+								    
+								    
+								    
+								    
+								    
 			                        if (rcount == 0) {         //if this is first row, no connection to TOP possible, so stuff into CURRENT bin
 			                            cur_block->vect=&v_arr[vcount];
 			                            v_arr[vcount].push_back(cur_block);
@@ -818,6 +827,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                          
                          for (int m=0; m < vcount ; m++) {
 							 if ((v_arr[m].size() > min_filtered) && (v_arr[m].size() < max_filtered))
+							 //if (v_arr[m].size() > min_filtered)
 							     blob_count+=v_arr[m].size();
 							 v_arr[m].clear();    
 	                     }	 
@@ -830,9 +840,6 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 					     czones[i]->motion_detected=true; //FIXME, only set if filter_pixels above threshold
 						 if (filter_pixels)	
 							    Info("Filter pixels score %d", filter_pixels);
-                         	
-						
-                         
 					     } 
 					     
                          
@@ -2031,6 +2038,7 @@ int FfmpegCamera::OpenFfmpeg() {
     for (int i=0; i < monitor->GetZonesNum() ; i++) {
 	  czones[i]->SetVectorMask();
 	  Info("Zone %d with min alarm pixels %d and max alarm pixels %d", i, czones[i]->GetMinAlarmPixels(), czones[i]->GetMaxAlarmPixels());
+	  Info("Zone %d with min filter pixels %d and max filter pixels %d", i, czones[i]->GetMinFilteredPixels(), czones[i]->GetMaxFilteredPixels());
 	  
 	  //Create the results buffer for recording indexes of macroblocks with motion per zone
 	  result[i]=(uint8_t*)zm_mallocaligned(4,numblocks/7); //slightly larger than needed
