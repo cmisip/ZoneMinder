@@ -568,49 +568,55 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
       if (buffer) {   
             
          if(buffer->flags & MMAL_BUFFER_HEADER_FLAG_CODECSIDEINFO) {
-			    got_result=true;  //succeeded wether we receive a video buffer or vector buffer  
+			      got_result=true;  //succeeded wether we receive a video buffer or vector buffer  
+			      
 			      uint32_t m_offset=0; 
+			      
                   for (int i=0; i < czones_n ; i++) {
                         mmal_motion_vector *mvarray=(mmal_motion_vector *)buffer->data;
-                        //memset(result[i],0,numblocks/8);
                         czones[i]->motion_detected=false;
 						
-						uint32_t count=0;
-                        uint32_t offset=0;
-                       
-                        uint32_t registers=0;
+						
+						//Scoring is just counting number of pixels 
+						if (czones[i]->GetCheckMethod() == 1) {
+						
+						
+						uint32_t alarm_pixels=0;
+						
+						uint32_t bcount=0;  //block counter
+						uint32_t registers=0;
                         uint32_t mask=0;
                         uint32_t res=0;
                         
                         uint32_t c=0;
                         uint32_t vec_count=0;
+						
+						Blocks *cur_block=0;
+						
+						uint32_t offset=0;
                         uint8_t* zone_vector_mask=czones[i]->zone_vector_mask;
-                        uint32_t alarm_pixels=0;
-                        uint32_t filter_pixels=0;
-                        
-                        
-                        
                         memcpy(&mask, zone_vector_mask+offset, sizeof(mask));
-                        
-                        for (int j=0;j < numblocks ; j++) {
-							
-							uint8_t block_direction=0;
+						
+						
+						for (int j=0; j<rows; j++) {
+		                   for (int k=0; k<columns; k++) {
+							  cur_block=(Block+bcount);
+							  cur_block->status=0;
+		                      if ((abs(mvarray[bcount].x_vector) + abs(mvarray[bcount].y_vector)) > min_vector_distance) { //if THIS is ON
+							   cur_block->status=1;
+							   registers = registers | (0x80000000 >> bcount);
+							   
+							   uint8_t block_direction=0;
+							   
+							   //[nw][w][sw][s][se][e][ne][n]
+							   //[0] [1][2] [3][4] [5][6] [7]
 							 
-							 //[nw][w][sw][s][se][e][ne][n]
-							 //[0] [1][2] [3][4] [5][6] [7]
 							 
-							 
-							 //[n][ne][e][se][s][sw][w][nw]
-							 //[7][6] [5][4] [3][2] [1][0] 
-                        
-                            (Block+j)->status=0;
-                            if ((abs(mvarray[j].x_vector) + abs(mvarray[j].y_vector)) > min_vector_distance) { 
-							//if (((abs(mvarray[j].x_vector) + abs(mvarray[j].y_vector)) > min_vector_distance) && (mvarray[j].sad < sad_threshold)){ 
-                               registers = registers | (0x80000000 >> count);
-                               (Block+j)->status=1; //set the block status if motion detected
-                            
-                            
- /*     N      */           if (mvarray[j].x_vector >0) { //to e
+							   //[n][ne][e][se][s][sw][w][nw]
+							   //[7][6] [5][4] [3][2] [1][0] 
+								    
+								                                
+ /*     N      */              if (mvarray[j].x_vector >0) { //to e
                                 if (mvarray[j].y_vector >0) { //to se
  /* W       E  */                  block_direction |= 1<<4;
                                 } else if (mvarray[j].y_vector <0) { //to ne
@@ -618,7 +624,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                                 } else { //e
                                    block_direction |= 1<<5;
 							    }
-                            } else if (mvarray[j].x_vector <0) {  //to w 
+                               } else if (mvarray[j].x_vector <0) {  //to w 
 								if (mvarray[j].y_vector >0) { //to sw
                                    block_direction |= 1<<2; 
                                 } else if (mvarray[j].y_vector <0) { //to nw
@@ -627,7 +633,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                                    block_direction |= 1<<1;
 							    }
 								     
-                            } else { //dx=0
+                               } else { //dx=0
 								if (mvarray[j].y_vector >0) { //to s
                                    block_direction |= 1<<3; 
                                 } else if (mvarray[j].y_vector <0) { //to n
@@ -635,100 +641,205 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                                 } else { //dy=0
                                 
 							    }  
-							}
+							  }
 							
-							//each Block save to the zones direction buffer on the jth position
-							memcpy(direction[i]+j,&block_direction,sizeof(block_direction));
-							
-						    }	//if abs ending bracket
-							
-                            count++;
-                            
-                            if ( count == 32) { //last batch of less than 32 bits will not be saved
+							 //each Block save to the zones direction buffer on the jth position
+							 memcpy(direction[i]+j,&block_direction,sizeof(block_direction));
+								    
+								    
+							 }
+							  
+							  bcount++;
+							  
+							  if ( bcount == 32) { //last batch of less than 32 bits will not be saved
 							   
-                               memcpy(&mask, zone_vector_mask+offset, sizeof(mask));  
-                               res= registers & mask;
-                               if (res) {
-                                  memcpy(result[i]+offset,&res,sizeof(res));
-                               
-                                  c =  ((res & 0xfff) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
-                                  c += (((res & 0xfff000) >> 12) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
-                                  c += ((res >> 24) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
-                                  vec_count+=c;
-                               
-						       } //if (res) closing bracket
+                                memcpy(&mask, zone_vector_mask+offset, sizeof(mask));  
+                                res= registers & mask;
+                                if (res) {
+                                   memcpy(result[i]+offset,&res,sizeof(res));
+                                   c =  ((res & 0xfff) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
+                                   c += (((res & 0xfff000) >> 12) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
+                                   c += ((res >> 24) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
+                                   vec_count+=c;
+						        } //if (res) closing bracket
 						       
-                               count=0;
-                               offset+=4;
-                                  
-                               registers=0;
+                                bcount=0;
+                                offset+=4;
+                                registers=0;
 
-                             }
-
-                         }  
-                         
-                         
-                         switch (czones[i]->GetCheckMethod()) {
-							//LEVEL 1 scoring is just counting number of pixels 
-							case 1 : //AlarmPixels
-							  alarm_pixels = vec_count<<(8+score_shift_multiplier);
-							  memcpy((*mv_buffer)+m_offset ,&alarm_pixels, 4 );
-							  czones[i]->motion_detected=true;
-							  //Info("Alarm pixels score %d", alarm_pixels);	
-							  break;
+                              }
 							  
-							//LEVEL 2 scoring is Filtered Pixels, Count a block only if it has greater than min_filtered_pixels
-                            //currently neighbor counting limited to 0-23  
-							case 2 : //FilteredPixels 
-							  int total_alarmed_neighbors=0;
-							  int min_filtered=czones[i]->GetMinFilteredPixels();
+						   }
+						}   	
+						
+						alarm_pixels = vec_count<<(8+score_shift_multiplier);
+					    memcpy((*mv_buffer)+m_offset ,&alarm_pixels, 4 );
+					    czones[i]->motion_detected=true; //FIXME, only turn on if there are sufficient alarm_pixels 
+					    if (alarm_pixels)	
+							    Info("Filter pixels score %d", alarm_pixels); 	    
+						} else if (czones[i]->GetCheckMethod() == 2) {
+						
+						//Filtered Pixels
+						
+						int min_filtered=czones[i]->GetMinFilteredPixels();
+						int max_filtered=czones[i]->GetMaxFilteredPixels();
+						uint32_t filter_pixels=0;
+						
+						int bcount=0;  //block counter
+	                    int vcount=0;  //container counter
+	                    int ccount=0;  //column counter
+	                    int rcount=0;  //row counter
+	
+	                    Blocks *prev_block=0; //block preceeding 
+	                    Blocks *up_block=0;   //block above
+	                    Blocks *cur_block=0;  //this block
+	                    
+	                    Blocks *block_row_up=NULL;
+	                    
+	                    int blob_count=0;
+						
+	                    
+                        for (int j=0; j<rows; j++) {
+		                   for (int k=0; k<columns; k++) {
+							  cur_block=(Block+bcount);
+							  cur_block->status=0;
+							  //-----------direction-start
 							  
-							  
-							  for ( int o=0; o< numblocks ; o++) {
-								 (Block+o)->is_neighbors=0;
-								 (Block+o)->has_neighbors=0;  
-							  }	  
-							  
-							  
-							  for ( int o=0; o< numblocks ; o++) {
-								if  ((Block+o)->status) { 
-								 if  ((Block+o)->is_neighbors >= min_filtered) {
-									 total_alarmed_neighbors+=1;
-									 //registers = registers | (0x80000000 >> count);
-								     continue; 
-								 }    
-							     for ( int p=0 ; p<7 ; p++) {
-							         int p_index=(o+*(neighbors+p));
-							         if ((p_index >= 0) || (p_index<numblocks)) {
-							           if (((Block+o)+p_index)->status) {
-							             (Block+o)->has_neighbors+=1;
-							             ((Block+o)+p_index)->is_neighbors+=1;
-							             if ((Block+o)->has_neighbors >= min_filtered)  {
-							                   total_alarmed_neighbors+=1;
-							                   //registers = registers | (0x80000000 >> count);
-							                   break;
-							             }      
-								       }
-								     }
-								 }
+							  uint8_t block_direction=0;
+							   
+							  //[nw][w][sw][s][se][e][ne][n]
+							  //[0] [1][2] [3][4] [5][6] [7]
+							 
+							 
+							  //[n][ne][e][se][s][sw][w][nw]
+							  //[7][6] [5][4] [3][2] [1][0] 
+								    
+								                                
+ /*     N      */             if (mvarray[j].x_vector >0) { //to e
+                                if (mvarray[j].y_vector >0) { //to se
+ /* W       E  */                  block_direction |= 1<<4;
+                                } else if (mvarray[j].y_vector <0) { //to ne
+ /*     S      */                  block_direction |= 1<<6;
+                                } else { //e
+                                   block_direction |= 1<<5;
 							    }
-								 
-							   }
-							   
-							   filter_pixels=total_alarmed_neighbors<<(8+score_shift_multiplier);
-							   memcpy((*mv_buffer)+m_offset ,&filter_pixels, 4 );
-							   czones[i]->motion_detected=true;
-							   if (filter_pixels)	
-							      Info("Filter pixels score %d", filter_pixels);
-							   break;	//case break    
-							   
+                              } else if (mvarray[j].x_vector <0) {  //to w 
+								if (mvarray[j].y_vector >0) { //to sw
+                                   block_direction |= 1<<2; 
+                                } else if (mvarray[j].y_vector <0) { //to nw
+                                   block_direction |= 1<<0;
+                                } else { //w
+                                   block_direction |= 1<<1;
+							    }
+								     
+                              } else { //dx=0
+								if (mvarray[j].y_vector >0) { //to s
+                                   block_direction |= 1<<3; 
+                                } else if (mvarray[j].y_vector <0) { //to n
+                                   block_direction |= 1<<7;
+                                } else { //dy=0
+                                
+							    }  
+							  }
+							
+							  //each Block save to the zones direction buffer on the jth position
+							  memcpy(direction[i]+j,&block_direction,sizeof(block_direction));
+								    
 							  
-						 }	 
+							  //-----------direction-end
+		                      if ((abs(mvarray[bcount].x_vector) + abs(mvarray[bcount].y_vector)) > min_vector_distance) { //if THIS is ON
+								    cur_block->status=1;
+			                        if (rcount == 0) {         //if this is first row, no connection to TOP possible, so stuff into CURRENT bin
+			                            cur_block->vect=&v_arr[vcount];
+			                            v_arr[vcount].push_back(cur_block);
+			                        } else { 
+				                         if ((ccount >0) && (ccount < columns)) {
+				                             prev_block=(Block+bcount-1);
+				      
+				                             if (prev_block->status) {
+						                        cur_block->vect=prev_block->vect;
+					                            prev_block->vect->push_back(cur_block); //add THIS to the left bin if connected to the LEFT
+					     
+						                        up_block = (block_row_up+ccount); 
+						                        if (up_block->status) {  //add TOP bin contents to the left bin too if connected to the TOP
+							                        if (prev_block->vect != up_block->vect) {
+							                            //prev_block->vect->reserve( up_block->vect->size() + prev_block->vect->size() );   
+                                                        prev_block->vect->insert( prev_block->vect->end(), up_block->vect->begin(), up_block->vect->end() );
+                                                        up_block->vect->clear();
+						                            }
+            						            }        	  
+					  
+					                         }	//if prev_block is ON
+					                         else { 
+						                        up_block = (block_row_up+ccount); 
+						                        if (up_block->status) {    //if not connected to the LEFT add THIS to the TOP bin if connected to the TOP
+							                       cur_block->vect=up_block->vect;
+					                               up_block->vect->push_back(cur_block);
+							  
+						                        } else {             //if not connected to the LEFT and not connected to the TOP, put in a CURRENT bin
+						                           cur_block->vect=&v_arr[vcount];
+			                                       v_arr[vcount].push_back(cur_block);
+						                        }
+				                             }	 //if prev_block is OFF	    
+			                             } else {//if column 0 
+				                             cur_block->vect=&v_arr[vcount];
+				                             v_arr[vcount].push_back(cur_block);
+				     
+			                             }	  
+		                            }  //if rcount>0 closing bracket 
+		   
+	                             }   else {  //if THIS is OFF
+			  
+			                         if (v_arr[vcount].size()) {  //start a NEW BIN only if the current bin is not empty
+			                            if (vcount < 50){
+			                               vcount++;
+			                            } else { 
+				                           Info("Blobber out of vectors");	     
+			                               break;
+			                            } 
+			                         }    
+	                             }
+		   
+		   
+	                             bcount++;ccount++;	   	   
+		  
+	                             if (ccount==columns) {
+			                         block_row_up=(Block+(ccount*rcount)); //set the row pointer to the proper position in the Block* array  
+			                         ccount=0;
+			                         rcount++;
+			                         if (v_arr[vcount].size()) {
+		                                 vcount++; //when moving from row to row, there needs to be a new container
+		                             }
+	                             }
+                           }
+                         } 
+                         
+                         //figure the score by adding the total blocks in all bins 
+                         
+                         for (int m=0; m < vcount ; m++) {
+							 if ((v_arr[m].size() > min_filtered) && (v_arr[m].size() < max_filtered))
+							     blob_count+=v_arr[m].size();
+							 v_arr[m].clear();    
+	                     }	 
+	                     
+	                     //FIXME, fill the results mask here
+                         
+                         
+                         filter_pixels=blob_count<<(8+score_shift_multiplier);
+						 memcpy((*mv_buffer)+m_offset ,&filter_pixels, 4 );
+					     czones[i]->motion_detected=true; //FIXME, only set if filter_pixels above threshold
+						 if (filter_pixels)	
+							    Info("Filter pixels score %d", filter_pixels);
+                         	
+						
+                         
+					     } 
+					     
                          
                          m_offset+=4;
                         
-                     }
-	     }
+                     } //czones_n
+	     } //buffer_flags_codec_sideinfo
 	     
 	     
          
@@ -1784,10 +1895,10 @@ int FfmpegCamera::OpenFfmpeg() {
     jpeg_limit=(j_width*j_height);  //Avoid segfault in case jpeg is bigger than the buffer.
     
     
-    int frame_width=monitor->Width()+16;
-    int frame_height=((monitor->Height()+16)/16)*16;
+    columns=(monitor->Width()+16)/16; //41
+    rows=(((monitor->Height()+16)/16)*16)/16; //23
   
-    numblocks= (frame_width*frame_height)/256;
+    numblocks= (columns*rows);  //943
     Info("ZMC with numblocks %d", numblocks);
     
     Block=(Blocks*)zm_mallocaligned(4,sizeof(Blocks)*numblocks);
@@ -1904,54 +2015,11 @@ int FfmpegCamera::OpenFfmpeg() {
 	}		
 	
 	
-	//Calculate relative indexes of neighboring 24 Blocks
-	neighbors=(int*)zm_mallocaligned(4,sizeof(int));
-	
-	int block_columns=(j_width+16)/16;
-	
-    //0 1 2
-    for (int i=0, j=2; j>-1; i++, --j){
-     *(neighbors+i) = 0 - (block_columns * 1 +j);
-	}
-	
-    //3	
-    *(neighbors+3) = 0 +(block_columns * 0 +1);
-  
-    //4 5 6
-    for (int i=4, j=2; j>-1; i++, --j){
-     *(neighbors+i) = 0 + (block_columns * 1 +j);
-	}
+	//Preallocate the vector of Blocks
+	for (int n=0; n< 50; n++) {
+	  v_arr[n].reserve(50);	
+	}	
 
-    //7
-    *(neighbors+7) = 0 -(block_columns * 0 + 1);
-  
-    //8 9 10 11 12
-    for (int i=8, j=4; j>-1; i++, --j){
-     *(neighbors+i) = 0 - (block_columns * 2 +j);
-	}
-	
-    //13 
-    *(neighbors+13) = 0 - (block_columns * 1 -1);
-  
-    //14
-    *(neighbors+14) = 0 -(block_columns * 0 - 2);
-  
-    //15
-    *(neighbors+15) = 0 +(block_columns * 1 +3);
-  
-    //16 17 18 19 20
-    for (int i=16, j=4; j>-1; i++, --j){
-     *(neighbors+i) = 0 + (block_columns * 2 +j);
-	}
-	
-    //21
-    *(neighbors+21) = 0 +(block_columns * 1 -1);
-  
-    //22
-    *(neighbors+22) = 0 +(block_columns * 0 -2);
-  
-    //23
-    *(neighbors+23) = 0 -(block_columns * 1 +3);
 	
 	
 	
@@ -2023,9 +2091,6 @@ int FfmpegCamera::CloseFfmpeg(){
      
   if (cpixel)
      zm_freealigned(cpixel);  
-     
-  if (neighbors)
-     zm_freealigned(neighbors);       
      
   if (P_ARRAY)
      zm_freealigned(P_ARRAY);      
@@ -2323,9 +2388,9 @@ int FfmpegCamera::Visualize_Buffer(uint8_t **dbuffer){
 							       if (colours == 3 )  
                                         RGB=(RGB24*)(*dbuffer); 
                                         
-                                   if (((Block+index)->has_neighbors >= min_filtered) || ((Block+index)->is_neighbors >= min_filtered))
-							           pixel_write(RGB,(Block+index)->rgbindex, r_pattern,RGB24(255,0,0)); //RED for FILTERED
-							       else
+                                   //if (((Block+index)->has_neighbors >= min_filtered) || ((Block+index)->is_neighbors >= min_filtered))
+							           //pixel_write(RGB,(Block+index)->rgbindex, r_pattern,RGB24(255,0,0)); //RED for FILTERED
+							       //else
 							           pixel_write(RGB,(Block+index)->rgbindex, r_pattern,RGB24(0,255,0)); //GREEN for ALARM
 							            
 							       

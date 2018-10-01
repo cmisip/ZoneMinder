@@ -18,6 +18,7 @@
 //#define __arm__
 #ifndef ZM_FFMPEG_CAMERA_H
 #define ZM_FFMPEG_CAMERA_H
+#include <vector>
 
 #include "zm_camera.h"
 
@@ -237,13 +238,21 @@ class FfmpegCamera : public Camera {
     int *rgbindex=0;
     
     
-    struct Blocks {
+    /*struct Block {
 		Coord *coords=NULL;
         int rgbindex=-1;
         int status=0; //alarmed=1
-        int has_neighbors=0;
-        int is_neighbors=0;
-	};
+	};*/
+	
+	class Blocks {
+     public:
+     Coord *coords=NULL;
+     int rgbindex=-1;
+     int status=0; //alarmed=1
+     std::vector<Blocks *> *vect=NULL;
+     Blocks():status(0){};
+     Blocks(int i):status(i){};
+    };
 	
 	Blocks *Block=NULL;	
     
@@ -252,6 +261,10 @@ class FfmpegCamera : public Camera {
     
     
     int numblocks=0;
+    int columns=0;
+    int rows=0;
+    
+    std::vector<Blocks*> v_arr[50];
 	
 	RGB24 *RGB=NULL;
 	
