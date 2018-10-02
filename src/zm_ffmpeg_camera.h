@@ -19,6 +19,7 @@
 #ifndef ZM_FFMPEG_CAMERA_H
 #define ZM_FFMPEG_CAMERA_H
 #include <vector>
+#include <algorithm>
 
 #include "zm_camera.h"
 
@@ -247,6 +248,7 @@ class FfmpegCamera : public Camera {
 	class Blocks {
      public:
      Coord *coords=NULL;
+     int index=-1;
      int rgbindex=-1;
      int status=0; //alarmed=1
      std::vector<Blocks *> *vect=NULL;
@@ -265,6 +267,7 @@ class FfmpegCamera : public Camera {
     int rows=0;
     
     std::vector<Blocks*> v_arr[50];
+    std::vector<int> v_all;
 	
 	RGB24 *RGB=NULL;
 	

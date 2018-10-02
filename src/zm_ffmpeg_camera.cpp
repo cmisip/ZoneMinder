@@ -600,8 +600,11 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 						
 						for (int j=0; j<rows; j++) {
 		                   for (int k=0; k<columns; k++) {
+							   
 							  cur_block=(Block+bcount);
 							  cur_block->status=0;
+							  cur_block->index=bcount;
+							  
 		                      if ((abs(mvarray[bcount].x_vector) + abs(mvarray[bcount].y_vector)) > min_vector_distance) { //if THIS is ON
 							   cur_block->status=1;
 							   registers = registers | (0x80000000 >> bcount);
@@ -701,11 +704,11 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 	                    
                         for (int j=0; j<rows; j++) {
 		                   for (int k=0; k<columns; k++) {
-							  cur_block=(Block+bcount);
-							  cur_block->status=0;
 							  
 							  cur_block=(Block+bcount);
 							  cur_block->status=0;
+							  cur_block->index=bcount;
+							  
 		                      if ((abs(mvarray[bcount].x_vector) + abs(mvarray[bcount].y_vector)) > min_vector_distance) { //if THIS is ON
 								    cur_block->status=1;
 								    
@@ -824,15 +827,25 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                          } 
                          
                          //figure the score by adding the total blocks in all bins 
+                         //fill the results mask here
                          
                          for (int m=0; m < vcount ; m++) {
-							 if ((v_arr[m].size() > min_filtered) && (v_arr[m].size() < max_filtered))
-							 //if (v_arr[m].size() > min_filtered)
+							 if ((v_arr[m].size() > min_filtered) && (v_arr[m].size() < max_filtered)) {
 							     blob_count+=v_arr[m].size();
-							 v_arr[m].clear();    
+							     for (int i=0; i< v_arr[m].size() < i++){
+								     v_all.push_back(v_arr[m][n]->index);	
+							     }	 
+							 }
+							 
+								     
+	     						 v_arr[m].clear();    
+						     
 	                     }	 
 	                     
-	                     //FIXME, fill the results mask here
+	                     std::sort(v_all.begin(), v_all.end());
+	                     
+	                     
+	                    
                          
                          
                          filter_pixels=blob_count<<(8+score_shift_multiplier);
@@ -2026,6 +2039,8 @@ int FfmpegCamera::OpenFfmpeg() {
 	for (int n=0; n< 50; n++) {
 	  v_arr[n].reserve(50);	
 	}	
+	
+	v_all.reserve(numblocks);
 
 	
 	
