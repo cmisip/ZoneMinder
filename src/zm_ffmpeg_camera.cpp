@@ -831,7 +831,8 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                          
                          //figure the score by adding the total blocks in all bins 
                          //fill the results mask here
-                         
+                         if (vcount > 50)  //avoid segfault when blobber is out of vectors
+                            vcount=50;
                          for (int m=0; m < vcount ; m++) {
 							 if ((v_arr[m].size() > min_filtered) && (v_arr[m].size() < max_filtered)) {
 							     blob_count+=v_arr[m].size();
@@ -2113,8 +2114,7 @@ int FfmpegCamera::OpenFfmpeg() {
     std::string line;
     std::istringstream sin;
     std::string homedir = getpwuid(getuid())->pw_dir;
-    std::string location=homedir+"/zm_config.txt";
-
+    std::string location=homedir+"/zm_config.txt"; //var/www/zm_config.txt
     std::ifstream fin(location.c_str());
 
     while (std::getline(fin, line)) {
