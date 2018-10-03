@@ -898,7 +898,7 @@ Info("Adjusting zone polygons with x factor %.3f and y factor %.3f", xfactor, yf
 #endif  
   
   polygon = Polygon( n_coords, coords );
-  Info("Polygon area after adjustment %d,", polygon.Area());   
+  Info("Polygon area after adjustment %d", polygon.Area());   
 
   Debug( 3, "Successfully parsed polygon string" );
   //printf( "Area: %d\n", pg.Area() );
@@ -1017,13 +1017,15 @@ int Zone::Load( Monitor *monitor, Zone **&zones ) {
 #ifdef __arm__
    //The min_alarm_pixels and max_alarm_pixels are loaded by the web UI to the db using the nondownscaled resolution
    //The db value therefore needs to be adjusted down here.
-   //These values are in pixels
+   
    //FIXME, would be better to get the Area value of non downscaled frame directly from DB parsing.  
    if ( monitor->GetFunction() == Monitor::MVDECT ) {
+	   //Min/MaxAlarmPixels are stored in the DB as pixel value computed from non downscaled resolution
        MinAlarmPixels=(MinAlarmPixels/(float)(monitor->S_Width()*monitor->S_Height()))*polygon.Area();
        MaxAlarmPixels=(MaxAlarmPixels/(float)(monitor->S_Width()*monitor->S_Height()))*polygon.Area();
    
        //Number of macroblocks to comprise minimum blob size
+       //Min/MaxFilterPixels are stored in the DB as pixel value computed from non downscaled resolution, converted to number of 16x16 pixels
        MinFilterPixels=((MinFilterPixels/(float)(monitor->S_Width()*monitor->S_Height()))*polygon.Area())/256;
        MaxFilterPixels=((MaxFilterPixels/(float)(monitor->S_Width()*monitor->S_Height()))*polygon.Area())/256;
    }
@@ -1041,14 +1043,15 @@ int Zone::Load( Monitor *monitor, Zone **&zones ) {
     if ( false && !strcmp( Units, "Percent" ) ) {
       MinAlarmPixels = (MinAlarmPixels*polygon.Area())/100;
       MaxAlarmPixels = (MaxAlarmPixels*polygon.Area())/100;
-      MinFilterPixels = (MinFilterPixels*polygon.Area())/100;
-      MaxFilterPixels = (MaxFilterPixels*polygon.Area())/100;
+      
 #ifdef __arm__   
       if ( monitor->GetFunction() == Monitor::MVDECT ) {   
-          MinBlobPixels = ((MinBlobPixels*polygon.Area())/100)/256;
-          MaxBlobPixels = ((MaxBlobPixels*polygon.Area())/100)/256;
+          MinFilterPixels = ((MinFilterPixels*polygon.Area())/100)/256; //converted to number of 16x16 blocks of pixels
+          MaxFilterPixels = ((MaxFilterPixels*polygon.Area())/100)/256;
       }    
-#endif      
+#endif 
+      MinBlobPixels = (MinBlobPixels*polygon.Area())/100;
+      MaxBlobPixels = (MaxBlobPixels*polygon.Area())/100;     
     }
     
     if ( atoi(dbrow[2]) == Zone::INACTIVE ) {

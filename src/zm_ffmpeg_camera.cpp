@@ -584,6 +584,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 						uint32_t alarm_pixels=0;
 						
 						uint32_t bcount=0;  //block counter
+						uint32_t wcount=0;  //counts to 32 
 						uint32_t registers=0;
                         uint32_t mask=0;
                         uint32_t res=0;
@@ -607,8 +608,9 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 							  
 		                      if ((abs(mvarray[bcount].x_vector) + abs(mvarray[bcount].y_vector)) > min_vector_distance) { //if THIS is ON
 							   cur_block->status=1;
-							   registers = registers | (0x80000000 >> bcount);
+							   registers = registers | (0x80000000 >> wcount);
 							   
+							   if (display_vectors) {
 							   uint8_t block_direction=0;
 							   
 							   //[nw][w][sw][s][se][e][ne][n]
@@ -648,25 +650,26 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 							
 							 //each Block save to the zones direction buffer on the jth position
 							 memcpy(direction[i]+bcount,&block_direction,sizeof(block_direction));
-								    
+						     }	  //if display_vectors  
 								    
 							 }
 							  
 							  bcount++;
+							  wcount++;
 							  
-							  if ( bcount == 32) { //last batch of less than 32 bits will not be saved
+							  if ( wcount == 32) { //last batch of less than 32 bits will not be saved
 							   
                                 memcpy(&mask, zone_vector_mask+offset, sizeof(mask));  
                                 res= registers & mask;
-                                if (res) {
+                                //if (res) { //removed so that the results buffer is overwritten with zeroes when there are no bits set in registers
                                    memcpy(result[i]+offset,&res,sizeof(res));
                                    c =  ((res & 0xfff) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
                                    c += (((res & 0xfff000) >> 12) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
                                    c += ((res >> 24) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
                                    vec_count+=c;
-						        } //if (res) closing bracket
+						        //} //if (res) closing bracket
 						       
-                                bcount=0;
+                                wcount=0;
                                 offset+=4;
                                 registers=0;
 
@@ -677,9 +680,9 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 						
 						alarm_pixels = vec_count<<(8+score_shift_multiplier);
 					    memcpy((*mv_buffer)+m_offset ,&alarm_pixels, 4 );
-					    czones[i]->motion_detected=true; //FIXME, only turn on if there are sufficient alarm_pixels 
-					    if (alarm_pixels)	
-							    Info("Alarm pixels score %d", alarm_pixels); 	    
+					    //czones[i]->motion_detected=true; //FIXME, only turn on if there are sufficient alarm_pixels 
+					    //if (alarm_pixels)	
+							    //Info("Alarm pixels score %d", alarm_pixels); 	    
 						} else if (czones[i]->GetCheckMethod() == 2) {
 						
 						//Filtered Pixels
@@ -713,7 +716,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 								    cur_block->status=1;
 								    
 								    //-----------direction-start
-							  
+							     if (display_vectors) {
 						        	uint8_t block_direction=0;
 							   
 							        //[nw][w][sw][s][se][e][ne][n]
@@ -754,7 +757,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 							    //each Block save to the zones direction buffer on the jth position
 							    memcpy(direction[i]+bcount,&block_direction,sizeof(block_direction));
 								    
-							  
+							  } //if display_vectors
 							  //-----------direction-end
 								    
 								    
@@ -832,28 +835,51 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                          for (int m=0; m < vcount ; m++) {
 							 if ((v_arr[m].size() > min_filtered) && (v_arr[m].size() < max_filtered)) {
 							     blob_count+=v_arr[m].size();
-							     for (int i=0; i< v_arr[m].size() < i++){
+							     for (int n=0; n< v_arr[m].size() ; n++){
 								     v_all.push_back(v_arr[m][n]->index);	
 							     }	 
 							 }
 							 
 								     
-	     						 v_arr[m].clear();    
+	     				     v_arr[m].clear();    
 						     
 	                     }	 
 	                     
 	                     std::sort(v_all.begin(), v_all.end());
 	                     
+	                     uint32_t *registers=NULL;
+	                     uint32_t reg=0;  	
+	
+	                     int r_offset=0;
+	
+	                     //START MASK BUILD
+	                     memset(result[i],0,numblocks/7); //zero it out first
+	                     registers=(uint32_t*)result[i];
+	                     for ( unsigned int p=0 ; p< v_all.size() ; p++ ) {
+                                if (!( lookup_blob[v_all[p]] == r_offset )) {
+                                   memcpy(registers,&reg,4);
+
+                                   reg=0;
+                                   registers=(uint32_t*)(result[i]+lookup_blob[v_all[p]]);
+                                   r_offset=lookup_blob[v_all[p]];
+                                }
+                            reg |= (0x80000000 >>lookup_offset[v_all[p]]);
+        
+	                     }	
+	                     
+	                     //END MASK BUILD
+	                     
+	                     v_all.clear();
 	                     
 	                    
                          
                          
                          filter_pixels=blob_count<<(8+score_shift_multiplier);
 						 memcpy((*mv_buffer)+m_offset ,&filter_pixels, 4 );
-					     czones[i]->motion_detected=true; //FIXME, only set if filter_pixels above threshold
-						 if (filter_pixels)	
-							    Info("Filter pixels score %d", filter_pixels);
-					     } 
+					     //czones[i]->motion_detected=true; //FIXME, only set if filter_pixels above threshold
+						 //if (filter_pixels)	
+						//	    Info("Filter pixels score %d", filter_pixels);
+					     } //end Filter Pixels
 					     
                          
                          m_offset+=4;
@@ -2035,6 +2061,16 @@ int FfmpegCamera::OpenFfmpeg() {
 	}		
 	
 	
+	
+	//Lookup tables for blob mask
+	for (int i=0; i< numblocks ; i++) { 
+	  lookup_blob.push_back((i/32)*4);	
+	}	
+	
+	for (int i=0; i< numblocks ; i++) {
+	  lookup_offset.push_back(i % 32);	
+	}	
+	
 	//Preallocate the vector of Blocks
 	for (int n=0; n< 50; n++) {
 	  v_arr[n].reserve(50);	
@@ -2065,9 +2101,38 @@ int FfmpegCamera::OpenFfmpeg() {
 		     Fatal("Memory allocation for result buffer failed: %s",strerror(errno));
       if(direction[i] == NULL)
 		     Fatal("Memory allocation for direction buffer failed: %s",strerror(errno));
-    }	  
+    }	
+    } //if ctype
+    
+    //FIXME, temporary config.txt parsing for variables that ought to be in the database
+    //zm_config.txt
+    //display_vectors=1
+    //score_shift_multiplier = 2
+    //min_vector_distance = 1
+
+    std::string line;
+    std::istringstream sin;
+    std::string homedir = getpwuid(getuid())->pw_dir;
+    std::string location=homedir+"/zm_config.txt";
+
+    std::ifstream fin(location.c_str());
+
+    while (std::getline(fin, line)) {
+    sin.str(line.substr(line.find("=")+1));
+    if (line.find("display_vectors") != std::string::npos) {
+       sin >> display_vectors;
+       Info("display vectors %d",display_vectors);
+    } else if (line.find("score_shift_multiplier") != std::string::npos) {
+       sin >> score_shift_multiplier;
+       Info("score shift multipler %d", score_shift_multiplier);
+    } else if (line.find("min_vector_distance") != std::string::npos) {
+	   sin >> min_vector_distance;	
+	   Info("min vector distance %d", min_vector_distance);
+	}	
+       sin.clear();
+    }  
    
-  }  
+    
   
   
     
@@ -2364,6 +2429,8 @@ int FfmpegCamera::WriteAudioPacket(){
 int FfmpegCamera::Visualize_Buffer(uint8_t **dbuffer){
     //Buffer visualization should be here after the resized buffer is created, and before it is converted to jpeg
 		        //Turn off for faster performance.  if not visualizing, turn result[i] memcpy off as well in mmal_encode. 
+		        if (!display_vectors)
+		           return 0;
 		        
 		        for (int i=0; i < monitor->GetZonesNum() ; i++) {
                      uint32_t offset=0;
@@ -2375,8 +2442,8 @@ int FfmpegCamera::Visualize_Buffer(uint8_t **dbuffer){
                      
                      int count=0;
                      int index=0;
-                     if (czones[i]->motion_detected) {
-						 int min_filtered=czones[i]->GetMinFilteredPixels();
+                     //if (czones[i]->motion_detected) {
+						 //int min_filtered=czones[i]->GetMinFilteredPixels();
 						 res=(uint32_t*)(result[i]+offset);
 						 for (int j=0; j<numblocks; j++) {
 						   if (*res) {
@@ -2436,7 +2503,7 @@ int FfmpegCamera::Visualize_Buffer(uint8_t **dbuffer){
 						 
 						 
 					
-                     }  
+                     //}  
                 } 
                 	
 }	
