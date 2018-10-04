@@ -813,6 +813,9 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 						           //Info("Filter pixels score %d", filter_pixels);
 					     } 
 					     
+					     //Visualization
+					     Visualize_Buffer(&rgb_buffer);
+					     
                          
                          m_offset+=4;
                         
@@ -864,7 +867,7 @@ int  FfmpegCamera::mmal_resize(uint8_t** dbuffer) {   //uses mRawFrame data, bui
          buffer = mmal_queue_timedwait(context.rqueue, 50);
       if (buffer) {
          got_resized=true;
-         memcpy((*dbuffer),buffer->data,width*height*colours);
+         memcpy((*dbuffer),buffer->data,rgb_buffer_size);//FIXME, can be sped up
          //save it as AVFrame holding a buffer with original video source resolution
          av_image_fill_arrays(mFrame->data, mFrame->linesize, *dbuffer, encoderPixFormat, mFrame->width, mFrame->height, 1);
          
@@ -1881,6 +1884,22 @@ int FfmpegCamera::OpenFfmpeg() {
     
     Block=(Blocks*)zm_mallocaligned(4,sizeof(Blocks)*numblocks);
     
+    //Create a uint8_t buffer to hold rgb data temporarily
+    if (colours==3) {
+      rgb_buffer_size=jpeg_limit*3;
+      rgb_buffer=(uint8_t*)zm_mallocaligned(4,jpeg_limit*3);
+    }  
+    else if (colours==4) {
+      rgb_buffer_size=jpeg_limit*4;
+      rgb_buffer=(uint8_t*)zm_mallocaligned(4,jpeg_limit*4);
+    }  
+    else if (colours==1) {
+      rgb_buffer_size=jpeg_limit;
+      rgb_buffer=(uint8_t*)zm_mallocaligned(4,jpeg_limit);
+    }
+    
+    if (rgb_buffer == NULL) 
+        Fatal("Memory allocation for rgb buffer failed: %s",strerror(errno));
     
     //Create a lookup table for numblocks coordinates and associated rgb index
     //The blocks will have coordinates outside of the frame due to the extra column
@@ -2043,9 +2062,10 @@ int FfmpegCamera::OpenFfmpeg() {
     std::string location=homedir+"/zm_config.txt"; //var/www/zm_config.txt
     std::ifstream fin(location.c_str());
 
+    Info("Extra CONFIG Options:");
     while (std::getline(fin, line)) {
     sin.str(line.substr(line.find("=")+1));
-    Info("Extra CONFIG Options:");
+    
     if (line.find("display_vectors") != std::string::npos) {
        sin >> display_vectors;
        Info("display vectors %d",display_vectors);
@@ -2057,12 +2077,15 @@ int FfmpegCamera::OpenFfmpeg() {
 	   Info("min vector distance %d", min_vector_distance);
 	} else if (line.find("jpeg_mode") != std::string::npos) {
        sin >> jmodestr;
-       Info("Jpeg encoding mode is %s", jmodestr);
-       if (jmodestr == "mmal")
+       
+       if (jmodestr == "mmal") {
           jmode=mmal;
-       else if (jmodestr == "libjpeg" )
+          Info("Jpeg encoding mode is mmal");
+       }   
+       else if (jmodestr == "libjpeg" ) {
           jmode=libjpeg;
-          
+          Info("Jpeg encoding mode is libjpeg");
+       }   
     }	
        sin.clear();
     }  
@@ -2116,8 +2139,10 @@ int FfmpegCamera::CloseFfmpeg(){
      zm_freealigned(cpixel);  
      
   if (P_ARRAY)
-     zm_freealigned(P_ARRAY);      
+     zm_freealigned(P_ARRAY); 
      
+  if (rgb_buffer)        
+     zm_freealigned(rgb_buffer);
   
   for (int i=0; i < monitor->GetZonesNum() ; i++) {
 	    if (result[i])
@@ -2564,14 +2589,7 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
       if ( frameComplete ) {
         //Debug( 4, "Got frame %d", frameCount );
 
-        /* Request a writeable buffer of the target image */
-        directbuffer = image.WriteBuffer(width, height, colours, subpixelorder);
-                   
-        if ( directbuffer == NULL ) {
-          Error("Failed requesting writeable buffer for the captured image.");
-          zm_av_packet_unref( &packet );
-          return (-1);
-        }
+        
         
         
         
@@ -2580,14 +2598,14 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
         if  (ctype) {
            
 #if LIBAVUTIL_VERSION_CHECK(54, 6, 0, 6, 0)
-            av_image_fill_arrays(mFrame->data, mFrame->linesize,
-                     directbuffer, imagePixFormat, width, height, 1);
+            //av_image_fill_arrays(mFrame->data, mFrame->linesize,directbuffer, imagePixFormat, width, height, 1);
+            av_image_fill_arrays(mFrame->data, mFrame->linesize,rgb_buffer, imagePixFormat, width, height, 1);
 #else
-            avpicture_fill( (AVPicture *)mFrame, directbuffer,
-                     imagePixFormat, width, height);
+            //avpicture_fill( (AVPicture *)mFrame, directbuffer,imagePixFormat, width, height);
+            avpicture_fill( (AVPicture *)mFrame, rgb_buffer,imagePixFormat, width, height);
 #endif
         
-            frameComplete=mmal_resize(&directbuffer); 
+            frameComplete=mmal_resize(&rgb_buffer); 
            
         } else  if (((ctype) && (cfunction == Monitor::MODECT)) || (!ctype)) {
 	      //This is the software scaler. Directbuffer is packaged into mFrame and processed by swscale to convert to appropriate format and size
@@ -2644,11 +2662,22 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
 	  
 //FRAMECOMPLETE 3 -> mmal_encode successfully received an output buffer. 	  
 	
-		
+	  
 	  if ( frameComplete ) {
 		    if  ((ctype) && (cfunction == Monitor::MVDECT)) {
 				
-				Visualize_Buffer(&directbuffer);
+				/* Request a writeable buffer of the target image */
+                directbuffer = image.WriteBuffer(width, height, colours, subpixelorder);
+                   
+                if ( directbuffer == NULL ) {
+                    Error("Failed requesting writeable buffer for the captured image.");
+                    zm_av_packet_unref( &packet );
+                    return (-1);
+                }
+                
+				memcpy(directbuffer,rgb_buffer, rgb_buffer_size); 
+				
+				//Visualize_Buffer(&direct_buffer);
 				
 				
 				//Create the JPEG buffer for this frame if frame is alarmed, using downscaled resolution
@@ -2672,7 +2701,7 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
         
           } //if cfunction
         
-          
+        
         frameCount++;
       }  // end if frameComplete
       

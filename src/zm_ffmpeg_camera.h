@@ -245,6 +245,9 @@ class FfmpegCamera : public Camera {
     Coord *coords=NULL;
     int *rgbindex=0;
     
+    uint8_t *rgb_buffer=NULL;
+    int rgb_buffer_size=0;
+    
     
     /*struct Block {
 		Coord *coords=NULL;
