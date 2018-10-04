@@ -2007,8 +2007,14 @@ int FfmpegCamera::OpenFfmpeg() {
     
     for (int i=0; i < monitor->GetZonesNum() ; i++) {
 	  czones[i]->SetVectorMask();
-	  Info("Zone %d with min alarm pixels %d and max alarm pixels %d", i, czones[i]->GetMinAlarmPixels(), czones[i]->GetMaxAlarmPixels());
-	  Info("Zone %d with min filter pixels %d and max filter pixels %d", i, czones[i]->GetMinFilteredPixels(), czones[i]->GetMaxFilteredPixels());
+	  if (czones[i]->GetCheckMethod() == 1) {
+		  Info("Zone Check Method is AlarmedPixels");
+	      Info("Zone %d with min alarm pixels %d and max alarm pixels %d", i, czones[i]->GetMinAlarmPixels(), czones[i]->GetMaxAlarmPixels());
+	  }    
+	  else if (czones[i]->GetCheckMethod() == 2) {
+		  Info("Zone Check Method is FilteredPixels");
+	      Info("Zone %d with min vector neighbors %d and max vector neighbors %d", i, czones[i]->GetMinFilteredPixels(), czones[i]->GetMaxFilteredPixels());
+	  }
 	  
 	  //Create the results buffer for recording indexes of macroblocks with motion per zone
 	  result[i]=(uint8_t*)zm_mallocaligned(4,numblocks/7); //slightly larger than needed
@@ -2039,6 +2045,7 @@ int FfmpegCamera::OpenFfmpeg() {
 
     while (std::getline(fin, line)) {
     sin.str(line.substr(line.find("=")+1));
+    Info("Extra CONFIG Options:");
     if (line.find("display_vectors") != std::string::npos) {
        sin >> display_vectors;
        Info("display vectors %d",display_vectors);
