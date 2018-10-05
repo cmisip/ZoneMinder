@@ -341,8 +341,8 @@ int FfmpegCamera::Capture( Image &image ) {
                    return (-1); 
                 }
 			
-		        
-		        //Option 1. use the image EncodeJpeg function which requires argument jpeg_size
+
+			    //Option 1. use the image EncodeJpeg function which requires argument jpeg_size
 			    if (jmode == libjpeg) {
 		            int *jpeg_size=(int *)jpegbuffer; 
 				    image.EncodeJpeg(jpegbuffer+4, jpeg_size );
@@ -583,13 +583,12 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                         czones[i]->motion_detected=false;
 						
 						
-						//Scoring is just counting number of pixels 
-						if (czones[i]->GetCheckMethod() == 1) {
+				        Blocks *cur_block=0;  //this block
+				        int bcount=0;  //block counter
 						
-						
+						//ALARMED PIXELS VARIABLES
 						uint32_t alarm_pixels=0;
 						
-						uint32_t bcount=0;  //block counter
 						uint32_t wcount=0;  //counts to 32 
 						uint32_t registers=0;
                         uint32_t mask=0;
@@ -598,119 +597,26 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                         uint32_t c=0;
                         uint32_t vec_count=0;
 						
-						Blocks *cur_block=0;
-						
 						uint32_t offset=0;
                         uint8_t* zone_vector_mask=czones[i]->zone_vector_mask;
-                        memcpy(&mask, zone_vector_mask+offset, sizeof(mask));
-						
-						
-						for (int j=0; j<rows; j++) {
-		                   for (int k=0; k<columns; k++) {
-							   
-							  cur_block=(Block+bcount);
-							  cur_block->status=0;
-							  cur_block->index=bcount;
-							  
-		                      if ((abs(mvarray[bcount].x_vector) + abs(mvarray[bcount].y_vector)) > min_vector_distance) { //if THIS is ON
-							   cur_block->status=1;
-							   registers = registers | (0x80000000 >> wcount);
-							   
-							   if (display_vectors) {
-							   uint8_t block_direction=0;
-							   
-							   //[nw][w][sw][s][se][e][ne][n]
-							   //[0] [1][2] [3][4] [5][6] [7]
-							 
-							 
-							   //[n][ne][e][se][s][sw][w][nw]
-							   //[7][6] [5][4] [3][2] [1][0] 
-								    
-								                                
- /*     N      */              if (mvarray[bcount].x_vector >0) { //to e
-                                if (mvarray[bcount].y_vector >0) { //to se
- /* W       E  */                  block_direction |= 1<<4;
-                                } else if (mvarray[bcount].y_vector <0) { //to ne
- /*     S      */                  block_direction |= 1<<6;
-                                } else { //e
-                                   block_direction |= 1<<5;
-							    }
-                               } else if (mvarray[bcount].x_vector <0) {  //to w 
-								if (mvarray[bcount].y_vector >0) { //to sw
-                                   block_direction |= 1<<2; 
-                                } else if (mvarray[bcount].y_vector <0) { //to nw
-                                   block_direction |= 1<<0;
-                                } else { //w
-                                   block_direction |= 1<<1;
-							    }
-								     
-                               } else { //dx=0
-								if (mvarray[bcount].y_vector >0) { //to s
-                                   block_direction |= 1<<3; 
-                                } else if (mvarray[bcount].y_vector <0) { //to n
-                                   block_direction |= 1<<7;
-                                } else { //dy=0
-                                
-							    }  
-							  }
-							
-							 //each Block save to the zones direction buffer on the jth position
-							 memcpy(direction[i]+bcount,&block_direction,sizeof(block_direction));
-						     }	  //if display_vectors  
-								    
-							 }
-							  
-							  bcount++;
-							  wcount++;
-							  
-							  if ( wcount == 32) { //last batch of less than 32 bits will not be saved
-							   
-                                memcpy(&mask, zone_vector_mask+offset, sizeof(mask));  
-                                res= registers & mask;
-                                //if (res) { //removed so that the results buffer is overwritten with zeroes when there are no bits set in registers
-                                   memcpy(result[i]+offset,&res,sizeof(res));
-                                   c =  ((res & 0xfff) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
-                                   c += (((res & 0xfff000) >> 12) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
-                                   c += ((res >> 24) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
-                                   vec_count+=c;
-						        //} //if (res) closing bracket
-						       
-                                wcount=0;
-                                offset+=4;
-                                registers=0;
-
-                              }
-							  
-						   }
-						}   	
-						
-						alarm_pixels = vec_count<<(8+score_shift_multiplier);
-					    memcpy((*mv_buffer)+m_offset ,&alarm_pixels, 4 );
-					    //czones[i]->motion_detected=true; //FIXME, only turn on if there are sufficient alarm_pixels 
-					    //if (alarm_pixels)	
-							    //Info("Alarm pixels score %d", alarm_pixels); 	    
-						} else if (czones[i]->GetCheckMethod() == 2) {
-						
-						//Filtered Pixels
-						
+                        
+						//FILTERED PIXELS VARIABLES
 						int min_filtered=czones[i]->GetMinFilteredPixels();
 						int max_filtered=czones[i]->GetMaxFilteredPixels();
 						uint32_t filter_pixels=0;
 						
-						int bcount=0;  //block counter
+						
 	                    int vcount=0;  //container counter
 	                    int ccount=0;  //column counter
 	                    int rcount=0;  //row counter
 	
 	                    Blocks *prev_block=0; //block preceeding 
 	                    Blocks *up_block=0;   //block above
-	                    Blocks *cur_block=0;  //this block
-	                    
 	                    Blocks *block_row_up=NULL;
 	                    
 	                    int blob_count=0;
 						
-	                    
+	                    memcpy(&mask, zone_vector_mask+offset, sizeof(mask));
                         for (int j=0; j<rows; j++) {
 		                   for (int k=0; k<columns; k++) {
 							  
@@ -718,9 +624,11 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 							  cur_block->status=0;
 							  cur_block->index=bcount;
 							  
-		                      if ((abs(mvarray[bcount].x_vector) + abs(mvarray[bcount].y_vector)) > min_vector_distance) { //if THIS is ON
-								    cur_block->status=1;
-								    
+		                      if ((abs(mvarray[bcount].x_vector) + abs(mvarray[bcount].y_vector)) > min_vector_distance) { 
+								 cur_block->status=1;
+							     registers = registers | (0x80000000 >> wcount);
+							        
+							        
 								    //-----------direction-start
 							     if (display_vectors) {
 						        	uint8_t block_direction=0;
@@ -757,18 +665,43 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                                          block_direction |= 1<<7;
                                     } else { //dy=0
                                 
-							      }  
-							    }
+							        }  
+							      }
 							
-							    //each Block save to the zones direction buffer on the jth position
-							    memcpy(direction[i]+bcount,&block_direction,sizeof(block_direction));
+							     //each Block save to the zones direction buffer on the jth position
+							     memcpy(direction[i]+bcount,&block_direction,sizeof(block_direction));
 								    
-							  } //if display_vectors
-							  //-----------direction-end
+							     } //if display_vectors
+							        
+							        
+							  } //mvarray	
+							  
+							  
+							  wcount++;   	   
+		                         
+		                      //-------------COUNT VECTORS AND FILL RESULTS MASK-----------------------------------------
+							  if ( wcount == 32) { //last batch of less than 32 bits will not be saved
+							   
+                                 memcpy(&mask, zone_vector_mask+offset, sizeof(mask));  
+                                 res= registers & mask;
+                                 memcpy(result[i]+offset,&res,sizeof(res));
+                                 c =  ((res & 0xfff) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
+                                 c += (((res & 0xfff000) >> 12) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
+                                 c += ((res >> 24) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
+                                 vec_count+=c;
+						       
+                                 wcount=0;
+                                 offset+=4;
+                                 registers=0;
+
+                              } 
+                              //++++++++++++++COUNT VECTORS AND FILL RESULTS MASK+++++++++++++++++++++++++++++++++++++++++
+							  
+								 
+							  //FILTERED PIXELS START---------------------------------------------------------------------	
+							  if (czones[i]->GetCheckMethod() == 2) {	
 								    
-								    
-								    
-								    
+								if (cur_block->status) {  //If THIS is ON  
 								    
 			                        if (rcount == 0) {         //if this is first row, no connection to TOP possible, so stuff into CURRENT bin
 			                            cur_block->vect=&v_arr[vcount];
@@ -820,10 +753,12 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 			                            } 
 			                         }    
 	                             }
+	                             
 		   
-		   
-	                             bcount++;ccount++;	   	   
-		  
+	                             
+	                             ccount++;	
+		                         
+		                         //-----------------------------------------------------
 	                             if (ccount==columns) {
 			                         block_row_up=(Block+(ccount*rcount)); //set the row pointer to the proper position in the Block* array  
 			                         ccount=0;
@@ -832,61 +767,54 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
 		                                 vcount++; //when moving from row to row, there needs to be a new container
 		                             }
 	                             }
-                           }
+	                             
+	                             
+	                            } //FILTERED PIXELS END---------------------------------------------------------------------
+	                            
+	                            
+	                            
+	                            //Block counter iterator
+	                            bcount++;
+                           } //for k
+                         }  //for j
+                         
+                         
+                         //----------RESULTS------------------------------------------------------
+                         
+                         //--------------------Level 1 Scoring
+                         if (czones[i]->GetCheckMethod() == 1) {
+                               alarm_pixels = vec_count<<(8+score_shift_multiplier);
+					           memcpy((*mv_buffer)+m_offset ,&alarm_pixels, 4 );
+					           //czones[i]->motion_detected=true; //FIXME, only turn on if there are sufficient alarm_pixels 
+					           //if (alarm_pixels)	
+							       //Info("Alarm pixels score %d", alarm_pixels); 	    
                          } 
                          
+                         //-----------------_--Level 2 scoring
+                         else if (czones[i]->GetCheckMethod() == 2) {
                          //figure the score by adding the total blocks in all bins 
-                         //fill the results mask here
-                         if (vcount > 50)  //avoid segfault when blobber is out of vectors
-                            vcount=50;
-                         for (int m=0; m < vcount ; m++) {
-							 if ((v_arr[m].size() > min_filtered) && (v_arr[m].size() < max_filtered)) {
-							     blob_count+=v_arr[m].size();
-							     for (int n=0; n< v_arr[m].size() ; n++){
-								     v_all.push_back(v_arr[m][n]->index);	
-							     }	 
-							 }
-							 
+                         
+                               if (vcount > 50)  //avoid segfault when blobber is out of vectors
+                                   vcount=50;
+                               for (int m=0; m < vcount ; m++) {
+							          if ((v_arr[m].size() > min_filtered) && (v_arr[m].size() < max_filtered)) {
+							              blob_count+=v_arr[m].size();
+							              for (int n=0; n< v_arr[m].size() ; n++){
+								              v_arr[m][n]->status=2;	
+							              }	 
+							          }
 								     
-	     				     v_arr[m].clear();    
-						     
-	                     }	 
+	     				              v_arr[m].clear();    
+	                           }	 
 	                     
-	                     std::sort(v_all.begin(), v_all.end());
-	                     
-	                     uint32_t *registers=NULL;
-	                     uint32_t reg=0;  	
-	
-	                     int r_offset=0;
-	
-	                     //START MASK BUILD
-	                     memset(result[i],0,numblocks/7); //zero it out first
-	                     registers=(uint32_t*)result[i];
-	                     for ( unsigned int p=0 ; p< v_all.size() ; p++ ) {
-                                if (!( lookup_blob[v_all[p]] == r_offset )) {
-                                   memcpy(registers,&reg,4);
-
-                                   reg=0;
-                                   registers=(uint32_t*)(result[i]+lookup_blob[v_all[p]]);
-                                   r_offset=lookup_blob[v_all[p]];
-                                }
-                            reg |= (0x80000000 >>lookup_offset[v_all[p]]);
-        
-	                     }	
-	                     
-	                     //END MASK BUILD
-	                     
-	                     v_all.clear();
-	                     
-	                    
                          
                          
-                         filter_pixels=blob_count<<(8+score_shift_multiplier);
-						 memcpy((*mv_buffer)+m_offset ,&filter_pixels, 4 );
-					     //czones[i]->motion_detected=true; //FIXME, only set if filter_pixels above threshold
-						 //if (filter_pixels)	
-						//	    Info("Filter pixels score %d", filter_pixels);
-					     } //end Filter Pixels
+                               filter_pixels=blob_count<<(8+score_shift_multiplier);
+						       memcpy((*mv_buffer)+m_offset ,&filter_pixels, 4 );
+					           //czones[i]->motion_detected=true; //FIXME, only set if filter_pixels above threshold
+						       //if (filter_pixels)	
+						           //Info("Filter pixels score %d", filter_pixels);
+					     } 
 					     
                          
                          m_offset+=4;
@@ -2071,23 +1999,10 @@ int FfmpegCamera::OpenFfmpeg() {
 	
 	
 	
-	//Lookup tables for blob mask
-	for (int i=0; i< numblocks ; i++) { 
-	  lookup_blob.push_back((i/32)*4);	
-	}	
-	
-	for (int i=0; i< numblocks ; i++) {
-	  lookup_offset.push_back(i % 32);	
-	}	
-	
 	//Preallocate the vector of Blocks
 	for (int n=0; n< 50; n++) {
 	  v_arr[n].reserve(50);	
 	}	
-	
-	v_all.reserve(numblocks);
-
-	
 	
 	
     
@@ -2136,7 +2051,7 @@ int FfmpegCamera::OpenFfmpeg() {
     Info("Extra CONFIG Options:");
     while (std::getline(fin, line)) {
     sin.str(line.substr(line.find("=")+1));
-    
+
     if (line.find("display_vectors") != std::string::npos) {
        sin >> display_vectors;
        Info("display vectors %d",display_vectors);
@@ -2157,6 +2072,7 @@ int FfmpegCamera::OpenFfmpeg() {
           jmode=libjpeg;
           Info("Jpeg encoding mode is libjpeg");
        }   
+
     }	
        sin.clear();
     }  
@@ -2509,8 +2425,10 @@ int FfmpegCamera::Visualize_Buffer(uint8_t **dbuffer){
                                    //if (((Block+index)->has_neighbors >= min_filtered) || ((Block+index)->is_neighbors >= min_filtered))
 							           //pixel_write(RGB,(Block+index)->rgbindex, r_pattern,RGB24(255,0,0)); //RED for FILTERED
 							       //else
+							       if ((Block+index)->status==1)
 							           pixel_write(RGB,(Block+index)->rgbindex, r_pattern,RGB24(0,255,0)); //GREEN for ALARM
-							            
+							       else if ((Block+index)->status==2)    
+							           pixel_write(RGB,(Block+index)->rgbindex, r_pattern,RGB24(0,0,255)); //BLUE for FILTERED 
 							       
 							           
 							 }
@@ -2526,12 +2444,6 @@ int FfmpegCamera::Visualize_Buffer(uint8_t **dbuffer){
 							 
 						   } //if (*res)	  
 					     }		 	 
-						 
-						 
-						 
-						 
-					
-                     //}  
                 } 
                 	
 }	
@@ -2756,8 +2668,7 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
                    return (-1); 
                 }
 			
-		        
-                //Option 1. use the image EncodeJpeg function which requires argument jpeg_size
+
 			    if (jmode == libjpeg) {
 		            int *jpeg_size=(int *)jpegbuffer; 
 				    image.EncodeJpeg(jpegbuffer+4, jpeg_size );
@@ -2766,7 +2677,6 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
 			    if (jmode == mmal)
      		        mmal_jpeg(&jpegbuffer);
 
-        
           } //if cfunction
         
           

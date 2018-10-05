@@ -274,11 +274,6 @@ class FfmpegCamera : public Camera {
     int rows=0;
     
     std::vector<Blocks*> v_arr[50];
-    std::vector<int> v_all;
-    
-    //Lookup tables for blob mask
-	std::vector<int> lookup_blob;
-	std::vector<int> lookup_offset;
 	
 	RGB24 *RGB=NULL;
 	
@@ -296,7 +291,7 @@ class FfmpegCamera : public Camera {
     //bool vector_study=true; //Mark all jpegs with vector arrow patterns
     int score_shift_multiplier=2; //Weighting of macroblocks, this is power of 2 so 2 means score is multiplied by 4
     jpeg_mode jmode=mmal;    
-    
+
     
 #endif
 };
