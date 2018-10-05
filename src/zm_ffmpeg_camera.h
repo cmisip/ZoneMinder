@@ -282,15 +282,20 @@ class FfmpegCamera : public Camera {
 	
 	RGB24 *RGB=NULL;
 	
+	enum jpeg_mode {
+		libjpeg, //software jpeg 
+		mmal     //hardware jpeg
+	};	
 	
 	
-	//CONFIG options
+    
+    //CONFIG options
     int min_vector_distance=1;  //minimum value of absolute value of sum of x_vector and y_vector to consider block alarmed
     //int sad_threshold=0; //higher Sum of Absolute Difference mean lower probability that this macroblock represents the macroblock it references in the previous frame
     bool display_vectors=true; //Draw arrow patterns on the jpegs to visualize vector direction
     //bool vector_study=true; //Mark all jpegs with vector arrow patterns
     int score_shift_multiplier=2; //Weighting of macroblocks, this is power of 2 so 2 means score is multiplied by 4
-    
+    jpeg_mode jmode=mmal;    
     
     
 #endif

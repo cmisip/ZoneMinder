@@ -341,11 +341,15 @@ int FfmpegCamera::Capture( Image &image ) {
                    return (-1); 
                 }
 			
+		        
 		        //Option 1. use the image EncodeJpeg function which requires argument jpeg_size
-		        //int *jpeg_size=(int *)jpegbuffer; 
-				//image.EncodeJpeg(jpegbuffer+4, jpeg_size );
-				//Option 2. use hardware mmal.
-		        mmal_jpeg(&jpegbuffer);
+			    if (jmode == libjpeg) {
+		            int *jpeg_size=(int *)jpegbuffer; 
+				    image.EncodeJpeg(jpegbuffer+4, jpeg_size );
+			    } else 
+			    //Option 2. use hardware mmal.
+			    if (jmode == mmal)
+     		        mmal_jpeg(&jpegbuffer);
 
 
         
@@ -438,6 +442,8 @@ void FfmpegCamera::control_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf
    mmal_buffer_header_release(buffer);
 
 }
+
+
 
 void FfmpegCamera::pixel_write(RGB24 *rgb_ptr, int b_index, pattern r_pattern, RGB24 rgb) {
 	    if (b_index <0)
@@ -1930,10 +1936,12 @@ int FfmpegCamera::OpenFfmpeg() {
 	
 	if (sigprocmask(SIG_BLOCK, &ctype_sigmask, NULL) == -1)
        Info("Failed to block SIGKILL");
+       
 	OpenMmalDecoder(mVideoCodecContext);
     OpenMmalEncoder(mVideoCodecContext);
     OpenMmalResizer(mVideoCodecContext);
     OpenMmalJPEG(mVideoCodecContext);
+    
     if (sigprocmask(SIG_UNBLOCK, &ctype_sigmask, NULL) == -1)
        Info("Failed to unblock SIGKILL"); 
     
@@ -2089,8 +2097,14 @@ int FfmpegCamera::OpenFfmpeg() {
     
     for (int i=0; i < monitor->GetZonesNum() ; i++) {
 	  czones[i]->SetVectorMask();
-	  Info("Zone %d with min alarm pixels %d and max alarm pixels %d", i, czones[i]->GetMinAlarmPixels(), czones[i]->GetMaxAlarmPixels());
-	  Info("Zone %d with min filter pixels %d and max filter pixels %d", i, czones[i]->GetMinFilteredPixels(), czones[i]->GetMaxFilteredPixels());
+	  if (czones[i]->GetCheckMethod() == 1) {
+		  Info("Zone Check Method is AlarmedPixels");
+	      Info("Zone %d with min alarm pixels %d and max alarm pixels %d", i, czones[i]->GetMinAlarmPixels(), czones[i]->GetMaxAlarmPixels());
+	  }    
+	  else if (czones[i]->GetCheckMethod() == 2) {
+		  Info("Zone Check Method is FilteredPixels");
+	      Info("Zone %d with min vector neighbors %d and max vector neighbors %d", i, czones[i]->GetMinFilteredPixels(), czones[i]->GetMaxFilteredPixels());
+	  }
 	  
 	  //Create the results buffer for recording indexes of macroblocks with motion per zone
 	  result[i]=(uint8_t*)zm_mallocaligned(4,numblocks/7); //slightly larger than needed
@@ -2105,20 +2119,24 @@ int FfmpegCamera::OpenFfmpeg() {
     }	
     } //if ctype
     
-    //FIXME, temporary config.txt parsing for variables that ought to be in the database
+    //FIXME, temporary /var/www/zm_config.txt parsing for variables that ought to be in the database
     //zm_config.txt
     //display_vectors=1
     //score_shift_multiplier = 2
     //min_vector_distance = 1
+    //jpeg_mode = mmal|libjpeg
 
     std::string line;
+    std::string jmodestr;
     std::istringstream sin;
     std::string homedir = getpwuid(getuid())->pw_dir;
     std::string location=homedir+"/zm_config.txt"; //var/www/zm_config.txt
     std::ifstream fin(location.c_str());
 
+    Info("Extra CONFIG Options:");
     while (std::getline(fin, line)) {
     sin.str(line.substr(line.find("=")+1));
+    
     if (line.find("display_vectors") != std::string::npos) {
        sin >> display_vectors;
        Info("display vectors %d",display_vectors);
@@ -2128,10 +2146,20 @@ int FfmpegCamera::OpenFfmpeg() {
     } else if (line.find("min_vector_distance") != std::string::npos) {
 	   sin >> min_vector_distance;	
 	   Info("min vector distance %d", min_vector_distance);
-	}	
+	} else if (line.find("jpeg_mode") != std::string::npos) {
+       sin >> jmodestr;
+       
+       if (jmodestr == "mmal") {
+          jmode=mmal;
+          Info("Jpeg encoding mode is mmal");
+       }   
+       else if (jmodestr == "libjpeg" ) {
+          jmode=libjpeg;
+          Info("Jpeg encoding mode is libjpeg");
+       }   
+    }	
        sin.clear();
     }  
-   
     
   
   
@@ -2728,12 +2756,15 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
                    return (-1); 
                 }
 			
-		        //Option 1. use the image EncodeJpeg function which requires argument jpeg_size
-		        //int *jpeg_size=(int *)jpegbuffer; 
-				//image.EncodeJpeg(jpegbuffer+4, jpeg_size );
-				//Option 2. use hardware mmal.
-		        mmal_jpeg(&jpegbuffer);
-
+		        
+                //Option 1. use the image EncodeJpeg function which requires argument jpeg_size
+			    if (jmode == libjpeg) {
+		            int *jpeg_size=(int *)jpegbuffer; 
+				    image.EncodeJpeg(jpegbuffer+4, jpeg_size );
+			    } else 
+			    //Option 2. use hardware mmal.
+			    if (jmode == mmal)
+     		        mmal_jpeg(&jpegbuffer);
 
         
           } //if cfunction
