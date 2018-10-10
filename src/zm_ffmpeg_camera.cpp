@@ -247,14 +247,7 @@ int FfmpegCamera::Capture( Image &image ) {
       if ( frameComplete ) {
         //Debug( 4, "Got frame %d", frameCount );
 
-        /* Request a writeable buffer of the target image */
-        directbuffer = image.WriteBuffer(width, height, colours, subpixelorder);
-                   
-        if ( directbuffer == NULL ) {
-          Error("Failed requesting writeable buffer for the captured image.");
-          zm_av_packet_unref( &packet );
-          return (-1);
-        }
+        
         
         
         
@@ -270,7 +263,7 @@ int FfmpegCamera::Capture( Image &image ) {
                      imagePixFormat, width, height);
 #endif
         
-            frameComplete=mmal_resize(&directbuffer); 
+            frameComplete=mmal_resize(); 
            
         } else  if (((ctype) && (cfunction == Monitor::MODECT)) || (!ctype)) {
 	      //This is the software scaler. Directbuffer is packaged into mFrame and processed by swscale to convert to appropriate format and size
@@ -316,9 +309,20 @@ int FfmpegCamera::Capture( Image &image ) {
 //FRAMECOMPLETE 2 -> mmal_resize has taken the buffer from mRawFrame, resized it and put it in mFrame        
         
       if (frameComplete) {
+		  
+		 /* Request a writeable buffer of the target image */
+         directbuffer = image.WriteBuffer(width, height, colours, subpixelorder);
+                   
+         if ( directbuffer == NULL ) {
+           Error("Failed requesting writeable buffer for the captured image.");
+           zm_av_packet_unref( &packet );
+           return (-1);
+         } 
+		  
+		  
          if ((ctype) && (cfunction == Monitor::MVDECT)) {
 		         
-		        frameComplete=mmal_encode(&mvect_buffer);
+		        frameComplete=mmal_encode(&mvect_buffer,&directbuffer);
 		        
 		}  //if cfunction
 	  } //if frameComplete 2
@@ -493,7 +497,8 @@ void FfmpegCamera::pixel_write(RGB24 *rgb_ptr, int b_index, pattern r_pattern, R
 	
 }	
 
-int FfmpegCamera::mmal_decode(AVPacket *pkt) {   
+int FfmpegCamera::mmal_decode(AVPacket *pkt) { 
+	//Info("start decode %d", frameCount);  
 	MMAL_BUFFER_HEADER_T *buffer;
 	int got_frame=false;
 	
@@ -502,11 +507,13 @@ int FfmpegCamera::mmal_decode(AVPacket *pkt) {
          memcpy(buffer->data,pkt->data,pkt->size);
          buffer->length=pkt->size;
          
-         buffer->flags|=MMAL_BUFFER_HEADER_FLAG_FRAME_START;
+         //buffer->flags|=MMAL_BUFFER_HEADER_FLAG_FRAME_START;
          buffer->flags|=MMAL_BUFFER_HEADER_FLAG_FRAME_END;
          
-         buffer->pts = pkt->pts == AV_NOPTS_VALUE ? MMAL_TIME_UNKNOWN : pkt->pts;
-         buffer->dts = pkt->dts == AV_NOPTS_VALUE ? MMAL_TIME_UNKNOWN : pkt->dts;
+         //buffer->pts = pkt->pts == AV_NOPTS_VALUE ? MMAL_TIME_UNKNOWN : pkt->pts;
+         //buffer->dts = pkt->dts == AV_NOPTS_VALUE ? MMAL_TIME_UNKNOWN : pkt->dts;
+         
+         buffer->pts = buffer->dts = frameCount;
          
          buffer->alloc_size = decoder->input[0]->buffer_size;
             
@@ -519,17 +526,26 @@ int FfmpegCamera::mmal_decode(AVPacket *pkt) {
       }
 
       
-      //while ((buffer = mmal_queue_get(context.dqueue)) != NULL)
+      while ((buffer = mmal_queue_get(context.dqueue)) != NULL) {
       //while ((buffer = mmal_queue_timedwait(context.dqueue, 50)) != NULL) {
-      if ((buffer = mmal_queue_get(context.dqueue)) == NULL)
-         buffer = mmal_queue_timedwait(context.dqueue, 50);
-      if (buffer) {
-         //save it as AVFrame holding an I420 buffer with original video source resolution
-         av_image_fill_arrays(mRawFrame->data, mRawFrame->linesize, buffer->data, AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 1);
-         got_frame=true;
+      //while (mmal_queue_length(context.dqueue)) {
+      //if ((buffer = mmal_queue_get(context.dqueue)) == NULL) 
+       //  buffer = mmal_queue_timedwait(context.dqueue, 50);
+      
+      //if (buffer) {   
+        if ((buffer->length>0) && (buffer->pts > dec_pts)) {
+           //save it as AVFrame holding an I420 buffer with original video source resolution
+           av_image_fill_arrays(mRawFrame->data, mRawFrame->linesize, buffer->data, AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 1);
+           got_frame=true;
+           //Info("DECODE with pts at %lld", buffer->pts);
+           dec_pts=buffer->pts;
+           mRawFrame->pts=buffer->pts;
          
-         mmal_buffer_header_release(buffer);
-      }
+        }
+        mmal_buffer_header_release(buffer); 
+      }   
+         
+      
 
       //if ((buffer = mmal_queue_get(pool_outd->queue)) != NULL) {
       while ((buffer = mmal_queue_get(pool_outd->queue)) != NULL){
@@ -537,16 +553,16 @@ int FfmpegCamera::mmal_decode(AVPacket *pkt) {
 			   Warning("failed to send empty buffer to decoder output for frame %d\n", frameCount);
          } 
       }
-      
+     //Info("end decode %d", frameCount);  
      return (got_frame);    
 }	
 
 
 
-int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled frame) data 
+int FfmpegCamera::mmal_encode(uint8_t **mv_buffer,uint8_t** dbuffer) {  //uses mFrame (downscaled frame) data 
 	MMAL_BUFFER_HEADER_T *buffer;
 	int got_result=false;
-	
+	//Info("start encode %d", frameCount);  
                
 	if ((buffer = mmal_queue_get(pool_ine->queue)) != NULL) {  
          
@@ -554,26 +570,42 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                                  encoderPixFormat, mFrame->width, mFrame->height, 1);
          buffer->length=bufsize_r;
          
-         buffer->pts = buffer->dts = MMAL_TIME_UNKNOWN;
+         //buffer->pts = buffer->dts = MMAL_TIME_UNKNOWN;
+         buffer->pts = buffer->dts = mFrame->pts;
+         buffer->flags|=MMAL_BUFFER_HEADER_FLAG_FRAME_END;
          
          buffer->alloc_size = encoder->input[0]->buffer_size;
+         
+         if (buffer->pts > enc_pts) {
+			 enc_pts=buffer->pts;
+			 buffqueue.push(*buffer);
+			 //Info("Pushing buffer %lld to queue",buffer->pts);
+			 
+			 
           
-         if (mmal_port_send_buffer(encoder->input[0], buffer) != MMAL_SUCCESS) {
+             if (mmal_port_send_buffer(encoder->input[0], buffer) != MMAL_SUCCESS) {
                  Warning("failed to send I420 buffer to encoder for frame %d\n", frameCount);
                   
-         }   
-         
+             }   
+	     }
          
       }
 
       
-      //while ((buffer = mmal_queue_get(context.equeue)) != NULL) {
+      while ((buffer = mmal_queue_get(context.equeue)) != NULL) {
       //while ((buffer = mmal_queue_timedwait(context.equeue, 100)) != NULL) {
-      if ((buffer = mmal_queue_get(context.equeue)) == NULL)
-         buffer = mmal_queue_timedwait(context.equeue, 50);
-      if (buffer) {   
+      //while (mmal_queue_length(context.equeue)) {
+      //if ((buffer = mmal_queue_get(context.equeue)) == NULL)
+      //   buffer = mmal_queue_timedwait(context.equeue, 50);
+      //if (buffer) { 
+     
+         if (buffer->pts > vec_pts)
+             vec_pts=buffer->pts;	
+             
+          //Info("ENCODE with vect pts at %d",vec_pts);    	    
             
          if(buffer->flags & MMAL_BUFFER_HEADER_FLAG_CODECSIDEINFO) {
+			      //Info("ENCODE MVECT with pts at %lld", vec_pts);
 			      got_result=true;  //succeeded wether we receive a video buffer or vector buffer  
 			      
 			      uint32_t m_offset=0; 
@@ -820,12 +852,43 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                          m_offset+=4;
                         
                      } //czones_n
+                     
+                     MMAL_BUFFER_HEADER_T pbuffer;
+                     
+                     if (buffqueue.size() > 0) {
+				       while (true) {
+                        pbuffer=(MMAL_BUFFER_HEADER_T)buffqueue.front();
+                        if (pbuffer.pts == vec_pts) {
+                           //Info("MATCH FRAME %lld with size %d with queue length at %d\n", pbuffer.pts, pbuffer.length, buffqueue.size());
+                           //DO SOMETHING WITH pbuffer
+                           memcpy((*dbuffer),pbuffer.data,width*height*colours);
+                           Visualize_Buffer(&(*dbuffer));
+                           av_image_fill_arrays(mFrame->data, mFrame->linesize, pbuffer.data, encoderPixFormat, mFrame->width, mFrame->height, 1);
+                           //mFrame->pts=pbuffer.pts;
+                           
+                           buffqueue.pop();
+                           //Info("POPPED FRAME with queue length at %d\n", buffqueue.size());
+                           break;
+                        }   
+                        else {
+                           //Info("REJECT FRAME %lld with size %d with queue length at %d\n", pbuffer.pts, pbuffer.length, buffqueue.size());
+                           buffqueue.pop();
+                        }    
+				    
+				        if (buffqueue.size() == 0)
+				          break;
+			 	   
+                 
+		              }    //while true
+		            } //if bufqueue.size
+                     
 	     } //buffer_flags_codec_sideinfo
 	     
 	     
          
          mmal_buffer_header_release(buffer);
-      }
+      } //if (buffer)
+      
 
       //if ((buffer = mmal_queue_get(pool_out->queue)) != NULL) {
       while ((buffer = mmal_queue_get(pool_oute->queue)) != NULL) {
@@ -834,23 +897,25 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer) {  //uses mFrame (downscaled 
                    }
 		  
       }
-      
+      //Info("end encode %d",frameCount);  
       return (got_result);
 }	
 
 
 
-int  FfmpegCamera::mmal_resize(uint8_t** dbuffer) {   //uses mRawFrame data, builds mFrame
+int  FfmpegCamera::mmal_resize() {   //uses mRawFrame data, builds mFrame
 	int got_resized=false;
 	MMAL_BUFFER_HEADER_T *buffer;
+	//Info("start resize %d", frameCount);  
 	if ((buffer = mmal_queue_get(pool_inr->queue)) != NULL) { 
 		 
          av_image_copy_to_buffer(buffer->data, bufsize_d, (const uint8_t **)mRawFrame->data, mRawFrame->linesize,
                                  AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 1);
          buffer->length=bufsize_d;
          
-         buffer->pts = buffer->dts = MMAL_TIME_UNKNOWN;
+         //buffer->pts = buffer->dts = MMAL_TIME_UNKNOWN;
          //buffer->flags=packet->flags;
+         buffer->pts = buffer->dts = mRawFrame->pts;
          
          buffer->alloc_size = resizer->input[0]->buffer_size;
             
@@ -861,19 +926,22 @@ int  FfmpegCamera::mmal_resize(uint8_t** dbuffer) {   //uses mRawFrame data, bui
          
       }
       
-      //while ((buffer = mmal_queue_get(context.rqueue)) != NULL){
+      while ((buffer = mmal_queue_get(context.rqueue)) != NULL){
       //while ((buffer = mmal_queue_timedwait(context.rqueue, 100)) != NULL) {
-      if ((buffer = mmal_queue_get(context.rqueue)) == NULL)
-         buffer = mmal_queue_timedwait(context.rqueue, 50);
-      if (buffer) {
+      //while (mmal_queue_length(context.rqueue)) {
+      //if ((buffer = mmal_queue_get(context.rqueue)) == NULL)
+      //   buffer = mmal_queue_timedwait(context.rqueue, 50);
+      //if (buffer) {
          got_resized=true;
-         memcpy((*dbuffer),buffer->data,width*height*colours);
+         //Info("RESIZE with pts at %lld", buffer->pts);
+         //memcpy((*dbuffer),buffer->data,width*height*colours);
          //save it as AVFrame holding a buffer with original video source resolution
-         av_image_fill_arrays(mFrame->data, mFrame->linesize, *dbuffer, encoderPixFormat, mFrame->width, mFrame->height, 1);
+         av_image_fill_arrays(mFrame->data, mFrame->linesize, buffer->data, encoderPixFormat, mFrame->width, mFrame->height, 1);
+         mFrame->pts=buffer->pts;
          
          mmal_buffer_header_release(buffer);
       }
-
+      
      
       //if ((buffer = mmal_queue_get(pool_outr->queue)) != NULL) {
       while ((buffer = mmal_queue_get(pool_outr->queue)) != NULL) {
@@ -882,12 +950,14 @@ int  FfmpegCamera::mmal_resize(uint8_t** dbuffer) {   //uses mRawFrame data, bui
                    }
 		  
       }
+      //Info("end resize %d", frameCount);  
      return (got_resized);    
 }	
 
 
 int  FfmpegCamera::mmal_jpeg(uint8_t** jbuffer) {   //uses mFrame data
 	int got_jpeg=false;
+	//Info("start jpeg %d",frameCount);  
 	MMAL_BUFFER_HEADER_T *buffer;
 	if ((buffer = mmal_queue_get(pool_inj->queue)) != NULL) { 
 		 
@@ -895,7 +965,8 @@ int  FfmpegCamera::mmal_jpeg(uint8_t** jbuffer) {   //uses mFrame data
                                  encoderPixFormat, mFrame->width, mFrame->height, 1);
          buffer->length=bufsize_r;
          
-         buffer->pts = buffer->dts = MMAL_TIME_UNKNOWN;
+         //buffer->pts = buffer->dts = MMAL_TIME_UNKNOWN;
+         buffer->pts = buffer->dts = mFrame->pts;
          //buffer->flags=packet->flags;
          buffer->flags|=MMAL_BUFFER_HEADER_FLAG_FRAME_END;
          
@@ -908,12 +979,14 @@ int  FfmpegCamera::mmal_jpeg(uint8_t** jbuffer) {   //uses mFrame data
          
       }
       
-      //while ((buffer = mmal_queue_get(context.jqueue)) != NULL) {
+      while ((buffer = mmal_queue_get(context.jqueue)) != NULL) {
       //while ((buffer = mmal_queue_timedwait(context.jqueue, 100)) != NULL) {
-      if ((buffer = mmal_queue_get(context.jqueue)) == NULL)
-         buffer = mmal_queue_timedwait(context.jqueue, 50);
-      if (buffer) {
+      //while (mmal_queue_length(context.jqueue)) {
+      //if ((buffer = mmal_queue_get(context.jqueue)) == NULL)
+      //   buffer = mmal_queue_timedwait(context.jqueue, 50);
+      //if (buffer) {
 		 got_jpeg=true; 
+		 //Info("JPEG with pts at %lld", buffer->pts);
          if (buffer->length < jpeg_limit) {
            memcpy((*jbuffer),&buffer->length,4);
            memcpy((*jbuffer)+4,buffer->data,buffer->length);
@@ -924,7 +997,7 @@ int  FfmpegCamera::mmal_jpeg(uint8_t** jbuffer) {   //uses mFrame data
 	     }
          mmal_buffer_header_release(buffer);
       }
-
+      
      
       //if ((buffer = mmal_queue_get(pool_outr->queue)) != NULL) {
       while ((buffer = mmal_queue_get(pool_outj->queue)) != NULL) {
@@ -933,6 +1006,7 @@ int  FfmpegCamera::mmal_jpeg(uint8_t** jbuffer) {   //uses mFrame data
                    }
 		  
       }
+      //Info("end decode %d", frameCount);  
      return (got_jpeg);    
 }	
 
@@ -1181,7 +1255,8 @@ int FfmpegCamera::OpenMmalEncoder(AVCodecContext *mVideoCodecContext){
     * our buffer headers. We use the buffer pool API to create these. */
    encoder->input[0]->buffer_num = encoder->input[0]->buffer_num_min;
    encoder->input[0]->buffer_size = encoder->input[0]->buffer_size_min;
-   encoder->output[0]->buffer_num = encoder->output[0]->buffer_num_min;
+   //encoder->output[0]->buffer_num = encoder->output[0]->buffer_num_min;
+   encoder->output[0]->buffer_num = 2; //One buffer for video data, one buffer for sideinfo so will receive two buffers at a time
    encoder->output[0]->buffer_size = encoder->output[0]->buffer_size_min;
    
    pool_ine = mmal_port_pool_create(encoder->input[0],encoder->input[0]->buffer_num,
@@ -2102,6 +2177,8 @@ int FfmpegCamera::ReopenFfmpeg() {
 }
 
 int FfmpegCamera::CloseFfmpeg(){
+if (sigprocmask(SIG_BLOCK, &ctype_sigmask, NULL) == -1)
+       Info("Failed to block SIGKILL");	
 
   Debug(2, "CloseFfmpeg called.");
 #ifdef __arm__
@@ -2160,6 +2237,9 @@ int FfmpegCamera::CloseFfmpeg(){
 #endif
     mFormatContext = NULL;
   }
+
+if (sigprocmask(SIG_UNBLOCK, &ctype_sigmask, NULL) == -1)
+       Info("Failed to unblock SIGKILL"); 
 
   return 0;
 }
@@ -2376,7 +2456,7 @@ int FfmpegCamera::Visualize_Buffer(uint8_t **dbuffer){
 		        if (!display_vectors)
 		           return 0;
 		        
-		        for (int i=0; i < monitor->GetZonesNum() ; i++) {
+		        for (int i=0; i < monitor->GetZonesNum() ; i++) { //FIXME, use a different color for each type of zone
                      uint32_t offset=0;
                      
                      uint32_t *res=NULL;
@@ -2480,6 +2560,8 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
 
   int frameComplete = false;
   while ( ! frameComplete ) {
+	frameCount++;  
+	//Info("FrameCount %d",frameCount);
     av_init_packet( &packet );
 
     ret = av_read_frame( mFormatContext, &packet );
@@ -2573,14 +2655,7 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
       if ( frameComplete ) {
         //Debug( 4, "Got frame %d", frameCount );
 
-        /* Request a writeable buffer of the target image */
-        directbuffer = image.WriteBuffer(width, height, colours, subpixelorder);
-                   
-        if ( directbuffer == NULL ) {
-          Error("Failed requesting writeable buffer for the captured image.");
-          zm_av_packet_unref( &packet );
-          return (-1);
-        }
+        
         
         
         
@@ -2596,7 +2671,7 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
                      imagePixFormat, width, height);
 #endif
         
-            frameComplete=mmal_resize(&directbuffer); 
+            frameComplete=mmal_resize(); 
            
         } else  if (((ctype) && (cfunction == Monitor::MODECT)) || (!ctype)) {
 	      //This is the software scaler. Directbuffer is packaged into mFrame and processed by swscale to convert to appropriate format and size
@@ -2631,7 +2706,7 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
 #else // HAVE_LIBSWSCALE
                 Fatal( "You must compile ffmpeg with the --enable-swscale option to use ffmpeg cameras" );
 #endif // HAVE_LIBSWSCALE         
-		frameCount++; //MODECT mode ends here
+		//frameCount++; //MODECT mode ends here
 	    }	
         
          
@@ -2642,9 +2717,23 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
 //FRAMECOMPLETE 2 -> mmal_resize has taken the buffer from mRawFrame, resized it and put it in mFrame        
         
       if (frameComplete) {
+		  
+		 /* Request a writeable buffer of the target image */
+         directbuffer = image.WriteBuffer(width, height, colours, subpixelorder);
+                   
+         if ( directbuffer == NULL ) {
+          Error("Failed requesting writeable buffer for the captured image.");
+          zm_av_packet_unref( &packet );
+          return (-1);
+         } 
+		  
+		  
          if ((ctype) && (cfunction == Monitor::MVDECT)) {
 		         
-		        frameComplete=mmal_encode(&mvect_buffer);
+		        frameComplete=mmal_encode(&mvect_buffer,&directbuffer);
+		        
+		        if (buffqueue.size() > 50)
+		           Fatal("Too large a buffer queue");  //Pushing more buffers than popping in mmal_encode. 
 		        
 		}  //if cfunction
 	  } //if frameComplete 2
@@ -2657,7 +2746,7 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
 	  if ( frameComplete ) {
 		    if  ((ctype) && (cfunction == Monitor::MVDECT)) {
 				
-				Visualize_Buffer(&directbuffer);
+				//Visualize_Buffer(&directbuffer);
 				
 				
 				//Create the JPEG buffer for this frame if frame is alarmed, using downscaled resolution
@@ -2680,7 +2769,7 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
           } //if cfunction
         
           
-        frameCount++;
+        //frameCount++;
       }  // end if frameComplete
       
       

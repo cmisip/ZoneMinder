@@ -265,6 +265,12 @@ bool Zone::CheckAlarms( uint8_t *& mvect_buffer, int zone_n) {
     //Info("Motion score %d, alarm pixels %d, min %d, max %d ",  score, alarm_pixels, min_alarm_pixels, max_alarm_pixels);  
   	  
     
+    
+    //SCORE will come in here as:
+    //1. Alarmed Pixels = total number of vectors converted to pixels with signficant displacement
+    //2. Filtered Pixels = total number of vectors converted to pixels with minimum blobs as minimum number of vector neighbors and maximum blobs as maximum number of vector neighbors
+    //***There only needs to be one classification of Not enough pixels or Too many pixels alarmed.  Filtered pixels will reduce the Alarmed Pixels score by being more selective
+    //based on having pixel neighbors.
     if( score ) {
       
       //Info("Motion %d, score %d, min %d, max %d ", vec_count, score, minimum_vector_coverage, maximum_vector_coverage);  

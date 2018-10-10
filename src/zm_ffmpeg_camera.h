@@ -19,6 +19,7 @@
 #ifndef ZM_FFMPEG_CAMERA_H
 #define ZM_FFMPEG_CAMERA_H
 #include <vector>
+#include <queue>
 #include <algorithm>
 #include <string>
 #include <iostream>
@@ -54,9 +55,14 @@ class FfmpegCamera : public Camera {
     std::string         mMethod;
     std::string         mOptions;
 
-    int frameCount; 
+    int frameCount=0; 
     int bufsize_d=0;
-    int bufsize_r=0;   
+    int bufsize_r=0; 
+    int dec_pts=0;
+    int enc_pts=0;
+    int vec_pts=0;
+    
+    std::queue<MMAL_BUFFER_HEADER_T> buffqueue;  
 
 #if HAVE_LIBAVFORMAT
     AVFormatContext     *mFormatContext;
@@ -227,8 +233,8 @@ class FfmpegCamera : public Camera {
     int *neighbors=NULL;
     
     int mmal_decode(AVPacket *packet);
-    int mmal_encode(uint8_t **mv_buffer);
-    int mmal_resize(uint8_t **dbuffer);
+    int mmal_encode(uint8_t **mv_buffer,uint8_t** dbuffer);
+    int mmal_resize();
     int mmal_jpeg(uint8_t** jbuffer);
     
     int OpenMmalDecoder(AVCodecContext *mVideoCodecContext);
@@ -281,7 +287,6 @@ class FfmpegCamera : public Camera {
 		libjpeg, //software jpeg 
 		mmal     //hardware jpeg
 	};	
-	
 	
     
     //CONFIG options
