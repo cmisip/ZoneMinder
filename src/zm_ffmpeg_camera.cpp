@@ -2774,6 +2774,7 @@ int FfmpegCamera::CaptureAndRecord( Image &image, timeval recording, char* event
 
 			    if (jmode == libjpeg) {
 		            int *jpeg_size=(int *)jpegbuffer; 
+		            *jpeg_size=0;
 				    image.EncodeJpeg(jpegbuffer+4, jpeg_size );
 			    } else 
 			    //Option 2. use hardware mmal.
