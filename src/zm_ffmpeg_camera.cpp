@@ -782,7 +782,8 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer,uint8_t** dbuffer) {  //uses m
 			                            if (vcount < 50){
 			                               vcount++;
 			                            } else { 
-				                           Info("Blobber out of vectors");	     
+				                           Info("Blobber out of vectors");	
+				                           got_result=0;     
 			                               break;
 			                            } 
 			                         }    
@@ -815,6 +816,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer,uint8_t** dbuffer) {  //uses m
                          
                          //----------RESULTS------------------------------------------------------
                          
+                         if (got_result) {
                          //--------------------Level 1 Scoring
                          if (czones[i]->GetCheckMethod() == 1) {
                                alarm_pixels = vec_count<<(8+score_shift_multiplier);
@@ -849,7 +851,10 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer,uint8_t** dbuffer) {  //uses m
 						       //if (filter_pixels)	
 						           //Info("Filter pixels score %d", filter_pixels);
 					     } 
-					     
+					     } else {
+							 memcpy((*mv_buffer)+m_offset ,&got_result, 4 );
+							 
+						 }	 
                          
                          m_offset+=4;
                         
