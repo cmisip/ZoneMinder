@@ -502,8 +502,9 @@ void FfmpegCamera::pixel_write(RGB24 *rgb_ptr, int b_index, pattern r_pattern, R
 int FfmpegCamera::mmal_decode(AVPacket *pkt) { 
 	//Info("start decode %d", frameCount);  
 	MMAL_BUFFER_HEADER_T *buffer;
-	int got_frame=false;
+	//int got_frame=false;
 	
+	if ((got_decode) || (decode_runs > 3)) {
 	while ((buffer = mmal_queue_get(pool_ind->queue)) != NULL) {  
          
          memcpy(buffer->data,pkt->data,pkt->size);
@@ -523,10 +524,11 @@ int FfmpegCamera::mmal_decode(AVPacket *pkt) {
                  Warning("failed to send H264 buffer to decoder for frame %d\n", frameCount);
                   
          }
+         got_decode=false;
                  
          
       }
-
+      } 
       
       while ((buffer = mmal_queue_get(context.dqueue)) != NULL) {
       //while ((buffer = mmal_queue_timedwait(context.dqueue, 50)) != NULL) {
@@ -538,7 +540,7 @@ int FfmpegCamera::mmal_decode(AVPacket *pkt) {
         if ((buffer->length>0) && (buffer->pts > dec_pts)) {
            //save it as AVFrame holding an I420 buffer with original video source resolution
            av_image_fill_arrays(mRawFrame->data, mRawFrame->linesize, buffer->data, AV_PIX_FMT_YUV420P, mRawFrame->width, mRawFrame->height, 1);
-           got_frame=true;
+           got_decode=true;
            //Info("DECODE with pts at %lld", buffer->pts);
            dec_pts=buffer->pts;
            mRawFrame->pts=buffer->pts;
@@ -546,8 +548,6 @@ int FfmpegCamera::mmal_decode(AVPacket *pkt) {
         }
         mmal_buffer_header_release(buffer); 
       }   
-         
-      
 
       //if ((buffer = mmal_queue_get(pool_outd->queue)) != NULL) {
       while ((buffer = mmal_queue_get(pool_outd->queue)) != NULL){
@@ -555,17 +555,24 @@ int FfmpegCamera::mmal_decode(AVPacket *pkt) {
 			   Warning("failed to send empty buffer to decoder output for frame %d\n", frameCount);
          } 
       }
-     //Info("end decode %d", frameCount);  
-     return (got_frame);    
+     //Info("end decode %d", frameCount); 
+     if (!got_decode)
+        decode_runs++;
+     else
+        decode_runs=0;
+
+      
+     return (got_decode);    
 }	
 
 
 
 int FfmpegCamera::mmal_encode(uint8_t **mv_buffer,uint8_t** dbuffer) {  //uses mFrame (downscaled frame) data 
 	MMAL_BUFFER_HEADER_T *buffer;
-	int got_result=false;
+	//int got_encode=false;
 	//Info("start encode %d", frameCount);  
-               
+    
+    if ((got_encode) || (encode_runs > 3)) {           
 	while ((buffer = mmal_queue_get(pool_ine->queue)) != NULL) {  
          
          av_image_copy_to_buffer(buffer->data, bufsize_r, (const uint8_t **)mFrame->data, mFrame->linesize,
@@ -590,9 +597,9 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer,uint8_t** dbuffer) {  //uses m
                   
              }   
 	     }
-         
+         got_encode=false;     
       }
-
+      }
       
       while ((buffer = mmal_queue_get(context.equeue)) != NULL) {
       //while ((buffer = mmal_queue_timedwait(context.equeue, 100)) != NULL) {
@@ -608,7 +615,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer,uint8_t** dbuffer) {  //uses m
             
          if(buffer->flags & MMAL_BUFFER_HEADER_FLAG_CODECSIDEINFO) {
 			      //Info("ENCODE MVECT with pts at %lld", vec_pts);
-			      got_result=true;  //succeeded wether we receive a video buffer or vector buffer  
+			      got_encode=true;  //succeeded wether we receive a video buffer or vector buffer  
 			      
 			      uint32_t m_offset=0; 
 			      
@@ -789,7 +796,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer,uint8_t** dbuffer) {  //uses m
 									       }
 									       vcount=0;
 				                           
-				                           got_result=0;     
+				                           got_encode=0;     
 			                               break;
 			                            } 
 			                         }    
@@ -822,7 +829,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer,uint8_t** dbuffer) {  //uses m
                          
                          //----------RESULTS------------------------------------------------------
                          
-                         if (got_result) {
+                         if (got_encode) {
                          //--------------------Level 1 Scoring
                            if (czones[i]->GetCheckMethod() == 1) {
                                alarm_pixels = vec_count<<(8+score_shift_multiplier);
@@ -858,7 +865,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer,uint8_t** dbuffer) {  //uses m
 						           //Info("Filter pixels score %d", filter_pixels);
 					      } 
 					     } else { //if got_result
-							 memcpy((*mv_buffer)+m_offset ,&got_result, 4 );
+							 memcpy((*mv_buffer)+m_offset ,&got_encode, 4 );
 							 
 						 }	 
                          
@@ -912,16 +919,22 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer,uint8_t** dbuffer) {  //uses m
                    }
 		  
       }
-      //Info("end encode %d",frameCount);  
-      return (got_result);
+      //Info("end encode %d",frameCount); 
+      if (!got_encode)
+        encode_runs++;
+      else
+        encode_runs=0;
+       
+      return (got_encode);
 }	
 
 
 
 int  FfmpegCamera::mmal_resize() {   //uses mRawFrame data, builds mFrame
-	int got_resized=false;
+	//int got_resized=false;
 	MMAL_BUFFER_HEADER_T *buffer;
-	//Info("start resize %d", frameCount);  
+	//Info("start resize %d", frameCount); 
+	if ((got_resize) || (resize_runs >3)) { 
 	while ((buffer = mmal_queue_get(pool_inr->queue)) != NULL) { 
 		 
          av_image_copy_to_buffer(buffer->data, bufsize_d, (const uint8_t **)mRawFrame->data, mRawFrame->linesize,
@@ -938,7 +951,8 @@ int  FfmpegCamera::mmal_resize() {   //uses mRawFrame data, builds mFrame
                  Warning("failed to send I420 buffer to resizer for frame %d\n", frameCount);
                   
          }      
-         
+         got_resize=false;   
+      }
       }
       
       while ((buffer = mmal_queue_get(context.rqueue)) != NULL){
@@ -947,7 +961,7 @@ int  FfmpegCamera::mmal_resize() {   //uses mRawFrame data, builds mFrame
       //if ((buffer = mmal_queue_get(context.rqueue)) == NULL)
       //   buffer = mmal_queue_timedwait(context.rqueue, 50);
       //if (buffer) {
-         got_resized=true;
+         got_resize=true;
          //Info("RESIZE with pts at %lld", buffer->pts);
          //memcpy((*dbuffer),buffer->data,width*height*colours);
          //save it as AVFrame holding a buffer with original video source resolution
@@ -965,15 +979,20 @@ int  FfmpegCamera::mmal_resize() {   //uses mRawFrame data, builds mFrame
                    }
 		  
       }
-      //Info("end resize %d", frameCount);  
-     return (got_resized);    
+      //Info("end resize %d", frameCount);
+      if (!got_resize)
+        resize_runs++;
+      else
+        resize_runs=0;  
+      return (got_resize);    
 }	
 
 
 int  FfmpegCamera::mmal_jpeg(uint8_t** jbuffer) {   //uses mFrame data
-	int got_jpeg=false;
+	//int got_jpeg=false;
 	//Info("start jpeg %d",frameCount);  
 	MMAL_BUFFER_HEADER_T *buffer;
+	if ((got_jpeg) || (jpeg_runs > 3)) {
     while ((buffer = mmal_queue_get(pool_inj->queue)) != NULL) { 
 		 
          av_image_copy_to_buffer(buffer->data, bufsize_r, (const uint8_t **)mFrame->data, mFrame->linesize,
@@ -991,7 +1010,8 @@ int  FfmpegCamera::mmal_jpeg(uint8_t** jbuffer) {   //uses mFrame data
                  Warning("failed to send RGB buffer to jpeg encoder for frame %d\n", frameCount);
                   
          }
-         
+         got_jpeg=false;   
+      }
       }
       
       while ((buffer = mmal_queue_get(context.jqueue)) != NULL) {
@@ -1022,6 +1042,10 @@ int  FfmpegCamera::mmal_jpeg(uint8_t** jbuffer) {   //uses mFrame data
 		  
       }
       //Info("end decode %d", frameCount);  
+     if (!got_jpeg)
+        jpeg_runs++;
+     else
+        jpeg_runs=0;
      return (got_jpeg);    
 }	
 

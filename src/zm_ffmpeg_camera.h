@@ -288,6 +288,11 @@ class FfmpegCamera : public Camera {
 		mmal     //hardware jpeg
 	};	
 	
+	int got_decode=true; int decode_runs=0;
+	int got_encode=true; int encode_runs=0;
+	int got_resize=true; int resize_runs=0;
+	int got_jpeg=true;   int jpeg_runs=0;
+	
     
     //CONFIG options
     int min_vector_distance=1;  //minimum value of absolute value of sum of x_vector and y_vector to consider block alarmed
