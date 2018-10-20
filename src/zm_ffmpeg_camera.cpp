@@ -560,6 +560,29 @@ int FfmpegCamera::mmal_decode(AVPacket *pkt) {
 }	
 
 
+void FfmpegCamera::fill(int r, int c, std::vector<Blocks *> &target, std::vector<Blocks *> &replacement) {
+    if ((Block+(r*columns+c))->vect != &target) {
+        return;
+    }    
+    queue<pair<int,int>> q;
+    q.push(make_pair(r, c));
+    while (!q.empty()) {
+        auto p = q.front();
+        q.pop();
+        int row = p.first, w = p.second, e = p.second;
+        while (w >= 0 && (Block+(row*columns+w))->vect == &target) --w;
+        while (e < columns && (Block+(row*columns+e))->vect == &target) ++e;
+        for (int n = w + 1; n < e; ++n) {
+            (Block+(row*columns+n))->vect = &replacement;
+            replacement.push_back(Block+(row*columns+n));
+            if (row >  0 && (Block+((row-1)*columns+n))->vect == &target)
+                q.push(make_pair(row-1, n));
+            if ((row < rows) && ((Block+((row+1)*columns+n))->vect == &target))
+                q.push(make_pair(row+1, n));
+        }
+    }
+}
+
 
 int FfmpegCamera::mmal_encode(uint8_t **mv_buffer,uint8_t** dbuffer) {  //uses mFrame (downscaled frame) data 
 	MMAL_BUFFER_HEADER_T *buffer;
@@ -640,8 +663,8 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer,uint8_t** dbuffer) {  //uses m
 						uint32_t filter_pixels=0;
 						
 						
-	                    int vcount=0;  //container counter
-	                    int ccount=0;  //column counter
+	                    int vcount=1;  //container counter
+	                    //int ccount=0;  //column counter
 	                    int rcount=0;  //row counter
 	
 	                    Blocks *prev_block=0; //block preceeding 
@@ -656,6 +679,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer,uint8_t** dbuffer) {  //uses m
 							  
 							  cur_block=(Block+bcount);
 							  cur_block->status=0;
+							  cur_block->vect=&v_arr[0]; //comparator for blobber
 							  cur_block->index=bcount;
 							  
 		                      if ((abs(mvarray[bcount].x_vector) + abs(mvarray[bcount].y_vector)) > min_vector_distance) { 
@@ -731,93 +755,43 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer,uint8_t** dbuffer) {  //uses m
                               } 
                               //++++++++++++++COUNT VECTORS AND FILL RESULTS MASK+++++++++++++++++++++++++++++++++++++++++
 							  
-								 
-							  //FILTERED PIXELS START---------------------------------------------------------------------	
-							  if (czones[i]->GetCheckMethod() == 2) {	
-								    
-								if (cur_block->status) {  //If THIS is ON  
-								    
-			                        if (rcount == 0) {         //if this is first row, no connection to TOP possible, so stuff into CURRENT bin
-			                            cur_block->vect=&v_arr[vcount];
-			                            v_arr[vcount].push_back(cur_block);
-			                        } else { 
-				                         if ((ccount >0) && (ccount < columns)) {
-				                             prev_block=(Block+bcount-1);
-				      
-				                             if (prev_block->status) {
-						                        cur_block->vect=prev_block->vect;
-					                            prev_block->vect->push_back(cur_block); //add THIS to the left bin if connected to the LEFT
-					     
-						                        up_block = (block_row_up+ccount); 
-						                        if (up_block->status) {  //add TOP bin contents to the left bin too if connected to the TOP
-							                        if (prev_block->vect != up_block->vect) {
-							                            //prev_block->vect->reserve( up_block->vect->size() + prev_block->vect->size() );   
-                                                        prev_block->vect->insert( prev_block->vect->end(), up_block->vect->begin(), up_block->vect->end() );
-                                                        up_block->vect->clear();
-						                            }
-            						            }        	  
-					  
-					                         }	//if prev_block is ON
-					                         else { 
-						                        up_block = (block_row_up+ccount); 
-						                        if (up_block->status) {    //if not connected to the LEFT add THIS to the TOP bin if connected to the TOP
-							                       cur_block->vect=up_block->vect;
-					                               up_block->vect->push_back(cur_block);
 							  
-						                        } else {             //if not connected to the LEFT and not connected to the TOP, put in a CURRENT bin
-						                           cur_block->vect=&v_arr[vcount];
-			                                       v_arr[vcount].push_back(cur_block);
-						                        }
-				                             }	 //if prev_block is OFF	    
-			                             } else {//if column 0 
-				                             cur_block->vect=&v_arr[vcount];
-				                             v_arr[vcount].push_back(cur_block);
-				     
-			                             }	  
-		                            }  //if rcount>0 closing bracket 
-		   
-	                             }   else {  //if THIS is OFF
-			  
-			                         if (v_arr[vcount].size()) {  //start a NEW BIN only if the current bin is not empty
-			                            if (vcount < 50){
-			                               vcount++;
-			                            } else { 
-				                           Info("Blobber out of vectors");	
-				                           
-				                           for (int m=0; m < vcount ; m++) {
-				                               v_arr[m].clear(); 
-									       }
-									       vcount=0;
-				                           
-				                           got_result=0;     
-			                               break;
-			                            } 
-			                         }    
-	                             }
-	                             
-		   
-	                             
-	                             ccount++;	
-		                         
-		                         //-----------------------------------------------------
-	                             if (ccount==columns) {
-			                         block_row_up=(Block+(ccount*rcount)); //set the row pointer to the proper position in the Block* array  
-			                         ccount=0;
-			                         rcount++;
-			                         if (v_arr[vcount].size()) {
-		                                 vcount++; //when moving from row to row, there needs to be a new container
-		                             }
-	                             }
-	                             
-	                             
-	                            } //FILTERED PIXELS END---------------------------------------------------------------------
 	                            
 	                            
-	                            
-	                            //Block counter iterator
-	                            bcount++;
+	                          //Block counter iterator
+	                          bcount++;
                            } //for k
                          }  //for j
+                         
+                         
+                         //FILTERED PIXELS START---------------------------------------------------------------------
+							  
+					     if (czones[i]->GetCheckMethod() == 2) {	
+                                       //if (cur_block->status) {
+                                     for (int r = 0; r < rows; ++r) {
+                                      for (int c = 0; c < columns; ++c) {  
+                                       if ((Block+(r*columns+c))->status) {
+                                         fill(r, c, v_arr[0] , v_arr[vcount]);
+                                           if (v_arr[vcount].size() >0) {
+											   if (vcount < 50){
+                                                   vcount++;
+										       } else {
+												   Info("Blobber out of vectors");	
+ 				                                   for (int m=1; m < vcount ; m++) {
+				                                      v_arr[m].clear(); 
+									               }
+									               vcount=1;
+				                           
+				                                   got_result=0;     
+			                                       break;
+											   }	   
+                                           }    
+			                            }
+			                           }
+			                          }  
+                         }
+							  
+							  //FILTERED PIXELS END---------------------------------------------------------------------
                          
                          
                          //----------RESULTS------------------------------------------------------
@@ -838,7 +812,7 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer,uint8_t** dbuffer) {  //uses m
                          
                                if (vcount > 50)  //avoid segfault when blobber is out of vectors
                                    vcount=50;
-                               for (int m=0; m < vcount ; m++) {
+                               for (int m=1; m < vcount ; m++) {
 							          if ((v_arr[m].size() > min_filtered) && (v_arr[m].size() < max_filtered)) {
 							              blob_count+=v_arr[m].size();
 							              for (int n=0; n< v_arr[m].size() ; n++){

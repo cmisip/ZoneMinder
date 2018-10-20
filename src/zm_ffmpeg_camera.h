@@ -137,6 +137,8 @@ class FfmpegCamera : public Camera {
     };
     
     sigset_t ctype_sigmask;
+    
+    
 #endif
     enum h264_codec {
         software,
@@ -232,6 +234,7 @@ class FfmpegCamera : public Camera {
     //Hold relative positions of Block neighbors
     int *neighbors=NULL;
     
+    
     int mmal_decode(AVPacket *packet);
     int mmal_encode(uint8_t **mv_buffer,uint8_t** dbuffer);
     int mmal_resize();
@@ -270,6 +273,8 @@ class FfmpegCamera : public Camera {
     };
 	
 	Blocks *Block=NULL;	
+	
+	void fill(int r, int c, std::vector<Blocks *> &target, std::vector<Blocks *> &replacement);
     
     uint8_t *result[10]={NULL}; //FIXME, 10 zone results only
     uint8_t *direction[10]={NULL};
