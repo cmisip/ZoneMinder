@@ -783,6 +783,12 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer,uint8_t** dbuffer) {  //uses m
 			                               vcount++;
 			                            } else { 
 				                           Info("Blobber out of vectors");	
+				                           
+				                           for (int m=0; m < vcount ; m++) {
+				                               v_arr[m].clear(); 
+									       }
+									       vcount=0;
+				                           
 				                           got_result=0;     
 			                               break;
 			                            } 
@@ -818,16 +824,16 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer,uint8_t** dbuffer) {  //uses m
                          
                          if (got_result) {
                          //--------------------Level 1 Scoring
-                         if (czones[i]->GetCheckMethod() == 1) {
+                           if (czones[i]->GetCheckMethod() == 1) {
                                alarm_pixels = vec_count<<(8+score_shift_multiplier);
 					           memcpy((*mv_buffer)+m_offset ,&alarm_pixels, 4 );
 					           czones[i]->motion_detected=true; //FIXME, only turn on if there are sufficient alarm_pixels 
 					           //if (alarm_pixels)	
 							       //Info("Alarm pixels score %d", alarm_pixels); 	    
-                         } 
+                           } 
                          
                          //-----------------_--Level 2 scoring
-                         else if (czones[i]->GetCheckMethod() == 2) {
+                           else if (czones[i]->GetCheckMethod() == 2) {
                          //figure the score by adding the total blocks in all bins 
                          
                                if (vcount > 50)  //avoid segfault when blobber is out of vectors
@@ -850,13 +856,13 @@ int FfmpegCamera::mmal_encode(uint8_t **mv_buffer,uint8_t** dbuffer) {  //uses m
 					           czones[i]->motion_detected=true; //FIXME, only set if filter_pixels above threshold
 						       //if (filter_pixels)	
 						           //Info("Filter pixels score %d", filter_pixels);
-					     } 
-					     } else {
+					      } 
+					     } else { //if got_result
 							 memcpy((*mv_buffer)+m_offset ,&got_result, 4 );
 							 
 						 }	 
                          
-                         m_offset+=4;
+                          m_offset+=4;
                         
                      } //czones_n
                      
